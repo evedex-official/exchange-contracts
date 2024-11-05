@@ -1,0 +1,236 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.26;
+
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {AccessControlEnumerableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/extensions/AccessControlEnumerableUpgradeable.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {StorageDEX} from "./StorageDEX.sol";
+import {OrderValidationLib, OrderWithdrawal} from "../lib/OrderValidationLib.sol";
+import "../interfaces/IBaseDEX.sol";
+
+abstract contract BaseDEX is
+  StorageDEX,
+  ReentrancyGuardUpgradeable,
+  AccessControlEnumerableUpgradeable,
+  UUPSUpgradeable,
+  IBaseDEX
+{
+  constructor() {
+    _disableInitializers();
+  }
+
+  function __BaseDEX_init(
+    address initialOwner_,
+    address depositDex_,
+    address sessionManager_,
+    address fundingRateAccount_,
+    uint256 maxOpenPositions_,
+    int112 soLevel_,
+    int112 withdrawMarginLevel_,
+    uint112 liquidationFeePercent_
+  ) internal onlyInitializing {
+    _setBasicParams(
+      depositDex_,
+      sessionManager_,
+      fundingRateAccount_,
+      soLevel_,
+      withdrawMarginLevel_,
+      maxOpenPositions_,
+      liquidationFeePercent_
+    );
+    __ReentrancyGuard_init();
+    __AccessControlEnumerable_init();
+    _grantRole(DEFAULT_ADMIN_ROLE, initialOwner_);
+  }
+
+  function getInstrumentData(uint256 index) external view returns (InstrumentData memory) {
+    return _instrumentInfo[index].instrumentData;
+  }
+
+  function getFundingRateData(
+    uint256 index,
+    uint256 start,
+    uint256 length
+  ) external view returns (FundingRateInfo[] memory) {
+    InstrumentInfo storage instrument = _instrumentInfo[index];
+    // return GetterLib.getFundingRateData(instrument, start, length);
+    uint256 finish = start + length;
+    uint256 max = instrument.fundingRateData.length;
+    if (start >= max) revert InvalidPositionsRequest(max);
+    length = finish < max ? length : max - start;
+    FundingRateInfo[] memory fundingRates = new FundingRateInfo[](length);
+    for (uint256 i = start; i < finish; i++) {
+      fundingRates[i] = instrument.fundingRateData[i];
+    }
+    return fundingRates;
+  }
+
+  function _getInstrumentLeverage(uint256 index) internal view returns (uint8) {
+    return _instrumentInfo[index].instrumentData.leverage;
+  }
+
+  function setBasicParams(
+    address depositDex_,
+    address sessionManager_,
+    address fundingRateAccount_,
+    int112 soLevel_,
+    int112 withdrawMarginLevel_,
+    uint256 maxOpenPositions_,
+    uint256 liquidationFeePercent_
+  ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    _setBasicParams(
+      depositDex_,
+      sessionManager_,
+      fundingRateAccount_,
+      soLevel_,
+      withdrawMarginLevel_,
+      maxOpenPositions_,
+      liquidationFeePercent_
+    );
+  }
+
+  function _setBasicParams(
+    address depositDex_,
+    address sessionManager_,
+    address fundingRateAccount_,
+    int112 soLevel_,
+    int112 withdrawMarginLevel_,
+    uint256 maxOpenPositions_,
+    uint256 liquidationFeePercent_
+  ) internal {
+    depositDex = depositDex_;
+    sessionManager = sessionManager_;
+    fundingRateAccount = fundingRateAccount_;
+    withdrawMarginLevel = withdrawMarginLevel_;
+    soLevel = soLevel_;
+    maxOpenPositions = maxOpenPositions_;
+    liquidationFeePercent = liquidationFeePercent_;
+    emit BasicParamsUpdate(
+      depositDex_,
+      sessionManager_,
+      fundingRateAccount_,
+      soLevel_,
+      withdrawMarginLevel_,
+      maxOpenPositions_,
+      liquidationFeePercent_
+    );
+  }
+
+  function addInstrument(
+    string[12] calldata ticker,
+    uint8 leverage,
+    int256 dailyFRLong,
+    int256 dailyFRShort,
+    uint32 timestamp
+  ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    _changeInstrument(instrumentsLength++, ticker, leverage, dailyFRLong, dailyFRShort, timestamp);
+  }
+
+  function deleteInstrument() external onlyRole(DEFAULT_ADMIN_ROLE) {
+    InstrumentInfo memory empty;
+    _instrumentInfo[--instrumentsLength] = empty;
+    emit InstrumentDeleted(instrumentsLength);
+  }
+
+  function changeInstrument(
+    uint256 index,
+    string[12] calldata ticker,
+    uint8 leverage,
+    int256 dailyFRLong,
+    int256 dailyFRShort,
+    uint32 timestamp
+  ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    _changeInstrument(index, ticker, leverage, dailyFRLong, dailyFRShort, timestamp);
+  }
+
+  function _changeInstrument(
+    uint256 index,
+    string[12] memory ticker,
+    uint8 leverage,
+    int256 dailyFRLong,
+    int256 dailyFRShort,
+    uint32 timestamp
+  ) internal {
+    if (instrumentsLength <= index) revert InstrumentDoesNotExist();
+
+    InstrumentInfo storage instrumentInfo_ = _instrumentInfo[index];
+    instrumentInfo_.instrumentData.ticker = ticker;
+    instrumentInfo_.instrumentData.leverage = leverage;
+    setFR(index, dailyFRLong, dailyFRShort, timestamp);
+    emit InstrumentUpdate(index, ticker, leverage);
+  }
+
+  //  Daily percent
+  //  100% = 10^11
+  //	10000000
+  //
+  //  Min = 0.000000864 (86400)
+  function setFR(
+    uint256 index,
+    int256 dailyFRLong,
+    int256 dailyFRShort,
+    uint32 timestamp
+  ) public onlyRole(MATCHER_ROLE) {
+    uint256 len = _instrumentInfo[index].fundingRateData.length;
+    FundingRateInfo memory newFundingRateInfo;
+    if (len > 0) {
+      uint256 lastIndex;
+      unchecked {
+        lastIndex = len - 1;
+      }
+      newFundingRateInfo.longFRStored = getTotalLongFR(index, block.timestamp, lastIndex);
+      newFundingRateInfo.shortFRStored = getTotalShortFR(index, block.timestamp, lastIndex);
+      if (timestamp <= _instrumentInfo[index].fundingRateData[lastIndex].lastFRUpdateTime) revert InvalidFRTimestamp();
+    }
+    newFundingRateInfo.lastFRUpdateTime = timestamp;
+    newFundingRateInfo.frLong = int40(dailyFRLong / _INT_1DAY);
+    newFundingRateInfo.frShort = int40(dailyFRShort / _INT_1DAY);
+    _instrumentInfo[index].fundingRateData.push(newFundingRateInfo);
+    emit NewFundingRate(
+      index,
+      newFundingRateInfo.frLong,
+      newFundingRateInfo.frShort,
+      newFundingRateInfo.longFRStored,
+      newFundingRateInfo.shortFRStored,
+      len
+    );
+  }
+
+  function _getFundingRateInfo(
+    uint256 index,
+    uint256 timestamp,
+    uint256 searchHint
+  ) internal view returns (FundingRateInfo memory) {
+    // InstrumentInfo storage instrument = _instrumentInfo[index];
+    // return GetterLib.getFundingRateInfo(instrument, timestamp, searchHint);
+    uint256 len = _instrumentInfo[index].fundingRateData.length;
+    if (len == 0) revert EmptyArrayToSearch();
+    if (_instrumentInfo[index].fundingRateData[searchHint].lastFRUpdateTime > timestamp)
+      revert SearchWithHintFailed(searchHint);
+
+    uint256 low = searchHint;
+    uint256 high = len;
+    while (low < high) {
+      uint256 mid = Math.average(low, high);
+      if (_instrumentInfo[index].fundingRateData[mid].lastFRUpdateTime > timestamp) {
+        high = mid;
+      } else {
+        low = mid + 1;
+      }
+    }
+
+    if (low > 0 && _instrumentInfo[index].fundingRateData[low - 1].lastFRUpdateTime == timestamp) {
+      low--;
+    }
+    if (low == len) revert SearchWithHintFailed(searchHint);
+    return _instrumentInfo[index].fundingRateData[low];
+  }
+
+  function getTotalLongFR(uint256 index, uint256 timestamp, uint256 searchHint) public view virtual returns (int72) {}
+
+  function getTotalShortFR(uint256 index, uint256 timestamp, uint256 searchHint) public view virtual returns (int72) {}
+
+  function _authorizeUpgrade(address newImplementation) internal override onlyRole(DEFAULT_ADMIN_ROLE) {}
+}
