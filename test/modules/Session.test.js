@@ -132,7 +132,7 @@ describe('Testing SessionManager contract', function () {
   });
 
   it('Checking session validation', async function () {
-    const [owner, validator, alice, aliceSession, aliceSession2, bob] = await ethers.getSigners();
+    const [owner, validator, alice, aliceSession, usdt, bob] = await ethers.getSigners();
 
     const timestamp = await time.latest();
     const allowance = ethers.parseEther('0.1');
@@ -152,9 +152,11 @@ describe('Testing SessionManager contract', function () {
     const order1 = {
       senderAddress: alice.address,
       matcherAddress: owner.address,
+      collateral: usdt.address,
       instrumentIndex: 1,
       amount: amount,
       price: 1000,
+      leverage: 5,
       matcherFee: 10,
       expiration: timestamp + 200,
       side: 0,
@@ -175,9 +177,11 @@ describe('Testing SessionManager contract', function () {
     const order2 = {
       senderAddress: bob.address,
       matcherAddress: owner.address,
+      collateral: usdt.address,
       instrumentIndex: 1,
       amount: amount,
       price: 1000,
+      leverage: 5,
       matcherFee: 10,
       expiration: timestamp + 200,
       side: 0,
@@ -199,9 +203,11 @@ describe('Testing SessionManager contract', function () {
     const order3 = {
       senderAddress: alice.address,
       matcherAddress: owner.address,
+      collateral: usdt.address,
       instrumentIndex: 1,
       amount: amount2,
       price: 1000,
+      leverage: 5,
       matcherFee: 10,
       expiration: timestamp + 1000,
       side: 0,
@@ -216,9 +222,11 @@ describe('Testing SessionManager contract', function () {
     const order4 = {
       senderAddress: alice.address,
       matcherAddress: owner.address,
+      collateral: usdt.address,
       instrumentIndex: 1,
       amount: amount2,
       price: 1000,
+      leverage: 5,
       matcherFee: 10,
       expiration: timestamp + 300,
       side: 0,
@@ -250,9 +258,11 @@ describe('Testing SessionManager contract', function () {
     const order5 = {
       senderAddress: alice.address,
       matcherAddress: owner.address,
+      collateral: usdt.address,
       instrumentIndex: 1,
       amount: amount2,
       price: 1000,
+      leverage: 5,
       matcherFee: 10,
       expiration: timestamp + 10000,
       side: 0,
@@ -279,7 +289,7 @@ describe('Testing SessionManager contract', function () {
   });
 
   it('Checking session withdraw validation', async function () {
-    const [owner, validator, alice, aliceSession, aliceSession2, bob] = await ethers.getSigners();
+    const [owner, validator, alice, aliceSession, usdt, bob] = await ethers.getSigners();
 
     const timestamp = await time.latest();
     const allowance = ethers.parseEther('0.1');
@@ -297,6 +307,7 @@ describe('Testing SessionManager contract', function () {
 
     const amount = ethers.parseEther('0.06');
     const withdrawOrder1 = {
+      collateral: usdt.address,
       account: alice.address,
       amount: amount,
       session: aliceSession.address,

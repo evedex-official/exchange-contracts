@@ -40,7 +40,7 @@ contract SessionManager is ISessionManager, AccessControlEnumerable {
   }
 
   /// @inheritdoc ISessionManager
-  function setSession(address session, SessionData memory data) external {
+  function setSession(address session, SessionData calldata data) external {
     address user = _msgSender();
     if (data.user != user) revert InvalidSessionUser();
     _sessions[user].add(session);

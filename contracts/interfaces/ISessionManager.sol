@@ -54,7 +54,7 @@ interface ISessionManager {
    * @param session Address of the session to update data for
    * @param data New data for the session
    */
-  function setSession(address session, SessionData memory data) external;
+  function setSession(address session, SessionData calldata data) external;
 
   /**
    * @notice Removes data for selected user's session

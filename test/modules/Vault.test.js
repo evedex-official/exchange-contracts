@@ -7,7 +7,7 @@ describe('Testing Vault contract', function () {
   beforeEach(async function () {
     const [owner] = await ethers.getSigners();
 
-    Vault = await ethers.getContractFactory('EvenHorizonVault');
+    Vault = await ethers.getContractFactory('EveVault');
     vault = await Vault.deploy(owner.address);
     vaultAddress = await vault.getAddress();
 

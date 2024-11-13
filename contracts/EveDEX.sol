@@ -358,7 +358,7 @@ contract EveDEX is BaseDEX, IEveDEX {
     uint112[] memory fullPrices,
     uint256 historyTimestamp,
     uint256 historySearchHint
-  ) public nonReentrant onlyRole(MATCHER_ROLE) {
+  ) public onlyRole(MATCHER_ROLE) {
     // Orders validation
     {
       address buyOrderSigner = buyOrder.senderAddress;
