@@ -20,7 +20,7 @@ struct AccountPositions {
   PositionInfo[] positions;
 }
 
-interface IEveDEX {
+interface IEVEDEX {
   event PositionUpdate(
     uint256 indexed index,
     address indexed account,
