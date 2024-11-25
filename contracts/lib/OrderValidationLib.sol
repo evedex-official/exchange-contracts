@@ -189,7 +189,7 @@ library OrderValidationLib {
       );
   }
 
-  function _getWithdrawalOrderTypeValueHash(OrderWithdrawal memory _withdrawalOrder) internal pure returns (bytes32) {
+  function _getWithdrawalOrderTypeValueHash(OrderWithdrawal memory _withdrawalOrder) public pure returns (bytes32) {
     return
       keccak256(
         abi.encode(
@@ -201,7 +201,6 @@ library OrderValidationLib {
         )
       );
   }
-
   function _getOrderDigest(Order memory order) public view returns (bytes32) {
     return keccak256(abi.encodePacked("\x19\x01", buildDomainSeparator(), _getOrderTypeValueHash(order)));
   }
@@ -215,7 +214,7 @@ library OrderValidationLib {
     if (timestamp < block.timestamp) revert InvalidExpiration();
   }
 
-  function _checkSignature(address signer, bytes32 digest, bytes memory signature) internal view {
+  function _checkSignature(address signer, bytes32 digest, bytes memory signature) public view {
     if (!SignatureChecker.isValidSignatureNow(signer, digest, signature)) revert InvalidSignature();
   }
 
@@ -235,13 +234,23 @@ library OrderValidationLib {
     _checkSignature(liquidationOrder.liquidator, digest, liquidationOrder.signature);
   }
 
+  error Debug(address a, bytes32 digest, bytes signature);
   function checkWithdrawalOrder(OrderWithdrawal memory withdrawalOrder, address orderSigner) public view {
     _checkExpiration(withdrawalOrder.expiration);
     bytes32 digest = keccak256(
       abi.encodePacked("\x19\x01", buildDomainSeparator(), _getWithdrawalOrderTypeValueHash(withdrawalOrder))
     );
+    // revert Debug(orderSigner, digest, withdrawalOrder.signature);
     _checkSignature(orderSigner, digest, withdrawalOrder.signature);
   }
+
+  function getWithdrawalOrderDigest(OrderWithdrawal memory withdrawalOrder) public view returns (bytes32) {
+    bytes32 digest = keccak256(
+      abi.encodePacked("\x19\x01", buildDomainSeparator(), _getWithdrawalOrderTypeValueHash(withdrawalOrder))
+    );
+    return digest;
+  }
+
 
   function checkOrdersInfo(
     Order memory buyOrder,

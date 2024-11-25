@@ -100,6 +100,7 @@ contract EveDEX is BaseDEX, IEveDEX {
     return (positionInfo_.position * (price - int112(uint112(positionInfo_.positionAvgPrice)))) / _INT_PRECISION;
   }
 
+
   // named return parameters because of stack to deep
   function calculateMarginLevel(
     address account,

@@ -31,7 +31,7 @@ interface IDepositDEX {
   error InsufficientMargin();
   error ArrayLengthError();
   error UnsupportedCollateral();
-  error IncompletePrices();
+  error IncompletePrices(uint256 a, uint256 b);
 
   event WithdrawRequestRegistered(address indexed account, OrderWithdrawal order);
 

@@ -124,7 +124,7 @@ abstract contract BaseDEX is
     int256 dailyFRLong,
     int256 dailyFRShort,
     uint32 timestamp
-  ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+  ) external { //todo
     _changeInstrument(instrumentsLength++, ticker, leverage, dailyFRLong, dailyFRShort, timestamp);
   }
 

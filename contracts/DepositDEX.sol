@@ -146,6 +146,7 @@ contract DepositDEX is IDepositDEX, UUPSUpgradeable {
     );
   }
 
+  error Debug(uint256 a);
   function _withdrawCollateralTo(
     address collateral,
     uint112 amount,
@@ -180,7 +181,7 @@ contract DepositDEX is IDepositDEX, UUPSUpgradeable {
 
   function getTotalBalance(address account, PriceData[] memory prices) public view returns (int112 balance) {
     uint256 len = prices.length;
-    if (len != _collaterals.length()) revert IncompletePrices();
+    if (len != _collaterals.length()) revert IncompletePrices(len, _collaterals.length());
     for (uint256 i; i < len; i++) {
       address collateral = _collaterals.at(i);
       balance += (_balances[account][collateral] * int112(int256(prices[i].price))) / _INT_PRECISION;
@@ -233,4 +234,8 @@ contract DepositDEX is IDepositDEX, UUPSUpgradeable {
   }
 
   function _authorizeUpgrade(address newImplementation) internal override onlyRole(_DEFAULT_ADMIN_ROLE) {}
+
+  function collateralLength() public view returns (uint256) {
+    return _collaterals.length();
+  }
 }
