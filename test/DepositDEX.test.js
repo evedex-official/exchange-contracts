@@ -4,7 +4,7 @@ const order = require('solhint/lib/rules/order');
 const { deployProxyWithLibraries, deployWithLibraries } = require('./helpers/deploy-utils');
 
 describe('DepositDex contract', function () {
-  let depositDex, vault, eveDex, sessions, token, tokenAddress, orderLib;
+  let depositDex, vault, eveDex, sessions, usdt, btcToken, tokenAddress, orderLib;
 
   let owner, alice, bob, liquidator, fundingRateAccount, matcher;
 
@@ -46,13 +46,26 @@ describe('DepositDex contract', function () {
     await sessions.grantRole(validatorRole, await eveDex.getAddress());
 
     MockToken = await ethers.getContractFactory('ERC20Mock');
-    token = await MockToken.deploy();
-    tokenAddress = await token.getAddress();
+    usdt = await MockToken.deploy();
+    tokenAddress = await usdt.getAddress();
+
+    btcToken = await MockToken.deploy();
 
     await depositDex.setCollateralConfigs([tokenAddress], [true]);
 
     const withdrawRole = await vault.WITHDRAWER_ROLE();
     await vault.grantRole(withdrawRole, depositDex.getAddress());
+
+    //add btc instrument
+    await eveDex.connect(owner).addInstrument(
+        ["BTC/USD",
+        "", "", "", "", "", "", "", "", "", "", ""],
+        10,
+        0,
+        0,
+        0
+    )
+
   });
 
   it('contracts are correctly initialized', async function () {
@@ -65,9 +78,9 @@ describe('DepositDex contract', function () {
 
   it('should deposit collateral', async function () {
     const amount = await ethers.parseEther('100');
-    await token.mint(alice.address, amount);
+    await usdt.mint(alice.address, amount);
 
-    await token.connect(alice).approve(await depositDex.getAddress(), amount);
+    await usdt.connect(alice).approve(await depositDex.getAddress(), amount);
 
     await depositDex.connect(alice).depositCollateral(tokenAddress, amount);
 
@@ -78,9 +91,9 @@ describe('DepositDex contract', function () {
 
   it('should withdraw balance by matcher', async function () {
     const amount = ethers.parseEther('100');
-    await token.mint(alice.address, amount);
+    await usdt.mint(alice.address, amount);
 
-    await token.connect(alice).approve(await depositDex.getAddress(), amount);
+    await usdt.connect(alice).approve(await depositDex.getAddress(), amount);
     await depositDex.connect(alice).depositCollateral(tokenAddress, amount);
 
     const withdrawalAmount = ethers.parseEther('10');
@@ -112,10 +125,10 @@ describe('DepositDex contract', function () {
     };
 
     const instrumentPrices = [
-      //   {
-      //     index: 0,
-      //     price: 100000000,
-      //   },
+        {
+          index: 0,
+          price: 100000000,
+        },
     ];
 
     const collateralPrices = [
