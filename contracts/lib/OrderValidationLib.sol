@@ -194,6 +194,7 @@ library OrderValidationLib {
       keccak256(
         abi.encode(
           WITHDRAWAL_ORDER_TYPEHASH,
+          _withdrawalOrder.collateral,
           _withdrawalOrder.account,
           _withdrawalOrder.amount,
           _withdrawalOrder.session,

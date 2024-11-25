@@ -104,11 +104,12 @@ contract EVEDEX is BaseDEX, IEVEDEX {
   function calculateMarginLevel(
     address account,
     PriceData[] memory prices,
+    CollateralPriceData[] memory collateralPrices,
     bool checkPrices,
     uint256 historyTimestamp,
     uint256 historySearchHint
   ) public view returns (int112 marginLevel, int112 equity, int112 margin, int112[] memory pnls, int112[] memory frs) {
-    equity = IDepositDEX(depositDex).getTotalBalance(account, prices);
+    equity = IDepositDEX(depositDex).getTotalBalance(account, collateralPrices);
     margin = 0;
     uint256 len = prices.length;
     pnls = new int112[](len);
@@ -141,24 +142,34 @@ contract EVEDEX is BaseDEX, IEVEDEX {
   function checkMarginWithPrices(
     address account,
     int112 marginLevel,
-    uint112[] memory fullPrices,
+    FullPrices calldata fullPrices,
     uint256 historyTimestamp,
     uint256 historySearchHint
   ) public view returns (bool, int112) {
-    if (fullPrices.length != instrumentsLength) revert PriceArrayLengthError();
+    if (fullPrices.instrumentPrices.length != instrumentsLength) revert PriceArrayLengthError();
     uint256[] memory indices = _activeInstruments[account].values();
     PriceData[] memory prices = new PriceData[](indices.length);
     for (uint256 i = 0; i < indices.length; ++i) {
       uint256 index = indices[i];
-      prices[i] = PriceData(index, fullPrices[index]);
+      prices[i] = fullPrices.instrumentPrices[index];
     }
-    return _checkMargin(account, marginLevel, prices, false, historyTimestamp, historySearchHint);
+    return
+      _checkMargin(
+        account,
+        marginLevel,
+        prices,
+        fullPrices.collateralPrices,
+        false,
+        historyTimestamp,
+        historySearchHint
+      );
   }
 
   function _checkMargin(
     address account,
     int112 marginLevel,
     PriceData[] memory prices,
+    CollateralPriceData[] memory collateralPrices,
     bool checkPrices,
     uint256 historyTimestamp,
     uint256 historySearchHint
@@ -166,6 +177,7 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     (int112 accountMarginLevel, int112 equity, int112 margin, , ) = calculateMarginLevel(
       account,
       prices,
+      collateralPrices,
       checkPrices,
       historyTimestamp,
       historySearchHint
@@ -218,7 +230,8 @@ contract EVEDEX is BaseDEX, IEVEDEX {
   //////////////////////////
   function liquidatePositions(
     MultiOrderLiquidation memory liquidationOrder,
-    uint112[] memory fullPrices,
+    FullPrices calldata fullPrices,
+    uint256 collateralIndex,
     uint256 historyTimestamp,
     uint256 historySearchHint
   ) external onlyRole(MATCHER_ROLE) {
@@ -229,6 +242,7 @@ contract EVEDEX is BaseDEX, IEVEDEX {
       liquidationOrder.accountToLiquidate,
       soLevel,
       liquidationOrder.prices,
+      fullPrices.collateralPrices,
       true,
       historyTimestamp,
       historySearchHint
@@ -236,6 +250,10 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     if (validMargin) revert SufficientMargin();
 
     uint256 liquidationPricesLength = liquidationOrder.liquidationPrices.length;
+    CollateralPriceData memory collateralPrice = CollateralPriceData({
+      collateral: liquidationOrder.collateral,
+      price: fullPrices.collateralPrices[collateralIndex].price
+    });
     for (uint256 i = 0; i < liquidationPricesLength; ++i) {
       uint112 liquidationPrice = uint112(liquidationOrder.liquidationPrices[i].price);
       uint256 index = liquidationOrder.liquidationPrices[i].index;
@@ -243,9 +261,9 @@ contract EVEDEX is BaseDEX, IEVEDEX {
         index,
         liquidationOrder.accountToLiquidate,
         liquidationOrder.liquidator,
-        liquidationOrder.collateral,
         int112(liquidationPrice),
         fullPrices,
+        collateralPrice,
         historyTimestamp,
         historySearchHint
       );
@@ -256,9 +274,9 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     uint256 index,
     address accountToLiquidate,
     address liquidator,
-    address collateral,
     int112 liquidationPrice,
-    uint112[] memory fullPrices,
+    FullPrices calldata fullPrices,
+    CollateralPriceData memory collateralPrice,
     uint256 historyTimestamp,
     uint256 historySearchHint
   ) internal returns (int112 pnl, int112 fr, uint112 liquidationFee) {
@@ -271,27 +289,27 @@ contract EVEDEX is BaseDEX, IEVEDEX {
       (getAccountFR(accountToLiquidate, index, historyTimestamp, historySearchHint) * liquidationPrice) /
       _INT_PRECISION;
 
-    int112 balance = _getBalance(accountToLiquidate, collateral, fullPrices[index]);
+    int112 balance = _getBalance(accountToLiquidate, collateralPrice.collateral, collateralPrice.price);
     balance += pnl + fr;
     liquidationFee = _calculateLiquidationFee(accountToLiquidatePosition);
 
     balance -= int112(liquidationFee);
-    int112 balanceOfLiquidator = _getBalance(liquidator, collateral, fullPrices[index]);
+    int112 balanceOfLiquidator = _getBalance(liquidator, collateralPrice.collateral, collateralPrice.price);
 
     // If it's the last instrument that user have liquidator pays for user's negative balance
     if (_activeInstruments[accountToLiquidate].length() == 1 && balance < 0) {
-      _setBalance(accountToLiquidate, collateral, 0);
-      _setBalance(liquidator, collateral, balance + int112(liquidationFee));
+      _setBalance(accountToLiquidate, collateralPrice.collateral, 0);
+      _setBalance(liquidator, collateralPrice.collateral, balance + int112(liquidationFee));
     } else {
-      _setBalance(accountToLiquidate, collateral, balance);
-      _setBalance(liquidator, collateral, balanceOfLiquidator + int112(liquidationFee));
+      _setBalance(accountToLiquidate, collateralPrice.collateral, balance);
+      _setBalance(liquidator, collateralPrice.collateral, balanceOfLiquidator + int112(liquidationFee));
     }
 
     _changePosition(
       index,
       liquidator,
       liquidatorPosition,
-      collateral,
+      collateralPrice.collateral,
       accountToLiquidatePosition.position,
       liquidationPrice,
       int112(100),
@@ -309,7 +327,7 @@ contract EVEDEX is BaseDEX, IEVEDEX {
       accountToLiquidate,
       index,
       uint112(liquidationFee),
-      _getBalance(accountToLiquidate, collateral, fullPrices[index]),
+      _getBalance(accountToLiquidate, collateralPrice.collateral, collateralPrice.price),
       pnl,
       fr
     );
@@ -317,7 +335,8 @@ contract EVEDEX is BaseDEX, IEVEDEX {
 
   function liquidatePosition(
     OrderLiquidation memory liquidationOrder,
-    uint112[] memory fullPrices,
+    FullPrices calldata fullPrices,
+    uint256 collateralIndex,
     uint256 historyTimestamp,
     uint256 historySearchHint
   ) external onlyRole(MATCHER_ROLE) {
@@ -328,19 +347,25 @@ contract EVEDEX is BaseDEX, IEVEDEX {
       liquidationOrder.accountToLiquidate,
       soLevel,
       liquidationOrder.prices,
+      fullPrices.collateralPrices,
       true,
       historyTimestamp,
       historySearchHint
     );
     if (validMargin) revert SufficientMargin();
 
+    CollateralPriceData memory collateralPrice = CollateralPriceData({
+      collateral: liquidationOrder.collateral,
+      price: fullPrices.collateralPrices[collateralIndex].price
+    });
+
     _liquidatePosition(
       liquidationOrder.index,
       liquidationOrder.accountToLiquidate,
       liquidationOrder.liquidator,
-      liquidationOrder.collateral,
       int112(uint112(liquidationOrder.prices[0].price)),
       fullPrices,
+      collateralPrice,
       historyTimestamp,
       historySearchHint
     );
@@ -355,7 +380,7 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     Order memory sellOrder,
     uint80 filledPrice,
     uint96 filledAmount,
-    uint112[] memory fullPrices,
+    FullPrices calldata fullPrices,
     uint256 historyTimestamp,
     uint256 historySearchHint
   ) public onlyRole(MATCHER_ROLE) {
@@ -395,26 +420,38 @@ contract EVEDEX is BaseDEX, IEVEDEX {
       _setBalance(
         buyOrder.senderAddress,
         buyOrder.collateral,
-        _getBalance(buyOrder.senderAddress, buyOrder.collateral, fullPrices[buyOrder.instrumentIndex]) -
-          buyOrderMatcherFee
+        _getBalance(
+          buyOrder.senderAddress,
+          buyOrder.collateral,
+          uint112(fullPrices.instrumentPrices[buyOrder.instrumentIndex].price)
+        ) - buyOrderMatcherFee
       );
       _setBalance(
         sellOrder.senderAddress,
         sellOrder.collateral,
-        _getBalance(sellOrder.senderAddress, sellOrder.collateral, fullPrices[sellOrder.instrumentIndex]) -
-          sellOrderMatcherFee
+        _getBalance(
+          sellOrder.senderAddress,
+          sellOrder.collateral,
+          uint112(fullPrices.instrumentPrices[sellOrder.instrumentIndex].price)
+        ) - sellOrderMatcherFee
       );
       _setBalance(
         buyOrder.matcherAddress,
         buyOrder.collateral,
-        _getBalance(buyOrder.matcherAddress, buyOrder.collateral, fullPrices[buyOrder.instrumentIndex]) +
-          buyOrderMatcherFee
+        _getBalance(
+          buyOrder.matcherAddress,
+          buyOrder.collateral,
+          uint112(fullPrices.instrumentPrices[buyOrder.instrumentIndex].price)
+        ) + buyOrderMatcherFee
       );
       _setBalance(
         sellOrder.matcherAddress,
         sellOrder.collateral,
-        _getBalance(sellOrder.matcherAddress, sellOrder.collateral, fullPrices[sellOrder.instrumentIndex]) +
-          sellOrderMatcherFee
+        _getBalance(
+          sellOrder.matcherAddress,
+          sellOrder.collateral,
+          uint112(fullPrices.instrumentPrices[sellOrder.instrumentIndex].price)
+        ) + sellOrderMatcherFee
       );
     }
 
@@ -469,7 +506,7 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     int112 price,
     int112 marginLevel,
     uint16 leverage,
-    uint112[] memory fullPrices,
+    FullPrices calldata fullPrices,
     uint256 historyTimestamp,
     uint256 historySearchHint
   ) internal {
@@ -488,12 +525,15 @@ contract EVEDEX is BaseDEX, IEVEDEX {
       _setBalance(
         positionOwner,
         collateral,
-        _getBalance(positionOwner, collateral, fullPrices[index]) + realizedFRCollateral + realizedPNL
+        _getBalance(positionOwner, collateral, uint112(fullPrices.instrumentPrices[index].price)) +
+          realizedFRCollateral +
+          realizedPNL
       );
       _setBalance(
         fundingRateAccount,
         collateral,
-        _getBalance(fundingRateAccount, collateral, fullPrices[index]) - realizedFRCollateral
+        _getBalance(fundingRateAccount, collateral, uint112(fullPrices.instrumentPrices[index].price)) -
+          realizedFRCollateral
       );
       posData.frAccumulated = 0;
       posData.positionAvgPrice = uint80(uint112(price));
@@ -516,12 +556,15 @@ contract EVEDEX is BaseDEX, IEVEDEX {
       _setBalance(
         positionOwner,
         collateral,
-        _getBalance(positionOwner, collateral, fullPrices[index]) + realizedFRCollateral + realizedPNL
+        _getBalance(positionOwner, collateral, uint112(fullPrices.instrumentPrices[index].price)) +
+          realizedFRCollateral +
+          realizedPNL
       );
       _setBalance(
         fundingRateAccount,
         collateral,
-        _getBalance(fundingRateAccount, collateral, fullPrices[index]) - realizedFRCollateral
+        _getBalance(fundingRateAccount, collateral, uint112(fullPrices.instrumentPrices[index].price)) -
+          realizedFRCollateral
       );
       posData.frAccumulated = (frCurrent * newPosition) / posData.position;
     }
@@ -547,7 +590,7 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     emit PositionUpdate(
       index,
       positionOwner,
-      _getBalance(positionOwner, collateral, fullPrices[index]),
+      _getBalance(positionOwner, collateral, uint112(fullPrices.instrumentPrices[index].price)),
       posData,
       realizedPNL,
       realizedFRCollateral
@@ -566,13 +609,5 @@ contract EVEDEX is BaseDEX, IEVEDEX {
       }
     }
     settledOrders[account]++;
-  }
-
-  function _getBalance(address account_, address collateral_, uint256 price_) internal view returns (int112 balance) {
-    balance = IDepositDEX(depositDex).getBalance(account_, collateral_, price_);
-  }
-
-  function _setBalance(address account_, address collateral_, int112 balance_) internal {
-    IDepositDEX(depositDex).setBalance(account_, collateral_, balance_);
   }
 }
