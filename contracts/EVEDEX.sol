@@ -5,9 +5,9 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {BaseDEX, FundingRateInfo} from "./base/BaseDEX.sol";
-import "./interfaces/IEveDEX.sol";
+import "./interfaces/IEVEDEX.sol";
 
-contract EveDEX is BaseDEX, IEveDEX {
+contract EVEDEX is BaseDEX, IEVEDEX {
   using EnumerableSet for EnumerableSet.UintSet;
   using EnumerableSet for EnumerableSet.AddressSet;
 

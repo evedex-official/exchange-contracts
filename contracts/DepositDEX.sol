@@ -116,16 +116,6 @@ contract DepositDEX is IDepositDEX, UUPSUpgradeable {
     _requestStatusChange(orderHash, RequestStatus.Cancelled);
   }
 
-  // function withdrawComplete(OrderWithdrawal calldata order) external {
-  //   _checkWithdrawOrder(order);
-
-  //   bytes32 orderHash = getWithdrawOrderHash(order);
-  //   if (_withdrawRequests[orderHash].timestamp + _WITHDRAW_DELAY < block.timestamp) revert SelfWithdrawIsNotReady();
-
-  //   _requestStatusChange(orderHash, RequestStatus.Completed);
-  //   _withdrawCollateralTo(order.collateral, uint112(order.amount), order.account, order.account, new uint112[](0), 0, 0);
-  // }
-
   function withdrawComplete(
     OrderWithdrawal calldata order,
     uint112[] memory fullPrices,

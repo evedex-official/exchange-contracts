@@ -158,7 +158,7 @@ abstract contract BaseDEX is
     InstrumentInfo storage instrumentInfo_ = _instrumentInfo[index];
     instrumentInfo_.instrumentData.ticker = ticker;
     instrumentInfo_.instrumentData.leverage = leverage;
-    setFR(index, dailyFRLong, dailyFRShort, timestamp);
+    _setFR(index, dailyFRLong, dailyFRShort, timestamp);
     emit InstrumentUpdate(index, ticker, leverage);
   }
 
@@ -167,12 +167,21 @@ abstract contract BaseDEX is
   //	10000000
   //
   //  Min = 0.000000864 (86400)
-  function setFR(
+    function setFR(
     uint256 index,
     int256 dailyFRLong,
     int256 dailyFRShort,
     uint32 timestamp
-  ) public onlyRole(MATCHER_ROLE) {
+  ) external onlyRole(MATCHER_ROLE) {
+    _setFR(index, dailyFRLong, dailyFRShort, timestamp);
+  }
+
+  function _setFR(
+    uint256 index,
+    int256 dailyFRLong,
+    int256 dailyFRShort,
+    uint32 timestamp
+  ) internal {
     uint256 len = _instrumentInfo[index].fundingRateData.length;
     FundingRateInfo memory newFundingRateInfo;
     if (len > 0) {
