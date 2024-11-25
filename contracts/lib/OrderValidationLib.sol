@@ -99,7 +99,11 @@ library OrderValidationLib {
     );
 
   bytes32 public constant WITHDRAWAL_ORDER_TYPEHASH =
-    keccak256(abi.encodePacked("OrderWithdrawal(address account,uint256 amount,address session,uint256 expiration)"));
+    keccak256(
+      abi.encodePacked(
+        "OrderWithdrawal(address collateral,address account,uint256 amount,address session,uint256 expiration)"
+      )
+    );
 
   function _getOrderTypeValueHash(Order memory _order) internal pure returns (bytes32) {
     return
