@@ -27,9 +27,9 @@ describe('Testing SessionManager contract', function () {
       limitAllowance: true,
       allowanceAllowed: ethers.parseEther('0.1'),
       limitWithdrawals: false,
-      withdrawalsAllowed: 0,
     };
-    await session.connect(alice).setSession(aliceSession.address, newSession);
+    const config = [{ collateral: ethers.ZeroAddress, amount: 0 }];
+    await session.connect(alice).setSession(aliceSession.address, newSession, config);
 
     expect((await session.getSessions(alice.address))[0]).to.be.equal(aliceSession.address);
     expect(await session.getSessionsAt(alice.address, 0)).to.be.equal(aliceSession.address);
@@ -55,11 +55,11 @@ describe('Testing SessionManager contract', function () {
       limitAllowance: true,
       allowanceAllowed: ethers.parseEther('0.1'),
       limitWithdrawals: false,
-      withdrawalsAllowed: 0,
     };
-    await session.connect(alice).setSession(aliceSession.address, newSession);
+    const config = [{ collateral: ethers.ZeroAddress, amount: 0 }];
+    await session.connect(alice).setSession(aliceSession.address, newSession, config);
 
-    await expect(session.connect(bob).setSession(bobSession.address, newSession)).to.be.revertedWithCustomError(
+    await expect(session.connect(bob).setSession(bobSession.address, newSession, config)).to.be.revertedWithCustomError(
       Session,
       'InvalidSessionUser',
     );
@@ -71,9 +71,8 @@ describe('Testing SessionManager contract', function () {
       limitAllowance: false,
       allowanceAllowed: ethers.parseEther('0.1'),
       limitWithdrawals: false,
-      withdrawalsAllowed: 0,
     };
-    expect(await session.connect(bob).setSession(bobSession.address, newBobSession))
+    expect(await session.connect(bob).setSession(bobSession.address, newBobSession, config))
       .to.emit(Session, 'SessionDataUpdated')
       .withArgs(bob.address, bobSession.address, anyValue);
   });
@@ -90,10 +89,10 @@ describe('Testing SessionManager contract', function () {
       limitAllowance: true,
       allowanceAllowed: ethers.parseEther('0.1'),
       limitWithdrawals: false,
-      withdrawalsAllowed: 0,
     };
-    await session.connect(alice).setSession(aliceSession.address, newSession);
-    await session.connect(alice).setSession(aliceSession2.address, newSession);
+    const config = [{ collateral: ethers.ZeroAddress, amount: 0 }];
+    await session.connect(alice).setSession(aliceSession.address, newSession, config);
+    await session.connect(alice).setSession(aliceSession2.address, newSession, config);
 
     expect(await session.getSessionsLength(alice.address)).to.be.equal(2);
     await expect(session.connect(bob).removeSession(aliceSession.address)).to.be.revertedWithCustomError(
@@ -115,8 +114,8 @@ describe('Testing SessionManager contract', function () {
     expect(storedSession.ordersAllowed).to.be.equal(0);
     expect(storedSession.limitAllowance).to.be.equal(false);
     expect(storedSession.allowanceAllowed).to.be.equal(0);
-    await session.connect(alice).setSession(aliceSession.address, newSession);
-    await session.connect(alice).setSession(aliceSession2.address, newSession);
+    await session.connect(alice).setSession(aliceSession.address, newSession, config);
+    await session.connect(alice).setSession(aliceSession2.address, newSession, config);
     storedSession = await session.getSessionData(aliceSession.address);
     expect(storedSession.user).to.be.equal(newSession.user);
     expect(storedSession.expiration).to.be.equal(newSession.expiration);
@@ -144,9 +143,9 @@ describe('Testing SessionManager contract', function () {
       limitAllowance: true,
       allowanceAllowed: allowance,
       limitWithdrawals: false,
-      withdrawalsAllowed: 0,
     };
-    await session.connect(alice).setSession(aliceSession.address, newSession);
+    const config = [{ collateral: ethers.ZeroAddress, amount: 0 }];
+    await session.connect(alice).setSession(aliceSession.address, newSession, config);
 
     const amount = ethers.parseEther('0.06');
     const order1 = {
@@ -253,7 +252,6 @@ describe('Testing SessionManager contract', function () {
       limitAllowance: false,
       allowanceAllowed: allowance,
       limitWithdrawals: false,
-      withdrawalsAllowed: 0,
     };
     const order5 = {
       senderAddress: alice.address,
@@ -269,7 +267,7 @@ describe('Testing SessionManager contract', function () {
       userSession: aliceSession.address,
       signature: '0x',
     };
-    await session.connect(alice).setSession(aliceSession.address, newSession2);
+    await session.connect(alice).setSession(aliceSession.address, newSession2, config);
     storedSession = await session.getSessionData(aliceSession.address);
     expect(storedSession.user).to.be.equal(newSession2.user);
     expect(storedSession.expiration).to.be.equal(newSession2.expiration);
@@ -303,7 +301,8 @@ describe('Testing SessionManager contract', function () {
       limitWithdrawals: true,
       withdrawalsAllowed: allowance,
     };
-    await session.connect(alice).setSession(aliceSession.address, newSession);
+    const withdrawConfig = [{ collateral: usdt.address, amount: allowance }];
+    await session.connect(alice).setSession(aliceSession.address, newSession, withdrawConfig);
 
     const amount = ethers.parseEther('0.06');
     const withdrawOrder1 = {
@@ -317,13 +316,19 @@ describe('Testing SessionManager contract', function () {
 
     let storedSession = await session.getSessionData(aliceSession.address);
     expect(storedSession.limitWithdrawals).to.be.equal(newSession.limitWithdrawals);
-    expect(storedSession.withdrawalsAllowed).to.be.equal(newSession.withdrawalsAllowed);
+    expect(await session.getSessionWithdrawLength(aliceSession.address)).to.be.equal(1);
+    expect((await session.getSessionWithdrawKeys(aliceSession.address))[0]).to.be.equal(usdt.address);
+    expect((await session.getSessionWithdrawValues(aliceSession.address, [usdt.address]))[0]).to.be.equal(
+      withdrawConfig[0].amount,
+    );
 
     expect(await session.connect(validator).validateWithdrawalOrder(withdrawOrder1))
       .to.emit(Session, 'SessionDataUpdated')
       .withArgs(alice.address, aliceSession.address, anyValue);
     storedSession = await session.getSessionData(aliceSession.address);
-    expect(storedSession.withdrawalsAllowed).to.be.equal(allowance - amount);
+    expect((await session.getSessionWithdrawValues(aliceSession.address, [usdt.address]))[0]).to.be.equal(
+      allowance - amount,
+    );
 
     await expect(session.connect(validator).validateWithdrawalOrder(withdrawOrder1)).to.be.revertedWithCustomError(
       Session,

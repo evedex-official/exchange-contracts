@@ -4,10 +4,11 @@ pragma solidity 0.8.27;
 import {AccessControlEnumerable} from "@openzeppelin/contracts/access/extensions/AccessControlEnumerable.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {Order, OrderWithdrawal} from "../lib/OrderValidationLib.sol";
-import {ISessionManager} from "../interfaces/ISessionManager.sol";
+import "../interfaces/ISessionManager.sol";
 
 contract SessionManager is ISessionManager, AccessControlEnumerable {
   using EnumerableSet for EnumerableSet.AddressSet;
+  using EnumerableMap for EnumerableMap.AddressToUintMap;
 
   bytes32 public constant VALIDATOR_ROLE = keccak256("VALIDATOR");
 
@@ -35,31 +36,55 @@ contract SessionManager is ISessionManager, AccessControlEnumerable {
   }
 
   /// @inheritdoc ISessionManager
-  function getSessionData(address session) external view returns (SessionData memory) {
-    return _sessionData[session];
+  function getSessionData(address session) external view returns (SessionValue memory) {
+    return _sessionData[session].values;
   }
 
   /// @inheritdoc ISessionManager
-  function setSession(address session, SessionData calldata data) external {
+  function getSessionWithdrawLength(address session) external view returns (uint256) {
+    return _sessionData[session].withdrawalsAllowed.length();
+  }
+
+  /// @inheritdoc ISessionManager
+  function getSessionWithdrawKeys(address session) external view returns (address[] memory) {
+    return _sessionData[session].withdrawalsAllowed.keys();
+  }
+
+  /// @inheritdoc ISessionManager
+  function getSessionWithdrawValues(address session, address[] memory keys) external view returns (uint256[] memory) {
+    uint256 length = keys.length;
+    uint256[] memory values = new uint256[](length);
+    for (uint256 i; i < length; i++) {
+      address key = keys[i];
+      (, uint256 value) = _sessionData[session].withdrawalsAllowed.tryGet(key);
+      values[i] = value;
+    }
+    return values;
+  }
+
+  /// @inheritdoc ISessionManager
+  function setSession(address session, SessionValue calldata data, SessionWithdraw[] memory config) external {
     address user = _msgSender();
     if (data.user != user) revert InvalidSessionUser();
     _sessions[user].add(session);
     _updateSessionData(session, data);
+    _updateSessionWithdraw(session, config);
   }
 
   /// @inheritdoc ISessionManager
   function removeSession(address session) external {
-    address user = _msgSender() == session ? _sessionData[session].user : _msgSender();
+    address user = _msgSender() == session ? _sessionData[session].values.user : _msgSender();
     if (!_sessions[user].remove(session)) revert SessionNotFound();
-    SessionData memory data;
+    SessionValue memory data;
     _updateSessionData(session, data);
+    _clearSessionWithdraw(session);
   }
 
   /// @inheritdoc ISessionManager
   function removeAllSessions() external {
     address user = _msgSender();
     address[] memory sessions = _sessions[user].values();
-    SessionData memory data;
+    SessionValue memory data;
     for (uint256 i; i < sessions.length; i++) {
       address session = sessions[i];
       _sessions[user].remove(session);
@@ -67,10 +92,30 @@ contract SessionManager is ISessionManager, AccessControlEnumerable {
     }
   }
 
-  function _updateSessionData(address _session, SessionData memory _data) internal {
-    _sessionData[_session] = _data;
+  function _updateSessionData(address _session, SessionValue memory _data) internal {
+    _sessionData[_session].values = _data;
 
     emit SessionDataUpdated(_data.user, _session, _data);
+  }
+
+  function _updateSessionWithdraw(address _session, SessionWithdraw[] memory _data) internal {
+    uint256 length = _data.length;
+    for (uint256 i; i < length; i++) {
+      _sessionData[_session].withdrawalsAllowed.set(_data[i].collateral, _data[i].amount);
+    }
+
+    emit SessionWithdrawUpdated(_session, _data);
+  }
+
+  function _clearSessionWithdraw(address _session) internal {
+    address[] memory keys = _sessionData[_session].withdrawalsAllowed.keys();
+    uint256 length = keys.length;
+    for (uint256 i; i < length; i++) {
+      address key = keys[i];
+      _sessionData[_session].withdrawalsAllowed.remove(key);
+    }
+
+    emit SessionDataCleared(_session);
   }
 
   /// @inheritdoc ISessionManager
@@ -85,7 +130,7 @@ contract SessionManager is ISessionManager, AccessControlEnumerable {
     _checkTimestamp(order.expiration, session);
     _checkTotalOrders(order, session);
 
-    emit SessionDataUpdated(user, session, _sessionData[session]);
+    emit SessionDataUpdated(user, session, _sessionData[session].values);
     return session;
   }
 
@@ -99,7 +144,7 @@ contract SessionManager is ISessionManager, AccessControlEnumerable {
     _checkWithdrawals(order, session);
     _checkTimestamp(order.expiration, session);
 
-    emit SessionDataUpdated(user, session, _sessionData[session]);
+    emit SessionDataUpdated(user, session, _sessionData[session].values);
     return session;
   }
 
@@ -120,13 +165,13 @@ contract SessionManager is ISessionManager, AccessControlEnumerable {
   }
 
   function _checkTimestamp(uint256 orderExpiration, address session) internal view {
-    SessionData storage data = _sessionData[session];
+    SessionValue storage data = _sessionData[session].values;
     uint256 expiration = data.expiration;
     if (expiration > 0 && orderExpiration > expiration) revert SessionExpired();
   }
 
   function _checkAllowance(Order calldata order, address session) internal {
-    SessionData storage data = _sessionData[session];
+    SessionValue storage data = _sessionData[session].values;
     if (data.limitAllowance) {
       uint256 allowance = data.allowanceAllowed;
       if (allowance < order.amount) revert SessionAllowanceExceeded();
@@ -137,7 +182,7 @@ contract SessionManager is ISessionManager, AccessControlEnumerable {
   }
 
   function _checkTotalOrders(Order calldata /*order*/, address session) internal {
-    SessionData storage data = _sessionData[session];
+    SessionValue storage data = _sessionData[session].values;
     if (data.limitMaxOrders) {
       uint32 totalOrders = data.ordersAllowed;
       if (totalOrders == 0) revert SessionMaxOrdersSettled();
@@ -149,18 +194,23 @@ contract SessionManager is ISessionManager, AccessControlEnumerable {
 
   function _checkWithdrawals(OrderWithdrawal calldata order, address session) internal {
     SessionData storage data = _sessionData[session];
-    if (data.limitWithdrawals) {
-      uint256 withdrawalsAllowed = data.withdrawalsAllowed;
-      if (withdrawalsAllowed < order.amount) revert SessionWithdrawalsExceeded();
+    if (data.values.limitWithdrawals) {
+      uint256 allowed = data.withdrawalsAllowed.get(order.collateral);
+      if (allowed < order.amount) revert SessionWithdrawalsExceeded();
       unchecked {
-        data.withdrawalsAllowed = uint128(withdrawalsAllowed - order.amount);
+        uint256 newAmount = allowed - order.amount;
+        data.withdrawalsAllowed.set(order.collateral, newAmount);
+        SessionWithdraw[] memory configs = new SessionWithdraw[](1);
+        configs[0] = SessionWithdraw({collateral: order.collateral, amount: newAmount});
+        emit SessionWithdrawUpdated(session, configs);
       }
     }
   }
 
   function _checkWithdrawalsView(OrderWithdrawal calldata order, address session) internal view {
     SessionData storage data = _sessionData[session];
-    if (data.limitWithdrawals && data.withdrawalsAllowed < order.amount) {
+    (, uint256 allowed) = data.withdrawalsAllowed.tryGet(order.collateral);
+    if (data.values.limitWithdrawals && allowed < order.amount) {
       revert SessionWithdrawalsExceeded();
     }
   }
