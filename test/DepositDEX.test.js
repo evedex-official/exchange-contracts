@@ -28,7 +28,7 @@ describe('DepositDex contract', function () {
         );
 
         eveDex = await deployProxyWithLibraries(
-            'EveDEX',
+            'EVEDEX',
             [
                 owner.address,
                 await depositDex.getAddress(),
@@ -77,7 +77,10 @@ describe('DepositDex contract', function () {
 
         await depositDex.connect(alice).depositCollateral(tokenAddress, amount);
 
-        const totalBalance = await depositDex.getTotalBalance(alice.address, [{index: 0, price: 100000000}])
+        const collateralPriceData = [
+            { collateral: tokenAddress, price: 100000000}
+        ]
+        const totalBalance = await depositDex.getTotalBalance(alice.address, collateralPriceData)
         expect(totalBalance).to.equal(amount, "wrong total balance")
     })
 
@@ -92,7 +95,7 @@ describe('DepositDex contract', function () {
         const expiration = Math.floor(Date.now() / 1000) + 3600; // 1 hour from now
 
         const withdrawalOrder = {
-            collateral: await token.getAddress(),
+            collateral: tokenAddress,
             account: alice.address,
             amount: withdrawalAmount,
             session: ethers.ZeroAddress,
@@ -100,7 +103,7 @@ describe('DepositDex contract', function () {
         };
 
         const domain = {
-            name: "EventHorizon",
+            name: "EVEDEX",
             version: "1",
             chainId: (await ethers.provider.getNetwork()).chainId,
             verifyingContract: await depositDex.getAddress()
@@ -108,17 +111,32 @@ describe('DepositDex contract', function () {
 
         const types = {
             OrderWithdrawal: [
+                { name: "collateral", type: "address" },
                 { name: "account", type: "address" },
                 { name: "amount", type: "uint256" },
                 { name: "session", type: "address" },
                 { name: "expiration", type: "uint256" },
             ],
         };
+
+        const instrumentPrices = [
+            {
+                index: 0,
+                price: 100000000
+            }
+        ]
+
+        const collateralPrices = [
+            {
+                collateral: tokenAddress,
+                price: 100000000
+            }
+        ]
         
-        const signatureEip712 = await alice.signTypedData(domain, types, withdrawalOrder);
+        const signature= await alice.signTypedData(domain, types, withdrawalOrder);
         await depositDex.connect(matcher).withdrawComplete(
-            {...withdrawalOrder, signature: signatureEip712},
-            [100000000], // fullPrices
+            {...withdrawalOrder, signature: signature},
+            { collateralPrices, instrumentPrices }, // fullPrices
             0, // historyTimestamp
             0 // historySearchHint
         )

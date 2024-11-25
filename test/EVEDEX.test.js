@@ -24,7 +24,7 @@ describe('EVEDEX contract', function () {
         );
 
         eveDex = await deployProxyWithLibraries(
-            'EveDEX',
+            'EVEDEX',
             [
                 owner.address,
                 await depositDex.getAddress(),
