@@ -158,7 +158,7 @@ abstract contract BaseDEX is
     InstrumentInfo storage instrumentInfo_ = _instrumentInfo[index];
     instrumentInfo_.instrumentData.ticker = ticker;
     instrumentInfo_.instrumentData.leverage = leverage;
-    setFR(index, dailyFRLong, dailyFRShort, timestamp);
+    _setFR(index, dailyFRLong, dailyFRShort, timestamp);
     emit InstrumentUpdate(index, ticker, leverage);
   }
 
@@ -172,7 +172,11 @@ abstract contract BaseDEX is
     int256 dailyFRLong,
     int256 dailyFRShort,
     uint32 timestamp
-  ) public onlyRole(MATCHER_ROLE) {
+  ) external onlyRole(MATCHER_ROLE) {
+    _setFR(index, dailyFRLong, dailyFRShort, timestamp);
+  }
+
+  function _setFR(uint256 index, int256 dailyFRLong, int256 dailyFRShort, uint32 timestamp) internal {
     uint256 len = _instrumentInfo[index].fundingRateData.length;
     FundingRateInfo memory newFundingRateInfo;
     if (len > 0) {
@@ -226,6 +230,14 @@ abstract contract BaseDEX is
     }
     if (low == len) revert SearchWithHintFailed(searchHint);
     return _instrumentInfo[index].fundingRateData[low];
+  }
+
+  function _getBalance(address account_, address collateral_, uint112 price_) internal view returns (int112 balance) {
+    balance = IDepositDEX(depositDex).getBalance(account_, collateral_, price_);
+  }
+
+  function _setBalance(address account_, address collateral_, int112 balance_) internal {
+    IDepositDEX(depositDex).setBalance(account_, collateral_, balance_);
   }
 
   function getTotalLongFR(uint256 index, uint256 timestamp, uint256 searchHint) public view virtual returns (int72) {}

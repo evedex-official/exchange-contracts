@@ -3,7 +3,7 @@ pragma solidity ^0.8.26;
 
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {InstrumentInfo} from "../interfaces/IBaseDEX.sol";
-import {PositionInfo} from "../interfaces/IEveDEX.sol";
+import {PositionInfo} from "../interfaces/IEVEDEX.sol";
 import "../interfaces/IStorageDEX.sol";
 
 abstract contract StorageDEX is IStorageDEX {

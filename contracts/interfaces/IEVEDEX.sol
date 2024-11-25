@@ -20,7 +20,17 @@ struct AccountPositions {
   PositionInfo[] positions;
 }
 
-interface IEveDEX {
+struct CollateralPriceData {
+  address collateral;
+  uint112 price;
+}
+
+struct FullPrices {
+  PriceData[] instrumentPrices;
+  CollateralPriceData[] collateralPrices;
+}
+
+interface IEVEDEX {
   event PositionUpdate(
     uint256 indexed index,
     address indexed account,
@@ -60,7 +70,7 @@ interface IEveDEX {
   function checkMarginWithPrices(
     address account,
     int112 marginLevel,
-    uint112[] memory fullPrices,
+    FullPrices calldata fullPrices,
     uint256 historyTimestamp,
     uint256 historySearchHint
   ) external view returns (bool, int112);

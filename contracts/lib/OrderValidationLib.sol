@@ -65,7 +65,7 @@ library OrderValidationLib {
   error InvalidPrice();
   error InvalidSignature();
 
-  bytes32 public constant HASHED_NAME = keccak256(bytes("EventHorizon"));
+  bytes32 public constant HASHED_NAME = keccak256(bytes("EVEDEX"));
   bytes32 public constant HASHED_VERSION = keccak256(bytes("1"));
 
   bytes32 public constant EIP712_DOMAIN_TYPEHASH =
@@ -194,6 +194,7 @@ library OrderValidationLib {
       keccak256(
         abi.encode(
           WITHDRAWAL_ORDER_TYPEHASH,
+          _withdrawalOrder.collateral,
           _withdrawalOrder.account,
           _withdrawalOrder.amount,
           _withdrawalOrder.session,

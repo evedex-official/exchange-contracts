@@ -116,19 +116,9 @@ contract DepositDEX is IDepositDEX, UUPSUpgradeable {
     _requestStatusChange(orderHash, RequestStatus.Cancelled);
   }
 
-  // function withdrawComplete(OrderWithdrawal calldata order) external {
-  //   _checkWithdrawOrder(order);
-
-  //   bytes32 orderHash = getWithdrawOrderHash(order);
-  //   if (_withdrawRequests[orderHash].timestamp + _WITHDRAW_DELAY < block.timestamp) revert SelfWithdrawIsNotReady();
-
-  //   _requestStatusChange(orderHash, RequestStatus.Completed);
-  //   _withdrawCollateralTo(order.collateral, uint112(order.amount), order.account, order.account, new uint112[](0), 0, 0);
-  // }
-
   function withdrawComplete(
     OrderWithdrawal calldata order,
-    uint112[] memory fullPrices,
+    FullPrices calldata fullPrices,
     uint256 historyTimestamp,
     uint256 historySearchHint
   ) external onlyRole(_MATCHER_ROLE) {
@@ -151,7 +141,7 @@ contract DepositDEX is IDepositDEX, UUPSUpgradeable {
     uint112 amount,
     address from,
     address to,
-    uint112[] memory fullPrices,
+    FullPrices calldata fullPrices,
     uint256 historyTimestamp,
     uint256 historySearchHint
   ) internal {
@@ -160,7 +150,7 @@ contract DepositDEX is IDepositDEX, UUPSUpgradeable {
     balance -= int112(amount);
     _balances[from][collateral] = balance;
 
-    (bool validMargin, ) = IEveDEX(baseDex).checkMarginWithPrices(
+    (bool validMargin, ) = IEVEDEX(baseDex).checkMarginWithPrices(
       from,
       IStorageDEX(baseDex).withdrawMarginLevel(),
       fullPrices,
@@ -174,16 +164,17 @@ contract DepositDEX is IDepositDEX, UUPSUpgradeable {
     emit DepositBalanceChanged(msg.sender, collateral, -int112(amount), balance);
   }
 
-  function getBalance(address account, address collateral, uint256 price) public view returns (int112 balance) {
-    balance = (_balances[account][collateral] * int112(int256(price))) / _INT_PRECISION;
+  function getBalance(address account, address collateral, uint112 price) public view returns (int112 balance) {
+    balance = (_balances[account][collateral] * int112(price)) / _INT_PRECISION;
   }
 
-  function getTotalBalance(address account, PriceData[] memory prices) public view returns (int112 balance) {
+  function getTotalBalance(address account, CollateralPriceData[] memory prices) public view returns (int112 balance) {
     uint256 len = prices.length;
     if (len != _collaterals.length()) revert IncompletePrices();
     for (uint256 i; i < len; i++) {
       address collateral = _collaterals.at(i);
-      balance += (_balances[account][collateral] * int112(int256(prices[i].price))) / _INT_PRECISION;
+      if (prices[i].collateral != collateral) revert InvalidPrice(collateral);
+      balance += (_balances[account][collateral] * int112(prices[i].price)) / _INT_PRECISION;
     }
   }
 

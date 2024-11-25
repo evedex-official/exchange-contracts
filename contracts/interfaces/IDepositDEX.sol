@@ -5,7 +5,7 @@ import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol"
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {OrderValidationLib, OrderWithdrawal, PriceData} from "../lib/OrderValidationLib.sol";
 import {ISessionManager} from "./ISessionManager.sol";
-import {IEveDEX} from "./IEveDEX.sol";
+import {IEVEDEX, FullPrices, CollateralPriceData} from "./IEVEDEX.sol";
 import {IStorageDEX} from "./IStorageDEX.sol";
 import {IVault} from "./IVault.sol";
 
@@ -32,6 +32,7 @@ interface IDepositDEX {
   error ArrayLengthError();
   error UnsupportedCollateral();
   error IncompletePrices();
+  error InvalidPrice(address);
 
   event WithdrawRequestRegistered(address indexed account, OrderWithdrawal order);
 
@@ -45,7 +46,7 @@ interface IDepositDEX {
 
   function setBalance(address account, address collateral, int112 balance) external;
 
-  function getBalance(address account, address collateral, uint256 price) external view returns (int112 balance);
+  function getBalance(address account, address collateral, uint112 price) external view returns (int112 balance);
 
-  function getTotalBalance(address account, PriceData[] memory prices) external view returns (int112 balance);
+  function getTotalBalance(address account, CollateralPriceData[] memory prices) external view returns (int112 balance);
 }

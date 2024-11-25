@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.21;
 
+import {IDepositDEX} from "./IDepositDEX.sol";
+
 struct FundingRateInfo {
   int40 frLong; // Funding rate for long position - percentage of position per second. frLong = 10**11 => 100% per second
   int40 frShort; // Funding rate for short position - percentage of position per second. frShort = 10**11 => 100% per second
