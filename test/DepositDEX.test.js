@@ -6,14 +6,14 @@ const { deployProxyWithLibraries, deployWithLibraries } = require('./helpers/dep
 
 describe('DepositDex contract', function () {
 
-    let depositDex, vault, eveDex, sessions, token, tokenAddress;
+    let depositDex, vault, eveDex, sessions, token, tokenAddress, orderLib;
 
     let owner, alice, bob, liquidator, fundingRateAccount, matcher;
 
     beforeEach(async function () {
         [owner, alice, bob, liquidator, fundingRateAccount, matcher] = await ethers.getSigners();
 
-        let orderLib = await deployWithLibraries('OrderValidationLib', []);
+        orderLib = await deployWithLibraries('OrderValidationLib', []);
         sessions = await deployWithLibraries('SessionManager', [owner.address])
 
         const libraries = { libraries: { OrderValidationLib: await orderLib.getAddress() } };
@@ -80,5 +80,50 @@ describe('DepositDex contract', function () {
         const totalBalance = await depositDex.getTotalBalance(alice.address, [{index: 0, price: 100000000}])
         expect(totalBalance).to.equal(amount, "wrong total balance")
     })
+
+    it('should withdraw balance by matcher', async function() {
+        const amount = ethers.parseEther('100');
+        await token.mint(alice.address, amount);
+
+        await token.connect(alice).approve(await depositDex.getAddress(), amount);
+        await depositDex.connect(alice).depositCollateral(tokenAddress, amount);
+
+        const withdrawalAmount = ethers.parseEther('10');
+        const expiration = Math.floor(Date.now() / 1000) + 3600; // 1 hour from now
+
+        const withdrawalOrder = {
+            collateral: await token.getAddress(),
+            account: alice.address,
+            amount: withdrawalAmount,
+            session: ethers.ZeroAddress,
+            expiration: expiration,
+        };
+
+        const domain = {
+            name: "EventHorizon",
+            version: "1",
+            chainId: (await ethers.provider.getNetwork()).chainId,
+            verifyingContract: await depositDex.getAddress()
+        }
+
+        const types = {
+            OrderWithdrawal: [
+                { name: "account", type: "address" },
+                { name: "amount", type: "uint256" },
+                { name: "session", type: "address" },
+                { name: "expiration", type: "uint256" },
+            ],
+        };
+        
+        const signatureEip712 = await alice.signTypedData(domain, types, withdrawalOrder);
+        await depositDex.connect(matcher).withdrawComplete(
+            {...withdrawalOrder, signature: signatureEip712},
+            [100000000], // fullPrices
+            0, // historyTimestamp
+            0 // historySearchHint
+        )
+
+    });
+        
 
 });
