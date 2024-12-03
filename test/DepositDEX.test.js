@@ -40,6 +40,10 @@ describe('DepositDex contract', function () {
     return signedWithdrawalOrder;
   };
 
+  before(async function () {
+    await upgrades.silenceWarnings();
+  });
+
   beforeEach(async function () {
     [owner, alice, bob, liquidator, fundingRateAccount, matcher] = await ethers.getSigners();
 
@@ -60,7 +64,7 @@ describe('DepositDex contract', function () {
         fundingRateAccount.address,
         128,
         80,
-        500,
+        100,
         0,
       ],
       libraries,
@@ -184,12 +188,12 @@ describe('DepositDex contract', function () {
       'WithdrawRequestRegistered',
     );
 
-    const withrawRequest = await depositDex.getWithdrawRequest(withdrawOrderHash);
-    const status = withrawRequest[1];
+    const withdrawRequest = await depositDex.getWithdrawRequest(withdrawOrderHash);
+    const status = withdrawRequest[1];
     expect(status).to.equal(1, 'status should be 1 (Open)');
   });
 
-  it('should cancel withraw request by user', async function () {
+  it('should cancel withdraw request by user', async function () {
     const amount = ethers.parseEther('100');
     await usdt.mint(alice.address, amount);
 
@@ -215,8 +219,8 @@ describe('DepositDex contract', function () {
     );
 
     await depositDex.connect(alice).withdrawRequestCancel(signedWithdrawalOrder);
-    const withrawRequest = await depositDex.getWithdrawRequest(withdrawOrderHash);
-    const status = withrawRequest[1];
+    const withdrawRequest = await depositDex.getWithdrawRequest(withdrawOrderHash);
+    const status = withdrawRequest[1];
     expect(status).to.equal(2, 'status should be 2 (Cancelled)');
   });
 });

@@ -30,6 +30,11 @@ struct FullPrices {
   CollateralPriceData[] collateralPrices;
 }
 
+struct OrderExtended {
+  uint256 collateralIndex;
+  Order order;
+}
+
 interface IEVEDEX {
   event PositionUpdate(
     uint256 indexed index,

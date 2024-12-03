@@ -12,6 +12,6 @@ module.exports = {
   fundingRateAddress: '0xFa02EDF9ebA53Ae811650e409A1da2E6103CDB54',
   maxOpenPositions: 128,
   soLevel: 80,
-  withdrawMarginLevel: 500,
+  withdrawMarginLevel: 100,
   liquidationFeePercent: 0,
 };

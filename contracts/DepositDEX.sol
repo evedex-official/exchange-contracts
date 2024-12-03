@@ -174,7 +174,7 @@ contract DepositDEX is IDepositDEX, UUPSUpgradeable {
     for (uint256 i; i < len; i++) {
       address collateral = _collaterals.at(i);
       if (prices[i].collateral != collateral) revert InvalidPrice(collateral);
-      balance += (_balances[account][collateral] * int112(prices[i].price)) / _INT_PRECISION;
+      balance += int112((int256(_balances[account][collateral]) * int112(prices[i].price))) / _INT_PRECISION;
     }
   }
 
