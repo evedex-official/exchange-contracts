@@ -78,7 +78,7 @@ library OrderValidationLib {
   bytes32 public constant ORDER_TYPEHASH =
     keccak256(
       abi.encodePacked(
-        "Order(address senderAddress,address matcherAddress,uint256 instrumentIndex,uint256 amount,uint256 price,uint16 leverage,uint256 matcherFee,uint256 expiration,uint8 side)"
+        "Order(address senderAddress,address matcherAddress,address collateral,uint256 instrumentIndex,uint256 amount,uint256 price,uint16 leverage,uint256 matcherFee,uint256 expiration,uint8 side)"
       )
     );
 
@@ -112,6 +112,7 @@ library OrderValidationLib {
           ORDER_TYPEHASH,
           _order.senderAddress,
           _order.matcherAddress,
+          _order.collateral,
           _order.instrumentIndex,
           _order.amount,
           _order.price,

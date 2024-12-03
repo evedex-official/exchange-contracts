@@ -119,7 +119,7 @@ abstract contract BaseDEX is
   }
 
   function addInstrument(
-    string[12] calldata ticker,
+    string calldata ticker,
     uint8 leverage,
     int256 dailyFRLong,
     int256 dailyFRShort,
@@ -136,7 +136,7 @@ abstract contract BaseDEX is
 
   function changeInstrument(
     uint256 index,
-    string[12] calldata ticker,
+    string calldata ticker,
     uint8 leverage,
     int256 dailyFRLong,
     int256 dailyFRShort,
@@ -147,7 +147,7 @@ abstract contract BaseDEX is
 
   function _changeInstrument(
     uint256 index,
-    string[12] memory ticker,
+    string memory ticker,
     uint8 leverage,
     int256 dailyFRLong,
     int256 dailyFRShort,
@@ -207,11 +207,9 @@ abstract contract BaseDEX is
     uint256 timestamp,
     uint256 searchHint
   ) internal view returns (FundingRateInfo memory) {
-    // InstrumentInfo storage instrument = _instrumentInfo[index];
-    // return GetterLib.getFundingRateInfo(instrument, timestamp, searchHint);
     uint256 len = _instrumentInfo[index].fundingRateData.length;
     if (len == 0) revert EmptyArrayToSearch();
-    if (_instrumentInfo[index].fundingRateData[searchHint].lastFRUpdateTime > timestamp)
+    if (_instrumentInfo[index].fundingRateData[searchHint].lastFRUpdateTime < timestamp)
       revert SearchWithHintFailed(searchHint);
 
     uint256 low = searchHint;
