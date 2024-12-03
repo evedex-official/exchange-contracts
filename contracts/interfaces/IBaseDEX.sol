@@ -18,11 +18,11 @@ struct InstrumentInfo {
 
 struct InstrumentData {
   uint8 leverage; // Max available leverage
-  string[12] ticker; // Ticker of underlying asset
+  string ticker; // Ticker of underlying asset
 }
 
 interface IBaseDEX {
-  event InstrumentUpdate(uint256 indexed index, string[12] ticker, uint8 leverage);
+  event InstrumentUpdate(uint256 indexed index, string ticker, uint8 leverage);
   event NewFundingRate(
     uint256 indexed index,
     int48 frLongPerSecond,
