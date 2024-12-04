@@ -6,10 +6,15 @@
   "files": [
     "networks"
   ],
+  "engines": {
+    "node": ">=20",
+    "npm": ">=7"
+  },
   "scripts": {
     "test": "hardhat test",
     "lint:sol": "solhint 'contracts/**/*.sol' && prettier -c 'contracts/**/*.sol'",
     "lint:sol:fix": "prettier --write 'contracts/**/*.sol'",
+    "lint:js:fix": "prettier --write './**/*.js'",
     "deploy": "hardhat deploy",
     "export-abi": "hardhat export-abi --dir ./networks/abi",
     "export-deploy": "hardhat export-deployed --file ./networks/contracts.json --fields address,blockNumber,upgradable.proxyAdmin",
@@ -25,6 +30,7 @@
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.6",
     "@nomicfoundation/hardhat-ethers": "^3.0.5",
     "@nomicfoundation/hardhat-network-helpers": "^1.0.11",
+    "@nomicfoundation/hardhat-toolbox-viem": "^3.0.0",
     "@openzeppelin/contracts": "^5.0.2",
     "@openzeppelin/contracts-upgradeable": "^5.0.2",
     "@openzeppelin/hardhat-upgrades": "^3.1.0",
@@ -42,6 +48,5 @@
     "solc-0.8": "^0.0.1-security",
     "solhint": "^4.5.4",
     "tiny-glob": "^0.2.9"
-  },
-  "devDependencies": {}
+  }
 }
