@@ -47,4 +47,43 @@ interface IBaseDEX {
   error InvalidFRTimestamp();
   error InstrumentDoesNotExist();
   error InvalidPositionsRequest(uint256);
+
+  function getInstrumentData(uint256 index) external view returns (InstrumentData memory);
+
+  function getFundingRateData(
+    uint256 index,
+    uint256 start,
+    uint256 length
+  ) external view returns (FundingRateInfo[] memory);
+
+  function setBasicParams(
+    address depositDex_,
+    address sessionManager_,
+    address fundingRateAccount_,
+    int112 soLevel_,
+    int112 withdrawMarginLevel_,
+    uint256 maxOpenPositions_,
+    uint256 liquidationFeePercent_
+  ) external;
+
+  function addInstrument(
+    string calldata ticker,
+    uint8 leverage,
+    int256 dailyFRLong,
+    int256 dailyFRShort,
+    uint32 timestamp
+  ) external;
+
+  function deleteInstrument() external;
+
+  function changeInstrument(
+    uint256 index,
+    string calldata ticker,
+    uint8 leverage,
+    int256 dailyFRLong,
+    int256 dailyFRShort,
+    uint32 timestamp
+  ) external;
+
+  function setFR(uint256 index, int256 dailyFRLong, int256 dailyFRShort, uint32 timestamp) external;
 }
