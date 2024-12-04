@@ -2,17 +2,27 @@
 pragma solidity ^0.8.21;
 
 import {Order, OrderWithdrawal} from "../lib/OrderValidationLib.sol";
+import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
 
 interface ISessionManager {
   struct SessionData {
+    SessionValue values;
+    EnumerableMap.AddressToUintMap withdrawalsAllowed; // Limit for withdrawals in asset
+  }
+
+  struct SessionValue {
     address user; // Session's owner
     uint64 expiration; // Expiration timestamp
     uint32 ordersAllowed; // Number of allowed orders, decreases with each order
-    uint128 allowanceAllowed; // Limit for total amount of trading, decreases within check
-    uint128 withdrawalsAllowed; // Limit for total amount of withdrawals, decreases within check
     bool limitAllowance; // Flag to enable check of total trading allowance
     bool limitMaxOrders; // Flag to enable check of allowed order number
     bool limitWithdrawals; // Flag to enable check of allowed withdrawals
+    uint128 allowanceAllowed; // Limit for total amount of trading, decreases within check
+  }
+
+  struct SessionWithdraw {
+    address collateral; // Collateral address
+    uint256 amount; // Withdrawable amount of collateral
   }
 
   /**
@@ -44,17 +54,40 @@ interface ISessionManager {
    * @notice Returns the stored session data
    * @dev Returns zeroes regardless the session status in the `getSessions` list
    * @param session Address of the user's session to search for
-   * @return The SessionData struct from the storage
+   * @return The SessionValue struct from the storage
    */
-  function getSessionData(address session) external view returns (SessionData memory);
+  function getSessionData(address session) external view returns (SessionValue memory);
+
+  /**
+   * @notice Returns length of the session's list of collaterals allowed to withdraw
+   * @param session Address of the user's session to search for
+   * @return The length of collaterals list
+   */
+  function getSessionWithdrawLength(address session) external view returns (uint256);
+
+  /**
+   * @notice Returns the session's list of collaterals allowed to withdraw
+   * @param session Address of the user's session to search for
+   * @return Array of collateral addresses
+   */
+  function getSessionWithdrawKeys(address session) external view returns (address[] memory);
+
+  /**
+   * @notice Returns the session's list of withdraw allowances for given collaterals
+   * @param session Address of the user's session to search for
+   * @param keys Array of collateral addresses to check withdraw allowance
+   * @return Array of withdraw allowances fro given list of collaterals
+   */
+  function getSessionWithdrawValues(address session, address[] memory keys) external view returns (uint256[] memory);
 
   /**
    * @notice Function to add or update session's parameters
    * @dev Emits `SessionDataUpdated` on success
    * @param session Address of the session to update data for
    * @param data New data for the session
+   * @param config New withdraw configs
    */
-  function setSession(address session, SessionData calldata data) external;
+  function setSession(address session, SessionValue calldata data, SessionWithdraw[] memory config) external;
 
   /**
    * @notice Removes data for selected user's session
@@ -101,7 +134,20 @@ interface ISessionManager {
    * @param session Address of the session to update data for
    * @param data New data stored
    */
-  event SessionDataUpdated(address indexed user, address indexed session, SessionData data);
+  event SessionDataUpdated(address indexed user, address indexed session, SessionValue data);
+
+  /**
+   * @dev Event to be emitted on session data being full erased
+   * @param session Address of the session to update data for
+   */
+  event SessionDataCleared(address indexed session);
+
+  /**
+   * @dev Event to be emitted on session withdraw mapping update
+   * @param session Address of the session to update data for
+   * @param configs Collateral addresses and allowed amounts
+   */
+  event SessionWithdrawUpdated(address indexed session, SessionWithdraw[] configs);
 
   /**
    * @notice Error to indicate mismatch of new session data and session's user
