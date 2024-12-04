@@ -97,7 +97,10 @@ contract EVEDEX is BaseDEX, IEVEDEX {
 
   function getPNL(address account, uint256 index, int112 price) public view returns (int112) {
     PositionInfo memory positionInfo_ = positionInfo[index][account];
-    return int112(int256(positionInfo_.position) * (price - int112(uint112(positionInfo_.positionAvgPrice))) / _INT_PRECISION);
+    return
+      int112(
+        (int256(positionInfo_.position) * (price - int112(uint112(positionInfo_.positionAvgPrice)))) / _INT_PRECISION
+      );
   }
 
   // named return parameters because of stack to deep
@@ -121,15 +124,16 @@ contract EVEDEX is BaseDEX, IEVEDEX {
 
       {
         PositionInfo memory positionInfo_ = positionInfo[index][account];
-        int112 leverage = int112(uint112(positionInfo_.leverage));
+        int256 leverage = int256(uint256(positionInfo_.leverage));
+        leverage = leverage == 0 ? int256(1) : leverage;
         int256 absPosition = positionInfo_.position < 0 ? -positionInfo_.position : positionInfo_.position;
-        margin += int112(absPosition * int112(uint112(positionInfo_.positionAvgPrice)) / _INT_PRECISION / leverage);
+        margin += int112((absPosition * int256(uint256(positionInfo_.positionAvgPrice))) / _INT_PRECISION / leverage);
       }
 
       pnls[i] = getPNL(account, index, int112(uint112(prices[i].price)));
-      frs[i] =
-        int112(getAccountFR(account, index, historyTimestamp, historySearchHint) * int256(prices[i].price) /
-        _INT_PRECISION);
+      frs[i] = int112(
+        (getAccountFR(account, index, historyTimestamp, historySearchHint) * int256(prices[i].price)) / _INT_PRECISION
+      );
       equity += pnls[i] + frs[i];
       ++pricesChecked;
     }
@@ -258,6 +262,7 @@ contract EVEDEX is BaseDEX, IEVEDEX {
         liquidationOrder.liquidator,
         int112(liquidationPrice),
         fullPrices,
+        liquidationOrder.leverage,
         collateralIndex,
         historyTimestamp,
         historySearchHint
@@ -271,6 +276,7 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     address liquidator,
     int112 liquidationPrice,
     FullPrices calldata fullPrices,
+    uint16 liquidatorLeverage,
     uint256 collateralIndex,
     uint256 historyTimestamp,
     uint256 historySearchHint
@@ -310,7 +316,7 @@ contract EVEDEX is BaseDEX, IEVEDEX {
       accountToLiquidatePosition.position,
       liquidationPrice,
       int112(100),
-      liquidatorPosition.leverage,
+      liquidatorLeverage,
       fullPrices,
       historyTimestamp,
       historySearchHint
@@ -357,6 +363,7 @@ contract EVEDEX is BaseDEX, IEVEDEX {
       liquidationOrder.liquidator,
       int112(uint112(liquidationOrder.prices[0].price)),
       fullPrices,
+      liquidationOrder.leverage,
       collateralIndex,
       historyTimestamp,
       historySearchHint

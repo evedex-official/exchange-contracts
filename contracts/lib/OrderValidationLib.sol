@@ -29,6 +29,7 @@ struct MultiOrderLiquidation {
   address collateral;
   PriceData[] liquidationPrices;
   PriceData[] prices;
+  uint16 leverage;
   uint256 liquidationTimestamp;
   uint256 expiration;
   bytes signature;
@@ -40,6 +41,7 @@ struct OrderLiquidation {
   address collateral;
   uint256 index;
   PriceData[] prices;
+  uint16 leverage;
   uint256 liquidationTimestamp;
   uint256 expiration;
   bytes signature;
@@ -61,6 +63,7 @@ library OrderValidationLib {
   error InvalidAmount();
   error InvalidDealSide();
   error InvalidExpiration();
+  error InvalidLeverage();
   error InvalidMatcher();
   error InvalidPrice();
   error InvalidSignature();
@@ -87,14 +90,14 @@ library OrderValidationLib {
   bytes32 public constant MULTI_ORDER_LIQUIDATION_TYPEHASH =
     keccak256(
       abi.encodePacked(
-        "MultiOrderLiquidation(address accountToLiquidate,address liquidator,PriceData[] liquidationPrices,PriceData[] prices,uint256 liquidationTimestamp,uint256 expiration)PriceData(uint256 index,uint256 price)"
+        "MultiOrderLiquidation(address accountToLiquidate,address liquidator,PriceData[] liquidationPrices,PriceData[] prices,uint16 leverage,uint256 liquidationTimestamp,uint256 expiration)PriceData(uint256 index,uint256 price)"
       )
     );
 
   bytes32 public constant LIQUIDATION_ORDER_TYPEHASH =
     keccak256(
       abi.encodePacked(
-        "OrderLiquidation(address accountToLiquidate,address liquidator,uint256 index,PriceData[] prices,uint256 liquidationTimestamp,uint256 expiration)PriceData(uint256 index,uint256 price)"
+        "OrderLiquidation(address accountToLiquidate,address liquidator,uint256 index,PriceData[] prices,uint16 leverage,uint256 liquidationTimestamp,uint256 expiration)PriceData(uint256 index,uint256 price)"
       )
     );
 
@@ -166,6 +169,7 @@ library OrderValidationLib {
           _liquidationOrder.liquidator,
           keccak256(abi.encodePacked(encodedLiquidationPrices)),
           keccak256(abi.encodePacked(encodedPrices)),
+          _liquidationOrder.leverage,
           _liquidationOrder.liquidationTimestamp,
           _liquidationOrder.expiration
         )
@@ -188,6 +192,7 @@ library OrderValidationLib {
           _liquidationOrder.liquidator,
           _liquidationOrder.index,
           keccak256(abi.encodePacked(encodedPrices)),
+          _liquidationOrder.leverage,
           _liquidationOrder.liquidationTimestamp,
           _liquidationOrder.expiration
         )
@@ -275,6 +280,7 @@ library OrderValidationLib {
     if (filledAmount > buyOrder.amount || filledAmount > sellOrder.amount) revert InvalidAmount();
     if (filledPrice > buyOrder.price || filledPrice < sellOrder.price) revert InvalidPrice();
     if (buyOrder.side != 1 && sellOrder.side != 0) revert InvalidDealSide();
+    if (buyOrder.leverage == 0 || sellOrder.leverage == 0) revert InvalidLeverage();
     buyOrderDigest = _getOrderDigestWithoutLeverage(buyOrder);
     sellOrderDigest = _getOrderDigestWithoutLeverage(sellOrder);
   }

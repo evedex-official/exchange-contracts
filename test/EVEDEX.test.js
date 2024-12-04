@@ -328,4 +328,144 @@ describe('EVEDEX contract', function () {
 
     expect(await token.balanceOf(alice.address)).to.equal(withdrawalAmountCorrect, 'incorrect withdrawal amount');
   });
+
+  it('should liquidate user', async function () {
+    const amount = await ethers.parseEther('100');
+    await token.mint(alice.address, amount);
+    await token.mint(bob.address, amount);
+
+    await token.connect(alice).approve(await depositDex.getAddress(), amount);
+    await token.connect(bob).approve(await depositDex.getAddress(), amount);
+    await depositDex.connect(alice).depositCollateral(tokenAddress, amount);
+    await depositDex.connect(bob).depositCollateral(tokenAddress, amount);
+
+    await token.mint(liquidator.address, ethers.parseEther('100000'));
+    await token.connect(liquidator).approve(await depositDex.getAddress(), ethers.parseEther('100000'));
+    await depositDex.connect(liquidator).depositCollateral(tokenAddress, ethers.parseEther('10000'));
+
+    const expiration = Math.floor(Date.now() / 1000) + 3600; // 1 hour from now
+    const orderAmount = await ethers.parseEther('3.75'); // 3.75 * 3000 (price) / 100 (leverage) * 0.8 (soLevel) = 90
+    const orderPrice = 300000000000;
+
+    const aliceOrder = {
+      senderAddress: alice.address,
+      matcherAddress: matcher.address,
+      collateral: tokenAddress,
+      instrumentIndex: 0,
+      amount: orderAmount,
+      price: orderPrice,
+      leverage: 100,
+      matcherFee: 0,
+      expiration: expiration,
+      side: 1,
+      userSession: ethers.ZeroAddress,
+    };
+    const bobOrder = {
+      senderAddress: bob.address,
+      matcherAddress: matcher.address,
+      collateral: tokenAddress,
+      instrumentIndex: 0,
+      amount: orderAmount,
+      price: orderPrice,
+      leverage: 100,
+      matcherFee: 0,
+      expiration: expiration,
+      side: 0,
+      userSession: ethers.ZeroAddress,
+    };
+    const domain = {
+      name: 'EVEDEX',
+      version: '1',
+      chainId: (await ethers.provider.getNetwork()).chainId,
+      verifyingContract: await eveDex.getAddress(),
+    };
+    const types = {
+      Order: [
+        { name: 'senderAddress', type: 'address' },
+        { name: 'matcherAddress', type: 'address' },
+        { name: 'collateral', type: 'address' },
+        { name: 'instrumentIndex', type: 'uint256' },
+        { name: 'amount', type: 'uint256' },
+        { name: 'price', type: 'uint256' },
+        { name: 'leverage', type: 'uint16' },
+        { name: 'matcherFee', type: 'uint256' },
+        { name: 'expiration', type: 'uint256' },
+        { name: 'side', type: 'uint8' },
+      ],
+    };
+    const instrumentPrices = [
+      {
+        index: 0,
+        price: orderPrice,
+      },
+    ];
+    const collateralPrices = [
+      {
+        collateral: tokenAddress,
+        price: 100000000,
+      },
+    ];
+
+    const aliceSignature = await alice.signTypedData(domain, types, aliceOrder);
+    const bobSignature = await bob.signTypedData(domain, types, bobOrder);
+    const buyOrder = { ...aliceOrder, signature: aliceSignature };
+    const sellOrder = { ...bobOrder, signature: bobSignature };
+    const buyOrderExt = { collateralIndex: 0, order: buyOrder };
+    const sellOrderExt = { collateralIndex: 0, order: sellOrder };
+
+    await eveDex.connect(matcher).fillOrders(
+      buyOrderExt,
+      sellOrderExt,
+      orderPrice,
+      orderAmount,
+      { collateralPrices, instrumentPrices }, // fullPrices
+      0, // historyTimestamp
+      0, // historySearchHint
+    );
+
+    const liquidationPrice = 301000000000;
+
+    const liquidationPrices = [
+      {
+        index: 0,
+        price: liquidationPrice,
+      },
+    ];
+    const multiLiquidationOrder = {
+      accountToLiquidate: bob.address,
+      liquidator: liquidator.address,
+      collateral: tokenAddress,
+      liquidationPrices: liquidationPrices,
+      prices: liquidationPrices,
+      leverage: 100,
+      liquidationTimestamp: Math.floor(Date.now() / 1000),
+      expiration: expiration,
+    };
+    const liquidationTypes = {
+      MultiOrderLiquidation: [
+        { name: 'accountToLiquidate', type: 'address' },
+        { name: 'liquidator', type: 'address' },
+        { name: 'liquidationPrices', type: 'PriceData[]' },
+        { name: 'prices', type: 'PriceData[]' },
+        { name: 'leverage', type: 'uint16' },
+        { name: 'liquidationTimestamp', type: 'uint256' },
+        { name: 'expiration', type: 'uint256' },
+      ],
+      PriceData: [
+        { name: 'index', type: 'uint256' },
+        { name: 'price', type: 'uint256' },
+      ],
+    };
+
+    const liquidatorSignature = await liquidator.signTypedData(domain, liquidationTypes, multiLiquidationOrder);
+    const liquidationOrder = { ...multiLiquidationOrder, signature: liquidatorSignature };
+
+    await eveDex.connect(matcher).liquidatePositions(
+      liquidationOrder,
+      { collateralPrices, instrumentPrices }, // fullPrices
+      0, // collateralIndex
+      0, // historyTimestamp
+      0, // historySearchHint
+    );
+  });
 });
