@@ -41,12 +41,42 @@ contract EVEDEX is BaseDEX, IEVEDEX {
 
   function getActiveInstrumentsPositions(
     address account
-  ) public view returns (uint256[] memory indexes, PositionInfo[] memory positions) {
+  ) external view returns (uint256[] memory indexes, PositionInfo[] memory positions) {
     indexes = _activeInstruments[account].values();
     uint256 indexesLen = indexes.length;
     positions = new PositionInfo[](indexesLen);
     for (uint i = 0; i < indexesLen; ++i) {
-      positions[i] = positionInfo[indexes[i]][account];
+      positions[i] = _positionInfo[indexes[i]][account];
+    }
+  }
+
+  function getAccountsWithOpenPositionLength() external view returns (uint256) {
+    return _accountsWithOpenPositions.length();
+  }
+
+  function getAccountsWithOpenPositions(uint256 offset, uint256 limit) external view returns (address[] memory res) {
+    uint256 length = _accountsWithOpenPositions.length();
+    if (offset >= length) return res;
+    uint256 size = length - offset < limit ? length - offset : limit;
+    res = new address[](size);
+    for (uint256 i = offset; i < offset + size; ++i) {
+      res[i] = _accountsWithOpenPositions.at(i);
+    }
+  }
+
+  function getOpenPositions(uint256 offset, uint256 limit) external view returns (AccountPositions[] memory positions) {
+    uint256 length = _accountsWithOpenPositions.length();
+    if (offset >= length) return (positions);
+    uint256 size = length - offset < limit ? length - offset : limit;
+    positions = new AccountPositions[](size);
+    for (uint256 i = offset; i < offset + size; ++i) {
+      positions[i].account = _accountsWithOpenPositions.at(i);
+      uint256[] memory indexes = getActiveInstrumentsIndexes(positions[i].account);
+      uint256 len = indexes.length;
+      positions[i].positions = new PositionInfo[](len);
+      for (uint256 j = 0; j < len; ++j) {
+        positions[i].positions[j] = _positionInfo[indexes[j]][positions[i].account];
+      }
     }
   }
 
@@ -54,7 +84,7 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     uint256 index,
     uint256 historyTimestamp,
     uint256 historySearchHint
-  ) public view override returns (int72) {
+  ) public view override(BaseDEX, IEVEDEX) returns (int72) {
     FundingRateInfo memory fundingRateInfo = _getFundingRateInfo(index, historyTimestamp, historySearchHint);
     // return
     //   fundingRateInfo.shortFRStored +
@@ -67,7 +97,7 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     uint256 index,
     uint256 historyTimestamp,
     uint256 historySearchHint
-  ) public view override returns (int72) {
+  ) public view override(BaseDEX, IEVEDEX) returns (int72) {
     FundingRateInfo memory fundingRateInfo = _getFundingRateInfo(index, historyTimestamp, historySearchHint);
     // return
     //   fundingRateInfo.longFRStored +
@@ -82,7 +112,7 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     uint256 historyTimestamp,
     uint256 historySearchHint
   ) public view returns (int112) {
-    PositionInfo memory positionInfo_ = positionInfo[index][account];
+    PositionInfo memory positionInfo_ = _positionInfo[index][account];
     int256 accumulatedPercentage;
     if (positionInfo_.position < 0) {
       accumulatedPercentage = (getTotalShortFR(index, historyTimestamp, historySearchHint) -
@@ -96,7 +126,7 @@ contract EVEDEX is BaseDEX, IEVEDEX {
   }
 
   function getPNL(address account, uint256 index, int112 price) public view returns (int112) {
-    PositionInfo memory positionInfo_ = positionInfo[index][account];
+    PositionInfo memory positionInfo_ = _positionInfo[index][account];
     return
       int112(
         (int256(positionInfo_.position) * (price - int112(uint112(positionInfo_.positionAvgPrice)))) / _INT_PRECISION
@@ -123,7 +153,7 @@ contract EVEDEX is BaseDEX, IEVEDEX {
       if (!_activeInstruments[account].contains(index)) continue;
 
       {
-        PositionInfo memory positionInfo_ = positionInfo[index][account];
+        PositionInfo memory positionInfo_ = _positionInfo[index][account];
         int256 leverage = int256(uint256(positionInfo_.leverage));
         leverage = leverage == 0 ? int256(1) : leverage;
         int256 absPosition = positionInfo_.position < 0 ? -positionInfo_.position : positionInfo_.position;
@@ -186,36 +216,6 @@ contract EVEDEX is BaseDEX, IEVEDEX {
       historySearchHint
     );
     return ((margin == 0 || accountMarginLevel >= marginLevel), equity);
-  }
-
-  function accountsWithOpenPositionLength() public view returns (uint256) {
-    return _accountsWithOpenPositions.length();
-  }
-
-  function getAccountsWithOpenPositions(uint256 offset, uint256 limit) public view returns (address[] memory res) {
-    uint256 length = _accountsWithOpenPositions.length();
-    if (offset >= length) return res;
-    uint256 size = length - offset < limit ? length - offset : limit;
-    res = new address[](size);
-    for (uint256 i = offset; i < offset + size; ++i) {
-      res[i] = _accountsWithOpenPositions.at(i);
-    }
-  }
-
-  function getOpenPositions(uint256 offset, uint256 limit) public view returns (AccountPositions[] memory positions) {
-    uint256 length = _accountsWithOpenPositions.length();
-    if (offset >= length) return (positions);
-    uint256 size = length - offset < limit ? length - offset : limit;
-    positions = new AccountPositions[](size);
-    for (uint256 i = offset; i < offset + size; ++i) {
-      positions[i].account = _accountsWithOpenPositions.at(i);
-      uint256[] memory indexes = getActiveInstrumentsIndexes(positions[i].account);
-      uint256 len = indexes.length;
-      positions[i].positions = new PositionInfo[](len);
-      for (uint256 j = 0; j < len; ++j) {
-        positions[i].positions[j] = positionInfo[indexes[j]][positions[i].account];
-      }
-    }
   }
 
   function _calculateLiquidationFee(PositionInfo memory position) internal view returns (uint112) {
@@ -281,8 +281,8 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     uint256 historyTimestamp,
     uint256 historySearchHint
   ) internal returns (int112 pnl, int112 fr, uint112 liquidationFee) {
-    PositionInfo storage accountToLiquidatePosition = positionInfo[index][accountToLiquidate];
-    PositionInfo storage liquidatorPosition = positionInfo[index][liquidator];
+    PositionInfo storage accountToLiquidatePosition = _positionInfo[index][accountToLiquidate];
+    PositionInfo storage liquidatorPosition = _positionInfo[index][liquidator];
     if (accountToLiquidatePosition.position == 0) revert ZeroPositionLiquidation();
     int112 positionAvgPrice = int112(uint112(accountToLiquidatePosition.positionAvgPrice));
     pnl = (accountToLiquidatePosition.position * (liquidationPrice - positionAvgPrice)) / _INT_PRECISION;
@@ -370,10 +370,6 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     );
   }
 
-  function _validateUserOrder(Order memory order) internal returns (address) {
-    return ISessionManager(sessionManager).validateUserOrder(order);
-  }
-
   function fillOrders(
     OrderExtended memory buyOrder,
     OrderExtended memory sellOrder,
@@ -382,7 +378,7 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     FullPrices calldata fullPrices,
     uint256 historyTimestamp,
     uint256 historySearchHint
-  ) public onlyRole(MATCHER_ROLE) {
+  ) external onlyRole(MATCHER_ROLE) {
     // Orders validation
     {
       address buyOrderSigner = buyOrder.order.senderAddress;
@@ -457,8 +453,8 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     }
 
     uint256 index = buyOrder.order.instrumentIndex;
-    PositionInfo storage buyerUserData = positionInfo[index][buyOrder.order.senderAddress];
-    PositionInfo storage sellerUserData = positionInfo[index][sellOrder.order.senderAddress];
+    PositionInfo storage buyerUserData = _positionInfo[index][buyOrder.order.senderAddress];
+    PositionInfo storage sellerUserData = _positionInfo[index][sellOrder.order.senderAddress];
     int112 amount = int112(uint112(filledAmount));
     int112 soLevel_ = soLevel;
 
@@ -598,6 +594,10 @@ contract EVEDEX is BaseDEX, IEVEDEX {
       realizedPNL,
       realizedFRCollateral
     );
+  }
+
+  function _validateUserOrder(Order memory order) internal returns (address) {
+    return ISessionManager(sessionManager).validateUserOrder(order);
   }
 
   function _updateActivePositions(address account, uint256 index, int256 position) internal {

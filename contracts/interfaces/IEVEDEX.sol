@@ -72,6 +72,39 @@ interface IEVEDEX {
   error OrderIsAlreadyFilled();
   error PriceArrayLengthError();
 
+  function getActiveInstrumentsIndexes(address account) external view returns (uint256[] memory);
+
+  function getActiveInstrumentsPositions(
+    address account
+  ) external view returns (uint256[] memory indexes, PositionInfo[] memory positions);
+
+  function getTotalShortFR(
+    uint256 index,
+    uint256 historyTimestamp,
+    uint256 historySearchHint
+  ) external view returns (int72);
+
+  function getTotalLongFR(
+    uint256 index,
+    uint256 historyTimestamp,
+    uint256 historySearchHint
+  ) external view returns (int72);
+
+  function getAccountFR(
+    address account,
+    uint256 index,
+    uint256 historyTimestamp,
+    uint256 historySearchHint
+  ) external view returns (int112);
+
+  function getPNL(address account, uint256 index, int112 price) external view returns (int112);
+
+  function getAccountsWithOpenPositionLength() external view returns (uint256);
+
+  function getAccountsWithOpenPositions(uint256 offset, uint256 limit) external view returns (address[] memory res);
+
+  function getOpenPositions(uint256 offset, uint256 limit) external view returns (AccountPositions[] memory positions);
+
   function checkMarginWithPrices(
     address account,
     int112 marginLevel,
@@ -79,4 +112,39 @@ interface IEVEDEX {
     uint256 historyTimestamp,
     uint256 historySearchHint
   ) external view returns (bool, int112);
+
+  function calculateMarginLevel(
+    address account,
+    PriceData[] memory prices,
+    CollateralPriceData[] memory collateralPrices,
+    bool checkPrices,
+    uint256 historyTimestamp,
+    uint256 historySearchHint
+  ) external view returns (int112 marginLevel, int112 equity, int112 margin, int112[] memory pnls, int112[] memory frs);
+
+  function liquidatePositions(
+    MultiOrderLiquidation memory liquidationOrder,
+    FullPrices calldata fullPrices,
+    uint256 collateralIndex,
+    uint256 historyTimestamp,
+    uint256 historySearchHint
+  ) external;
+
+  function liquidatePosition(
+    OrderLiquidation memory liquidationOrder,
+    FullPrices calldata fullPrices,
+    uint256 collateralIndex,
+    uint256 historyTimestamp,
+    uint256 historySearchHint
+  ) external;
+
+  function fillOrders(
+    OrderExtended memory buyOrder,
+    OrderExtended memory sellOrder,
+    uint80 filledPrice,
+    uint96 filledAmount,
+    FullPrices calldata fullPrices,
+    uint256 historyTimestamp,
+    uint256 historySearchHint
+  ) external;
 }
