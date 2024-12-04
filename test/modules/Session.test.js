@@ -160,6 +160,8 @@ describe('Testing SessionManager contract', function () {
       expiration: timestamp + 200,
       side: 0,
       userSession: aliceSession.address,
+      merkleRoot: ethers.ZeroHash,
+      merkleProof: [],
       signature: '0x',
     };
 
@@ -185,6 +187,8 @@ describe('Testing SessionManager contract', function () {
       expiration: timestamp + 200,
       side: 0,
       userSession: aliceSession.address,
+      merkleRoot: ethers.ZeroHash,
+      merkleProof: [],
       signature: '0x',
     };
 
@@ -211,6 +215,8 @@ describe('Testing SessionManager contract', function () {
       expiration: timestamp + 1000,
       side: 0,
       userSession: aliceSession.address,
+      merkleRoot: ethers.ZeroHash,
+      merkleProof: [],
       signature: '0x',
     };
 
@@ -230,6 +236,8 @@ describe('Testing SessionManager contract', function () {
       expiration: timestamp + 300,
       side: 0,
       userSession: aliceSession.address,
+      merkleRoot: ethers.ZeroHash,
+      merkleProof: [],
       signature: '0x',
     };
     expect(await session.connect(validator).validateUserOrder(order4))
@@ -265,6 +273,8 @@ describe('Testing SessionManager contract', function () {
       expiration: timestamp + 10000,
       side: 0,
       userSession: aliceSession.address,
+      merkleRoot: ethers.ZeroHash,
+      merkleProof: [],
       signature: '0x',
     };
     await session.connect(alice).setSession(aliceSession.address, newSession2, config);

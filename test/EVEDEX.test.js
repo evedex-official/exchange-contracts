@@ -1,7 +1,15 @@
 const { ethers } = require('hardhat');
 const { time } = require('@nomicfoundation/hardhat-network-helpers');
 const { expect } = require('chai');
+const { StandardMerkleTree } = require('@openzeppelin/merkle-tree');
 const { deployProxyWithLibraries, deployWithLibraries } = require('./helpers/deploy-utils');
+const {
+  multiOrderLiquidationTypes,
+  orderTypes,
+  multiOrderTypes,
+  orderWithdrawalTypes,
+  domain,
+} = require('./helpers/eip712-types');
 
 describe('EVEDEX contract', function () {
   let depositDex, vault, eveDex, sessions, token, tokenAddress, orderLib;
@@ -17,25 +25,8 @@ describe('EVEDEX contract', function () {
       expiration,
       signature: '0x',
     };
-
-    const domain = {
-      name: 'EVEDEX',
-      version: '1',
-      chainId: (await ethers.provider.getNetwork()).chainId,
-      verifyingContract: await depositDex.getAddress(),
-    };
-
-    const types = {
-      OrderWithdrawal: [
-        { name: 'collateral', type: 'address' },
-        { name: 'account', type: 'address' },
-        { name: 'amount', type: 'uint256' },
-        { name: 'session', type: 'address' },
-        { name: 'expiration', type: 'uint256' },
-      ],
-    };
-    const signature = await alice.signTypedData(domain, types, withdrawalOrder);
-
+    const domainDeposit = await domain(await depositDex.getAddress());
+    const signature = await alice.signTypedData(domainDeposit, orderWithdrawalTypes, withdrawalOrder);
     const signedWithdrawalOrder = { ...withdrawalOrder, signature };
     return signedWithdrawalOrder;
   };
@@ -131,6 +122,8 @@ describe('EVEDEX contract', function () {
       expiration: expiration,
       side: 1,
       userSession: ethers.ZeroAddress,
+      merkleRoot: ethers.ZeroHash,
+      merkleProof: [],
     };
     const bobOrder = {
       senderAddress: bob.address,
@@ -144,27 +137,17 @@ describe('EVEDEX contract', function () {
       expiration: expiration,
       side: 0,
       userSession: ethers.ZeroAddress,
+      merkleRoot: ethers.ZeroHash,
+      merkleProof: [],
     };
-    const domain = {
-      name: 'EVEDEX',
-      version: '1',
-      chainId: (await ethers.provider.getNetwork()).chainId,
-      verifyingContract: await eveDex.getAddress(),
-    };
-    const types = {
-      Order: [
-        { name: 'senderAddress', type: 'address' },
-        { name: 'matcherAddress', type: 'address' },
-        { name: 'collateral', type: 'address' },
-        { name: 'instrumentIndex', type: 'uint256' },
-        { name: 'amount', type: 'uint256' },
-        { name: 'price', type: 'uint256' },
-        { name: 'leverage', type: 'uint16' },
-        { name: 'matcherFee', type: 'uint256' },
-        { name: 'expiration', type: 'uint256' },
-        { name: 'side', type: 'uint8' },
-      ],
-    };
+    const domainBase = await domain(await eveDex.getAddress());
+    const aliceSignature = await alice.signTypedData(domainBase, orderTypes, aliceOrder);
+    const bobSignature = await bob.signTypedData(domainBase, orderTypes, bobOrder);
+    const buyOrder = { ...aliceOrder, signature: aliceSignature };
+    const sellOrder = { ...bobOrder, signature: bobSignature };
+    const buyOrderExt = { collateralIndex: 0, order: buyOrder };
+    const sellOrderExt = { collateralIndex: 0, order: sellOrder };
+
     const instrumentPrices = [
       {
         index: 0,
@@ -177,13 +160,6 @@ describe('EVEDEX contract', function () {
         price: 100000000,
       },
     ];
-
-    const aliceSignature = await alice.signTypedData(domain, types, aliceOrder);
-    const bobSignature = await bob.signTypedData(domain, types, bobOrder);
-    const buyOrder = { ...aliceOrder, signature: aliceSignature };
-    const sellOrder = { ...bobOrder, signature: bobSignature };
-    const buyOrderExt = { collateralIndex: 0, order: buyOrder };
-    const sellOrderExt = { collateralIndex: 0, order: sellOrder };
 
     await eveDex.connect(matcher).fillOrders(
       buyOrderExt,
@@ -199,6 +175,175 @@ describe('EVEDEX contract', function () {
     expect(alicePositions[1][0][0]).to.equal(orderAmount, 'wrong buyer position');
     const bobPositions = await eveDex.getActiveInstrumentsPositions(bob.address);
     expect(bobPositions[1][0][0]).to.equal(-orderAmount, 'wrong seller position');
+  });
+
+  it('should fill multiOrder', async function () {
+    const amount = await ethers.parseEther('100');
+    await token.mint(alice.address, amount);
+    await token.mint(bob.address, amount);
+
+    await token.connect(alice).approve(await depositDex.getAddress(), amount);
+    await token.connect(bob).approve(await depositDex.getAddress(), amount);
+    await depositDex.connect(alice).depositCollateral(tokenAddress, amount);
+    await depositDex.connect(bob).depositCollateral(tokenAddress, amount);
+
+    const expiration = Math.floor(Date.now() / 1000) + 3600; // 1 hour from now
+    const orderAmount1 = await ethers.parseEther('1.0');
+    const orderAmount2 = await ethers.parseEther('0.5');
+    const orderPrice = 300000000000;
+
+    const aliceOrder1 = {
+      senderAddress: alice.address,
+      matcherAddress: matcher.address,
+      collateral: tokenAddress,
+      instrumentIndex: 0,
+      amount: orderAmount1,
+      price: orderPrice,
+      leverage: 100,
+      matcherFee: 0,
+      expiration: expiration,
+      side: 1,
+      userSession: ethers.ZeroAddress,
+      merkleRoot: ethers.ZeroHash,
+      merkleProof: [],
+    };
+    const aliceOrder2 = {
+      senderAddress: alice.address,
+      matcherAddress: matcher.address,
+      collateral: tokenAddress,
+      instrumentIndex: 0,
+      amount: orderAmount2,
+      price: orderPrice,
+      leverage: 100,
+      matcherFee: 0,
+      expiration: expiration,
+      side: 1,
+      userSession: ethers.ZeroAddress,
+      merkleRoot: ethers.ZeroHash,
+      merkleProof: [],
+    };
+    const bobOrder = {
+      senderAddress: bob.address,
+      matcherAddress: matcher.address,
+      collateral: tokenAddress,
+      instrumentIndex: 0,
+      amount: orderAmount1 + orderAmount2,
+      price: orderPrice,
+      leverage: 100,
+      matcherFee: 0,
+      expiration: expiration,
+      side: 0,
+      userSession: ethers.ZeroAddress,
+      merkleRoot: ethers.ZeroHash,
+      merkleProof: [],
+    };
+
+    const leafEncoding = [
+      'bytes32',
+      'address',
+      'address',
+      'address',
+      'uint256',
+      'uint256',
+      'uint256',
+      'uint16',
+      'uint256',
+      'uint256',
+      'uint8',
+    ];
+    const typehash = await orderLib.ORDER_TYPEHASH();
+    const values = [
+      [
+        typehash,
+        aliceOrder1.senderAddress,
+        aliceOrder1.matcherAddress,
+        aliceOrder1.collateral,
+        aliceOrder1.instrumentIndex,
+        aliceOrder1.amount,
+        aliceOrder1.price,
+        aliceOrder1.leverage,
+        aliceOrder1.matcherFee,
+        aliceOrder1.expiration,
+        aliceOrder1.side,
+      ],
+      [
+        typehash,
+        aliceOrder2.senderAddress,
+        aliceOrder2.matcherAddress,
+        aliceOrder2.collateral,
+        aliceOrder2.instrumentIndex,
+        aliceOrder2.amount,
+        aliceOrder2.price,
+        aliceOrder2.leverage,
+        aliceOrder2.matcherFee,
+        aliceOrder2.expiration,
+        aliceOrder2.side,
+      ],
+    ];
+    const tree = StandardMerkleTree.of(values, leafEncoding);
+    const aliceMultiOrder = { merkleRoot: tree.root };
+
+    const domainBase = await domain(await eveDex.getAddress());
+    const aliceSignature = await alice.signTypedData(domainBase, multiOrderTypes, aliceMultiOrder);
+    const bobSignature = await bob.signTypedData(domainBase, orderTypes, bobOrder);
+    const buyOrder1 = { ...aliceOrder1, signature: aliceSignature };
+    const buyOrder2 = { ...aliceOrder2, signature: aliceSignature };
+    for (const [i, v] of tree.entries()) {
+      if (v[5] === orderAmount1) {
+        buyOrder1.merkleRoot = tree.root;
+        buyOrder1.merkleProof = tree.getProof(i);
+      } else if (v[5] === orderAmount2) {
+        buyOrder2.merkleRoot = tree.root;
+        buyOrder2.merkleProof = tree.getProof(i);
+      }
+    }
+    const sellOrder = { ...bobOrder, signature: bobSignature };
+    const buyOrderExt1 = { collateralIndex: 0, order: buyOrder1 };
+    const buyOrderExt2 = { collateralIndex: 0, order: buyOrder2 };
+    const sellOrderExt = { collateralIndex: 0, order: sellOrder };
+
+    const instrumentPrices = [
+      {
+        index: 0,
+        price: orderPrice,
+      },
+    ];
+    const collateralPrices = [
+      {
+        collateral: tokenAddress,
+        price: 100000000,
+      },
+    ];
+
+    await eveDex.connect(matcher).fillOrders(
+      buyOrderExt1,
+      sellOrderExt,
+      orderPrice,
+      orderAmount1,
+      { collateralPrices, instrumentPrices }, // fullPrices
+      0, // historyTimestamp
+      0, // historySearchHint
+    );
+
+    const alicePositions1 = await eveDex.getActiveInstrumentsPositions(alice.address);
+    expect(alicePositions1[1][0][0]).to.equal(orderAmount1, 'wrong buyer position');
+    const bobPositions1 = await eveDex.getActiveInstrumentsPositions(bob.address);
+    expect(bobPositions1[1][0][0]).to.equal(-orderAmount1, 'wrong seller position');
+
+    await eveDex.connect(matcher).fillOrders(
+      buyOrderExt2,
+      sellOrderExt,
+      orderPrice,
+      orderAmount2,
+      { collateralPrices, instrumentPrices }, // fullPrices
+      0, // historyTimestamp
+      0, // historySearchHint
+    );
+
+    const alicePositions2 = await eveDex.getActiveInstrumentsPositions(alice.address);
+    expect(alicePositions2[1][0][0]).to.equal(orderAmount1 + orderAmount2, 'wrong buyer position');
+    const bobPositions2 = await eveDex.getActiveInstrumentsPositions(bob.address);
+    expect(bobPositions2[1][0][0]).to.equal(-orderAmount1 - orderAmount2, 'wrong seller position');
   });
 
   it('should withdraw within margin', async function () {
@@ -227,6 +372,8 @@ describe('EVEDEX contract', function () {
       expiration: expiration,
       side: 1,
       userSession: ethers.ZeroAddress,
+      merkleRoot: ethers.ZeroHash,
+      merkleProof: [],
     };
     const bobOrder = {
       senderAddress: bob.address,
@@ -240,27 +387,17 @@ describe('EVEDEX contract', function () {
       expiration: expiration,
       side: 0,
       userSession: ethers.ZeroAddress,
+      merkleRoot: ethers.ZeroHash,
+      merkleProof: [],
     };
-    const domain = {
-      name: 'EVEDEX',
-      version: '1',
-      chainId: (await ethers.provider.getNetwork()).chainId,
-      verifyingContract: await eveDex.getAddress(),
-    };
-    const types = {
-      Order: [
-        { name: 'senderAddress', type: 'address' },
-        { name: 'matcherAddress', type: 'address' },
-        { name: 'collateral', type: 'address' },
-        { name: 'instrumentIndex', type: 'uint256' },
-        { name: 'amount', type: 'uint256' },
-        { name: 'price', type: 'uint256' },
-        { name: 'leverage', type: 'uint16' },
-        { name: 'matcherFee', type: 'uint256' },
-        { name: 'expiration', type: 'uint256' },
-        { name: 'side', type: 'uint8' },
-      ],
-    };
+    const domainBase = await domain(await eveDex.getAddress());
+    const aliceSignature = await alice.signTypedData(domainBase, orderTypes, aliceOrder);
+    const bobSignature = await bob.signTypedData(domainBase, orderTypes, bobOrder);
+    const buyOrder = { ...aliceOrder, signature: aliceSignature };
+    const sellOrder = { ...bobOrder, signature: bobSignature };
+    const buyOrderExt = { collateralIndex: 0, order: buyOrder };
+    const sellOrderExt = { collateralIndex: 0, order: sellOrder };
+
     const instrumentPrices = [
       {
         index: 0,
@@ -273,13 +410,6 @@ describe('EVEDEX contract', function () {
         price: 100000000,
       },
     ];
-
-    const aliceSignature = await alice.signTypedData(domain, types, aliceOrder);
-    const bobSignature = await bob.signTypedData(domain, types, bobOrder);
-    const buyOrder = { ...aliceOrder, signature: aliceSignature };
-    const sellOrder = { ...bobOrder, signature: bobSignature };
-    const buyOrderExt = { collateralIndex: 0, order: buyOrder };
-    const sellOrderExt = { collateralIndex: 0, order: sellOrder };
 
     await eveDex.connect(matcher).fillOrders(
       buyOrderExt,
@@ -359,6 +489,8 @@ describe('EVEDEX contract', function () {
       expiration: expiration,
       side: 1,
       userSession: ethers.ZeroAddress,
+      merkleRoot: ethers.ZeroHash,
+      merkleProof: [],
     };
     const bobOrder = {
       senderAddress: bob.address,
@@ -372,27 +504,17 @@ describe('EVEDEX contract', function () {
       expiration: expiration,
       side: 0,
       userSession: ethers.ZeroAddress,
+      merkleRoot: ethers.ZeroHash,
+      merkleProof: [],
     };
-    const domain = {
-      name: 'EVEDEX',
-      version: '1',
-      chainId: (await ethers.provider.getNetwork()).chainId,
-      verifyingContract: await eveDex.getAddress(),
-    };
-    const types = {
-      Order: [
-        { name: 'senderAddress', type: 'address' },
-        { name: 'matcherAddress', type: 'address' },
-        { name: 'collateral', type: 'address' },
-        { name: 'instrumentIndex', type: 'uint256' },
-        { name: 'amount', type: 'uint256' },
-        { name: 'price', type: 'uint256' },
-        { name: 'leverage', type: 'uint16' },
-        { name: 'matcherFee', type: 'uint256' },
-        { name: 'expiration', type: 'uint256' },
-        { name: 'side', type: 'uint8' },
-      ],
-    };
+    const domainBase = await domain(await eveDex.getAddress());
+    const aliceSignature = await alice.signTypedData(domainBase, orderTypes, aliceOrder);
+    const bobSignature = await bob.signTypedData(domainBase, orderTypes, bobOrder);
+    const buyOrder = { ...aliceOrder, signature: aliceSignature };
+    const sellOrder = { ...bobOrder, signature: bobSignature };
+    const buyOrderExt = { collateralIndex: 0, order: buyOrder };
+    const sellOrderExt = { collateralIndex: 0, order: sellOrder };
+
     const instrumentPrices = [
       {
         index: 0,
@@ -405,13 +527,6 @@ describe('EVEDEX contract', function () {
         price: 100000000,
       },
     ];
-
-    const aliceSignature = await alice.signTypedData(domain, types, aliceOrder);
-    const bobSignature = await bob.signTypedData(domain, types, bobOrder);
-    const buyOrder = { ...aliceOrder, signature: aliceSignature };
-    const sellOrder = { ...bobOrder, signature: bobSignature };
-    const buyOrderExt = { collateralIndex: 0, order: buyOrder };
-    const sellOrderExt = { collateralIndex: 0, order: sellOrder };
 
     await eveDex.connect(matcher).fillOrders(
       buyOrderExt,
@@ -441,23 +556,12 @@ describe('EVEDEX contract', function () {
       liquidationTimestamp: Math.floor(Date.now() / 1000),
       expiration: expiration,
     };
-    const liquidationTypes = {
-      MultiOrderLiquidation: [
-        { name: 'accountToLiquidate', type: 'address' },
-        { name: 'liquidator', type: 'address' },
-        { name: 'liquidationPrices', type: 'PriceData[]' },
-        { name: 'prices', type: 'PriceData[]' },
-        { name: 'leverage', type: 'uint16' },
-        { name: 'liquidationTimestamp', type: 'uint256' },
-        { name: 'expiration', type: 'uint256' },
-      ],
-      PriceData: [
-        { name: 'index', type: 'uint256' },
-        { name: 'price', type: 'uint256' },
-      ],
-    };
 
-    const liquidatorSignature = await liquidator.signTypedData(domain, liquidationTypes, multiLiquidationOrder);
+    const liquidatorSignature = await liquidator.signTypedData(
+      domainBase,
+      multiOrderLiquidationTypes,
+      multiLiquidationOrder,
+    );
     const liquidationOrder = { ...multiLiquidationOrder, signature: liquidatorSignature };
 
     await eveDex.connect(matcher).liquidatePositions(

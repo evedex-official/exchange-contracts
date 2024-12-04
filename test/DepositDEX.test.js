@@ -2,6 +2,7 @@ const { ethers, upgrades } = require('hardhat');
 const { expect } = require('chai');
 const order = require('solhint/lib/rules/order');
 const { deployProxyWithLibraries, deployWithLibraries } = require('./helpers/deploy-utils');
+const { orderWithdrawalTypes, domain } = require('./helpers/eip712-types');
 
 describe('DepositDex contract', function () {
   let depositDex, vault, eveDex, sessions, usdt, btcToken, tokenAddress, orderLib;
@@ -17,25 +18,8 @@ describe('DepositDex contract', function () {
       expiration,
       signature: '0x',
     };
-
-    const domain = {
-      name: 'EVEDEX',
-      version: '1',
-      chainId: (await ethers.provider.getNetwork()).chainId,
-      verifyingContract: await depositDex.getAddress(),
-    };
-
-    const types = {
-      OrderWithdrawal: [
-        { name: 'collateral', type: 'address' },
-        { name: 'account', type: 'address' },
-        { name: 'amount', type: 'uint256' },
-        { name: 'session', type: 'address' },
-        { name: 'expiration', type: 'uint256' },
-      ],
-    };
-    const signature = await alice.signTypedData(domain, types, withdrawalOrder);
-
+    const domainDeposit = await domain(await depositDex.getAddress());
+    const signature = await alice.signTypedData(domainDeposit, orderWithdrawalTypes, withdrawalOrder);
     const signedWithdrawalOrder = { ...withdrawalOrder, signature };
     return signedWithdrawalOrder;
   };

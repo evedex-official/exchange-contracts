@@ -2,6 +2,7 @@
 pragma solidity ^0.8.26;
 
 import "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
+import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 
 struct Order {
   address senderAddress;
@@ -15,6 +16,8 @@ struct Order {
   uint256 expiration;
   uint8 side;
   address userSession;
+  bytes32 merkleRoot;
+  bytes32[] merkleProof;
   bytes signature;
 }
 
@@ -67,6 +70,7 @@ library OrderValidationLib {
   error InvalidMatcher();
   error InvalidPrice();
   error InvalidSignature();
+  error InvalidMerkleTree();
 
   bytes32 public constant HASHED_NAME = keccak256(bytes("EVEDEX"));
   bytes32 public constant HASHED_VERSION = keccak256(bytes("1"));
@@ -84,6 +88,8 @@ library OrderValidationLib {
         "Order(address senderAddress,address matcherAddress,address collateral,uint256 instrumentIndex,uint256 amount,uint256 price,uint16 leverage,uint256 matcherFee,uint256 expiration,uint8 side)"
       )
     );
+
+  bytes32 public constant MULTI_ORDER_TYPEHASH = keccak256(abi.encodePacked("MultiOrder(bytes32 merkleRoot)"));
 
   bytes32 public constant PRICE_INFO_TYPEHASH = keccak256(abi.encodePacked("PriceData(uint256 index,uint256 price)"));
 
@@ -125,6 +131,10 @@ library OrderValidationLib {
           _order.side
         )
       );
+  }
+
+  function _getMultiOrderTypeValueHash(Order memory _order) internal pure returns (bytes32) {
+    return keccak256(abi.encode(MULTI_ORDER_TYPEHASH, _order.merkleRoot));
   }
 
   function _getOrderTypeValueHashWithoutLeverage(Order memory _order) internal pure returns (bytes32) {
@@ -217,9 +227,12 @@ library OrderValidationLib {
     return keccak256(abi.encodePacked("\x19\x01", buildDomainSeparator(), _getOrderTypeValueHash(order)));
   }
 
-  function _getOrderDigestWithoutLeverage(Order memory order) public view returns (bytes32) {
-    return
-      keccak256(abi.encodePacked("\x19\x01", buildDomainSeparator(), _getOrderTypeValueHashWithoutLeverage(order)));
+  function _getMultiOrderDigest(Order memory order) public view returns (bytes32, bytes32) {
+    bytes32 digest = keccak256(
+      abi.encodePacked("\x19\x01", buildDomainSeparator(), _getMultiOrderTypeValueHash(order))
+    );
+    bytes32 leaf = keccak256(bytes.concat(_getOrderTypeValueHash(order)));
+    return (digest, leaf);
   }
 
   function _checkExpiration(uint256 timestamp) internal view {
@@ -228,6 +241,10 @@ library OrderValidationLib {
 
   function _checkSignature(address signer, bytes32 digest, bytes memory signature) internal view {
     if (!SignatureChecker.isValidSignatureNow(signer, digest, signature)) revert InvalidSignature();
+  }
+
+  function _checkMerkleTree(bytes32[] memory proof, bytes32 root, bytes32 leaf) internal pure {
+    if (!MerkleProof.verify(proof, root, leaf)) revert InvalidMerkleTree();
   }
 
   function checkLiquidationOrder(OrderLiquidation memory liquidationOrder) public view {
@@ -268,8 +285,22 @@ library OrderValidationLib {
     _checkExpiration(buyOrder.expiration);
     _checkExpiration(sellOrder.expiration);
 
-    buyOrderDigest = _getOrderDigest(buyOrder);
-    sellOrderDigest = _getOrderDigest(sellOrder);
+    if (buyOrder.merkleRoot != 0x00) {
+      bytes32 buyOrderLeaf;
+      (buyOrderDigest, buyOrderLeaf) = _getMultiOrderDigest(buyOrder);
+      _checkMerkleTree(buyOrder.merkleProof, buyOrder.merkleRoot, buyOrderLeaf);
+    } else {
+      buyOrderDigest = _getOrderDigest(buyOrder);
+    }
+
+    if (sellOrder.merkleRoot != 0x00) {
+      bytes32 sellOrderLeaf;
+      (sellOrderDigest, sellOrderLeaf) = _getMultiOrderDigest(sellOrder);
+      _checkMerkleTree(sellOrder.merkleProof, sellOrder.merkleRoot, sellOrderLeaf);
+    } else {
+      sellOrderDigest = _getOrderDigest(sellOrder);
+    }
+
     _checkSignature(buyOrderSigner, buyOrderDigest, buyOrder.signature);
     _checkSignature(sellOrderSigner, sellOrderDigest, sellOrder.signature);
 
@@ -281,7 +312,7 @@ library OrderValidationLib {
     if (filledPrice > buyOrder.price || filledPrice < sellOrder.price) revert InvalidPrice();
     if (buyOrder.side != 1 && sellOrder.side != 0) revert InvalidDealSide();
     if (buyOrder.leverage == 0 || sellOrder.leverage == 0) revert InvalidLeverage();
-    buyOrderDigest = _getOrderDigestWithoutLeverage(buyOrder);
-    sellOrderDigest = _getOrderDigestWithoutLeverage(sellOrder);
+    buyOrderDigest = _getOrderTypeValueHashWithoutLeverage(buyOrder);
+    sellOrderDigest = _getOrderTypeValueHashWithoutLeverage(sellOrder);
   }
 }
