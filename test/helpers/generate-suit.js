@@ -8,13 +8,14 @@ const { parseEther } = require('viem/utils');
 const suits = {};
 
 const prepareWallets = async () => {
-  const [owner, alice, bob, liquidator, fundingRateAccount, matcher] = await viem.getWalletClients();
-  return { owner, alice, bob, liquidator, fundingRateAccount, matcher };
+  const [owner, alice, bob, liquidator, fundingRateAccount, matcher, aliceSessionWallet, bobSessionWallet] =
+    await viem.getWalletClients();
+  return { owner, alice, bob, liquidator, fundingRateAccount, matcher, aliceSessionWallet, bobSessionWallet };
 };
 
 const prepareTokens = async (wallets) => {
   const [usdtToken, btcToken] = await Promise.all([viem.deployContract('ERC20Mock'), viem.deployContract('ERC20Mock')]);
-  await Promise.all(wallets.map((wallet) => usdtToken.write.mint([wallet.account.address, parseEther('100')])));
+  await Promise.all(wallets.map((user) => usdtToken.write.mint([user.account.address, parseEther('100')])));
   await Promise.all(wallets.map((wallet) => btcToken.write.mint([wallet.account.address, parseEther('100')])));
   return { usdtToken, btcToken };
 };
@@ -51,7 +52,7 @@ const prepareContracts = async ({ owner, matcher, usdtToken, btcToken, fundingRa
   await Promise.all([
     eveDex.write.grantRole([zeroHash, owner.account.address]),
     eveDex.write.grantRole([matcherRole, matcher.account.address]),
-    sessions.write.grantRole([validatorRole, eveDex.address]),
+    sessions.write.grantRole([validatorRole, depositDex.address]),
     vault.write.grantRole([withdrawRole, depositDex.address]),
     depositDex.write.setCollateralConfigs([[usdtToken.address], [true]]),
     depositDex.write.setCollateralConfigs([[btcToken.address], [true]]),
@@ -69,7 +70,8 @@ const prepareContracts = async ({ owner, matcher, usdtToken, btcToken, fundingRa
 
 const generateSuit = async (id) => {
   if (!id) throw new Error('Suit id is required');
-  const { owner, alice, bob, liquidator, fundingRateAccount, matcher } = await prepareWallets();
+  const { owner, alice, bob, liquidator, fundingRateAccount, matcher, aliceSessionWallet, bobSessionWallet } =
+    await prepareWallets();
   const { usdtToken, btcToken } = await prepareTokens([owner, alice, bob, liquidator, fundingRateAccount, matcher]);
   const { orderLib, sessions, vault, depositDex, eveDex } = await prepareContracts({
     owner,
@@ -92,6 +94,8 @@ const generateSuit = async (id) => {
     vault,
     depositDex,
     eveDex,
+    aliceSessionWallet,
+    bobSessionWallet,
   };
 
   return suits[id];

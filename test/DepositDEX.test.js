@@ -1,6 +1,5 @@
 const { ethers, upgrades } = require('hardhat');
 const { expect } = require('chai');
-const order = require('solhint/lib/rules/order');
 const { deployProxyWithLibraries, deployWithLibraries } = require('./helpers/deploy-utils');
 const { orderWithdrawalTypes, domain } = require('./helpers/eip712-types');
 
@@ -63,7 +62,7 @@ describe('DepositDex contract', function () {
     await eveDex.grantRole(matcherRole, matcher.address);
 
     const validatorRole = await sessions.VALIDATOR_ROLE();
-    await sessions.grantRole(validatorRole, await eveDex.getAddress());
+    await sessions.grantRole(validatorRole, await depositDex.getAddress());
 
     MockToken = await ethers.getContractFactory('ERC20Mock');
     usdt = await MockToken.deploy();
