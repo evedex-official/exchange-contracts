@@ -1,6 +1,7 @@
 const { domain, orderWithdrawalTypes } = require('./eip712-types');
 const { signTypedData } = require('viem/actions');
 const { maxUint32, maxUint128, maxUint64 } = require('viem');
+const { writeContract } = require('viem/actions');
 
 const signWithdrawOrder = async ({ wallet, order, contractAddress }) => {
   const signature = await signTypedData(wallet, {
@@ -24,7 +25,7 @@ const createWithdrawOrder = ({ accountAddress, collateralAddress, amount, sessio
 };
 
 const createSession = async ({
-  userAccount,
+  userWallet,
   sessionManagerContract,
   sessionWallet,
   expirationTs = maxUint64,
@@ -36,7 +37,7 @@ const createSession = async ({
   withdrawConfig = [],
 }) => {
   const session = {
-    user: userAccount.address,
+    user: userWallet.account.address,
     expiration: expirationTs,
     limitMaxOrders,
     ordersAllowed,
@@ -44,13 +45,21 @@ const createSession = async ({
     allowanceAllowed,
     limitWithdrawals,
   };
-  await sessionManagerContract.write.setSession([sessionWallet.account.address, session, withdrawConfig], {
-    account: userAccount,
+  await writeContract(userWallet, {
+    functionName: 'setSession',
+    address: sessionManagerContract.address,
+    abi: sessionManagerContract.abi,
+    args: [sessionWallet.account.address, session, withdrawConfig],
   });
 };
 
-const removeSession = async ({ userAccount, sessionManagerContract, sessionAccount }) => {
-  await sessionManagerContract.write.removeSession([sessionAccount.address], { account: userAccount });
+const removeSession = async ({ userWallet, sessionManagerContract, sessionAccount }) => {
+  await writeContract(userWallet, {
+    functionName: 'removeSession',
+    address: sessionManagerContract.address,
+    abi: sessionManagerContract.abi,
+    args: [sessionAccount.address],
+  });
 };
 
 module.exports = {
