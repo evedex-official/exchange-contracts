@@ -107,11 +107,15 @@ describe(flow, () => {
 
     // After order is registered, matcher decides to complete or to cancel it.
     // In this case, matcher completes the order
+
+    // fullPrices is a structure with prices of all collaterals and instruments
+    // instrumentPrices is a list of all futures prices available on dex
+    // collateralPrices is a list of all collateral prices available on dex
     const fullPrices = {
       instrumentPrices: [
         {
           index: 0,
-          price: usdtPrice * pricePrecision,
+          price: btcPrice * pricePrecision,
         },
       ],
       collateralPrices: [
@@ -157,12 +161,17 @@ describe(flow, () => {
     await depositDex.write.withdrawRequest([withdrawOrder], {
       account: alice.account,
     });
+
     // After order is registered, matcher decides to complete or to cancel it.
     // In this case, matcher completes the order
+
+    // fullPrices is a structure with prices of all collaterals and instruments
+    // instrumentPrices is a list of all futures prices available on dex
+    // collateralPrices is a list of all collateral prices available on dex
     const fullPrices = {
       instrumentPrices: [
         {
-          index: 1,
+          index: 0,
           price: btcPrice * pricePrecision,
         },
       ],
