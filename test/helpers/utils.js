@@ -12,7 +12,7 @@ const signWithdrawOrder = async ({ wallet, order, contractAddress }) => {
   return signature;
 };
 
-const createWithdrawOrder = async ({ accountAddress, collateralAddress, amount, session, expiration }) => {
+const createWithdrawOrder = ({ accountAddress, collateralAddress, amount, session, expiration }) => {
   return {
     collateral: collateralAddress,
     account: accountAddress,

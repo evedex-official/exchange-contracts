@@ -87,7 +87,7 @@ describe(flow, () => {
   it('usdt withdraw request signed by user', async () => {
     // Alice generate withdraw order and sends request to depositDex contract
     const { depositDex, usdtToken, alice, matcher, btcToken } = await restoreSuit(flow);
-    const withdrawOrder = await createWithdrawOrder({
+    const withdrawOrder = createWithdrawOrder({
       accountAddress: alice.account.address,
       collateralAddress: usdtToken.address,
       depositDexAddress: depositDex.address,
@@ -125,8 +125,8 @@ describe(flow, () => {
         },
       ],
     };
-    const historyTimestamp = 0n;
-    const historySearchHint = 0n;
+    const historyTimestamp = Math.trunc(Date.now() / 1000);
+    const historySearchHint = 0n; // element index in funding rate array. Hint from backend to reduce tx gas cost
     const aliceBalanceBefore = await usdtToken.read.balanceOf([alice.account.address]);
     await depositDex.write.withdrawComplete([withdrawOrder, fullPrices, historyTimestamp, historySearchHint], {
       account: matcher.account,
@@ -140,7 +140,7 @@ describe(flow, () => {
   it('btc withdraw request signed by session', async () => {
     // Alice generate withdraw order and sends request to depositDex contract
     const { depositDex, usdtToken, alice, matcher, btcToken, aliceSessionWallet } = await restoreSuit(flow);
-    const withdrawOrder = await createWithdrawOrder({
+    const withdrawOrder = createWithdrawOrder({
       accountAddress: alice.account.address,
       collateralAddress: btcToken.address,
       depositDexAddress: depositDex.address,
@@ -177,8 +177,8 @@ describe(flow, () => {
         },
       ],
     };
-    const historyTimestamp = 1n;
-    const historySearchHint = 1n;
+    const historyTimestamp = Math.trunc(Date.now() / 1000);
+    const historySearchHint = 0n; // element index in funding rate array. Hint from backend to reduce tx gas cost
     const aliceBalanceBefore = await btcToken.read.balanceOf([alice.account.address]);
     await depositDex.write.withdrawComplete([withdrawOrder, fullPrices, historyTimestamp, historySearchHint], {
       account: matcher.account,
