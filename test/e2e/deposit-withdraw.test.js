@@ -6,6 +6,7 @@ const { expect } = require('chai');
 const { createWithdrawOrder, signWithdrawOrder, createSession } = require('../helpers/utils');
 const { zeroAddress, maxUint256 } = require('viem');
 const { writeContract, readContract } = require('viem/actions');
+const { BTC_USD_INDEX } = require('../helpers/constants');
 
 /**
  * Basic flow of moving funds between user's account and depositDex contract
@@ -145,7 +146,7 @@ describe(flow, () => {
     const fullPrices = {
       instrumentPrices: [
         {
-          index: 0,
+          index: BTC_USD_INDEX,
           price: btcPrice * pricePrecision,
         },
       ],
@@ -225,7 +226,7 @@ describe(flow, () => {
     const fullPrices = {
       instrumentPrices: [
         {
-          index: 0,
+          index: BTC_USD_INDEX,
           price: btcPrice * pricePrecision,
         },
       ],
@@ -244,7 +245,7 @@ describe(flow, () => {
     const historyTimestamp = Math.trunc(Date.now() / 1000);
     const historySearchHint = 0n; // element index in funding rate array. Hint from backend to reduce tx gas cost
 
-    const aliceBalanceBefore = await readContract(alice,{
+    const aliceBalanceBefore = await readContract(alice, {
       functionName: 'balanceOf',
       address: btcToken.address,
       abi: btcToken.abi,

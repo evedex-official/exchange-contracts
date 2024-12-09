@@ -1,0 +1,10 @@
+'use strict';
+
+module.exports = {
+  BUY_SIDE: 1,
+  SELL_SIDE: 0,
+  BTC_USD_INDEX: 0,
+  BTC_USD_SYMBOL: 'BTC/USD',
+  USDT_COLLATERAL_INDEX: 0,
+  BTC_COLLATERAL_INDEX: 1,
+};
