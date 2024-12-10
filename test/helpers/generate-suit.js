@@ -58,8 +58,8 @@ const prepareContracts = async ({ owner, matcher, usdtToken, btcToken, fundingRa
     sessions.write.grantRole([validatorRole, depositDex.address]),
     sessions.write.grantRole([validatorRole, eveDex.address]),
     vault.write.grantRole([withdrawRole, depositDex.address]),
-    // positions of collaterals and instruments selected according to test/helpers/constants.js
   ]);
+  // positions of collaterals and instruments selected according to test/helpers/constants.js
   await depositDex.write.setCollateralConfigs([[usdtToken.address], [true]]);
   await depositDex.write.setCollateralConfigs([[btcToken.address], [true]]);
   await eveDex.write.addInstrument([
