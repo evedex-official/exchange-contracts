@@ -230,8 +230,8 @@ abstract contract BaseDEX is
     return _instrumentInfo[index].fundingRateData[low];
   }
 
-  function _getBalance(address account_, address collateral_, uint112 price_) internal view returns (int112 balance) {
-    balance = IDepositDEX(depositDex).getBalance(account_, collateral_, price_);
+  function _getBalance(address account_, address collateral_) internal view returns (int112 balance) {
+    balance = IDepositDEX(depositDex).getBalance(account_, collateral_);
   }
 
   function _setBalance(address account_, address collateral_, int112 balance_) internal {

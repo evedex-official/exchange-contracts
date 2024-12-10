@@ -164,8 +164,8 @@ contract DepositDEX is IDepositDEX, UUPSUpgradeable {
     emit DepositBalanceChanged(msg.sender, collateral, -int112(amount), balance);
   }
 
-  function getBalance(address account, address collateral, uint112 price) public view returns (int112 balance) {
-    balance = int112((int256(_balances[account][collateral]) * int112(price)) / _INT_PRECISION);
+  function getBalance(address account, address collateral) public view returns (int112 balance) {
+    balance = int112((int256(_balances[account][collateral])));
   }
 
   function getTotalBalance(address account, CollateralPriceData[] memory prices) public view returns (int112 balance) {
