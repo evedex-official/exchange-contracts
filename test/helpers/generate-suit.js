@@ -52,22 +52,22 @@ const prepareContracts = async ({ owner, matcher, usdtToken, btcToken, fundingRa
     vault.read.WITHDRAWER_ROLE(),
   ]);
 
-  await Promise.all([
-    eveDex.write.grantRole([zeroHash, owner.account.address]),
-    eveDex.write.grantRole([matcherRole, matcher.account.address]),
-    sessions.write.grantRole([validatorRole, depositDex.address]),
-    sessions.write.grantRole([validatorRole, eveDex.address]),
-    vault.write.grantRole([withdrawRole, depositDex.address]),
-    // positions of collaterals and instruments selected according to test/helpers/constants.js
-    depositDex.write.setCollateralConfigs([[usdtToken.address], [true]]),
-    depositDex.write.setCollateralConfigs([[btcToken.address], [true]]),
-    eveDex.write.addInstrument([
-      BTC_USD_SYMBOL,
-      100, //leverage
-      86400, //dailyFRLong
-      86400, //dailyFRShort
-      Math.floor(Date.now() / 1000), //timestamp
-    ]),
+  // there is a bug in nonce manager?
+  // if we do those actions in parallel, sometimes tests will fail with InvalidPrice() error.
+  await eveDex.write.grantRole([zeroHash, owner.account.address]);
+  await eveDex.write.grantRole([matcherRole, matcher.account.address]);
+  await sessions.write.grantRole([validatorRole, depositDex.address]);
+  await sessions.write.grantRole([validatorRole, eveDex.address]);
+  await vault.write.grantRole([withdrawRole, depositDex.address]);
+  // positions of collaterals and instruments selected according to test/helpers/constants.js;
+  await depositDex.write.setCollateralConfigs([[usdtToken.address], [true]]);
+  await depositDex.write.setCollateralConfigs([[btcToken.address], [true]]);
+  await eveDex.write.addInstrument([
+    BTC_USD_SYMBOL,
+    100, //leverage
+    86400, //dailyFRLong
+    86400, //dailyFRShort
+    Math.floor(Date.now() / 1000), //timestamp
   ]);
 
   return { orderLib, sessions, vault, depositDex, eveDex };
