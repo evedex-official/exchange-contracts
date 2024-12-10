@@ -3,30 +3,27 @@
 const { upgrades } = require('hardhat');
 const { generateSuit, restoreSuit } = require('../helpers/generate-suit');
 const { maxUint256 } = require('viem');
-const { createSession, createOrderExtended, signOrder } = require('../helpers/utils');
-const { writeContract } = require('viem/actions');
 const {
-  BUY_SIDE,
-  BTC_USD_INDEX,
-  USDT_COLLATERAL_INDEX,
-  SELL_SIDE,
-} = require('../helpers/constants');
+  createSession,
+  createOrderExtended,
+  signOrder,
+  parsePrice,
+  calculateBoundaryOrderAmount,
+} = require('../helpers/utils');
+const { writeContract } = require('viem/actions');
+const { BUY_SIDE, BTC_USD_INDEX, USDT_COLLATERAL_INDEX, SELL_SIDE } = require('../helpers/constants');
 
-const flow = 'deposit -> create session -> buy order -> sell order -> withdraw';
+const flow = 'deposit -> create session -> margin level check -> buy order -> sell order -> withdraw';
 
 describe(flow, () => {
   before(upgrades.silenceWarnings);
 
-  const btcPrice = 100_000n;
-  const usdtPrice = 1n;
-  const pricePrecision = 100_000_000n;
-  const usdtDepositAmount = 100_000_000n; // 100 usdt
-  const orderLeverage = 1n;
-  const soLevel = 80n;
-  // buy bitcoin for 100 usdt
-  // buyOrderAmount = balance * balancePercent * collateralPrice * leverage / (instrumentPrice * soLevel)
-  const buyOrderAmount = (usdtDepositAmount * 100n * usdtPrice * orderLeverage) / (btcPrice * soLevel);
-  const sellOrderAmount = buyOrderAmount;
+  const btcPrice = parsePrice(100_000);
+  const usdtPrice = parsePrice(1.0);
+  const btcDecimals = 18n;
+  const usdtDecimals = 6n;
+  const usdtDepositAmount = 100n * 10n ** usdtDecimals;
+  const orderLeverage = 100n;
   // simulate the heap of the matcher
   const matcherState = {
     buyOrder: null,
@@ -101,7 +98,34 @@ describe(flow, () => {
   });
 
   it('Alice buy order creation', async () => {
-    const { alice, matcher, usdtToken, aliceSessionWallet, eveDex } = await restoreSuit(flow);
+    const { alice, matcher, usdtToken, btcToken, aliceSessionWallet, eveDex } = await restoreSuit(flow);
+    // Set up prices for instruments and collateral
+    const instrumentPrices = [
+      {
+        index: BTC_USD_INDEX,
+        price: btcPrice, // BTC price
+      },
+    ];
+    const collateralPrices = [
+      {
+        collateral: usdtToken.address,
+        price: usdtPrice, // USDT price
+      },
+      {
+        collateral: btcToken.address,
+        price: btcPrice, // BTC price (if BTC is used as collateral)
+      },
+    ];
+    const buyOrderAmount = await calculateBoundaryOrderAmount({
+      eveDexContract: eveDex,
+      instrumentPrices,
+      userWallet: alice,
+      leverage: orderLeverage,
+      instrumentIndex: BTC_USD_INDEX,
+      instrumentDecimals: btcDecimals,
+      collateralPrices,
+    });
+
     const buyOrderExtended = createOrderExtended({
       collateralIndex: USDT_COLLATERAL_INDEX,
       senderAddress: alice.account.address,
@@ -110,21 +134,50 @@ describe(flow, () => {
       instrumentIndex: BTC_USD_INDEX,
       side: BUY_SIDE,
       amount: buyOrderAmount,
-      price: btcPrice * pricePrecision,
+      price: btcPrice,
       leverage: orderLeverage,
       userSession: aliceSessionWallet.account.address,
     });
+
     const signature = await signOrder({
       wallet: aliceSessionWallet,
       order: buyOrderExtended.order,
       contractAddress: eveDex.address,
     });
+
     buyOrderExtended.order.signature = signature;
     matcherState.buyOrder = buyOrderExtended;
   });
 
   it('Bob sell order creation', async () => {
-    const { bob, matcher, usdtToken, bobSessionWallet, eveDex } = await restoreSuit(flow);
+    const { bob, matcher, usdtToken, btcToken, bobSessionWallet, eveDex } = await restoreSuit(flow);
+    // Set up prices for instruments and collateral
+    const instrumentPrices = [
+      {
+        index: BTC_USD_INDEX,
+        price: btcPrice, // BTC price
+      },
+    ];
+    const collateralPrices = [
+      {
+        collateral: usdtToken.address,
+        price: usdtPrice, // USDT price
+      },
+      {
+        collateral: btcToken.address,
+        price: btcPrice, // BTC price (if BTC is used as collateral)
+      },
+    ];
+    const sellOrderAmount = await calculateBoundaryOrderAmount({
+      eveDexContract: eveDex,
+      instrumentPrices,
+      userWallet: bob,
+      leverage: orderLeverage,
+      instrumentIndex: BTC_USD_INDEX,
+      instrumentDecimals: btcDecimals,
+      collateralPrices,
+    });
+
     const sellOrderExtended = createOrderExtended({
       collateralIndex: USDT_COLLATERAL_INDEX,
       senderAddress: bob.account.address,
@@ -133,15 +186,17 @@ describe(flow, () => {
       instrumentIndex: BTC_USD_INDEX,
       side: SELL_SIDE,
       amount: sellOrderAmount,
-      price: btcPrice * pricePrecision,
+      price: btcPrice,
       leverage: orderLeverage,
       userSession: bobSessionWallet.account.address,
     });
+
     const signature = await signOrder({
       wallet: bobSessionWallet,
       order: sellOrderExtended.order,
       contractAddress: eveDex.address,
     });
+
     sellOrderExtended.order.signature = signature;
     matcherState.sellOrder = sellOrderExtended;
   });
@@ -158,17 +213,17 @@ describe(flow, () => {
       instrumentPrices: [
         {
           index: BTC_USD_INDEX,
-          price: btcPrice * pricePrecision,
+          price: btcPrice,
         },
       ],
       collateralPrices: [
         {
           collateral: usdtToken.address,
-          price: usdtPrice * pricePrecision,
+          price: usdtPrice,
         },
         {
           collateral: btcToken.address,
-          price: btcPrice * pricePrecision,
+          price: btcPrice,
         },
       ],
     };
@@ -178,15 +233,7 @@ describe(flow, () => {
       functionName: 'fillOrders',
       address: eveDex.address,
       abi: eveDex.abi,
-      args: [
-        buyOrder,
-        sellOrder,
-        btcPrice * pricePrecision,
-        buyOrderAmount,
-        fullPrices,
-        historyTimestamp,
-        historySearchHint,
-      ],
+      args: [buyOrder, sellOrder, btcPrice, buyOrder.order.amount, fullPrices, historyTimestamp, historySearchHint],
     });
   });
 });

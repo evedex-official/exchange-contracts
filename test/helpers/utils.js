@@ -1,7 +1,8 @@
 const { domain, orderWithdrawalTypes, orderTypes } = require('./eip712-types');
-const { signTypedData } = require('viem/actions');
+const { signTypedData, readContract } = require('viem/actions');
 const { maxUint32, maxUint128, maxUint64, zeroHash } = require('viem');
 const { writeContract } = require('viem/actions');
+const { INT_PRECISION } = require('./constants');
 
 const signWithdrawOrder = async ({ wallet, order, contractAddress }) => {
   const signature = await signTypedData(wallet, {
@@ -128,6 +129,45 @@ const removeSession = async ({ userWallet, sessionManagerContract, sessionAccoun
   });
 };
 
+const parsePrice = (priceFloat, precision = 100_000_000) => {
+  return BigInt(Math.round(priceFloat * precision));
+};
+
+const calculateBoundaryOrderAmount = async ({
+  eveDexContract,
+  userWallet,
+  instrumentPrices,
+  collateralPrices,
+  instrumentIndex,
+  leverage,
+}) => {
+  const [, equity, margin] = await readContract(userWallet, {
+    functionName: 'calculateMarginLevel',
+    address: eveDexContract.address,
+    abi: eveDexContract.abi,
+    args: [
+      userWallet.account.address, // Bob's address
+      instrumentPrices, // Current instrument prices
+      collateralPrices, // Current collateral prices
+      true, // Check prices flag
+      Math.floor(Date.now() / 1000), // Historical timestamp
+      0n, // History search hint (optimization for gas)
+    ],
+  });
+  const soLevel = await readContract(userWallet, {
+    functionName: 'soLevel',
+    address: eveDexContract.address,
+    abi: eveDexContract.abi,
+    args: [],
+  });
+  const instrumentPrice = instrumentPrices[instrumentIndex].price;
+
+  // Calculate the maximum position size that maintains margin above the stop-out level
+  const positionSize =
+    (leverage * (equity * 100n - margin * soLevel - 1n) * INT_PRECISION) / (soLevel * instrumentPrice);
+  return positionSize;
+};
+
 module.exports = {
   createWithdrawOrder,
   signWithdrawOrder,
@@ -135,4 +175,6 @@ module.exports = {
   removeSession,
   createOrderExtended,
   signOrder,
+  parsePrice,
+  calculateBoundaryOrderAmount,
 };

@@ -14,7 +14,10 @@ const prepareWallets = async () => {
 };
 
 const prepareTokens = async (wallets) => {
-  const [usdtToken, btcToken] = await Promise.all([viem.deployContract('ERC20Mock'), viem.deployContract('ERC20Mock')]);
+  const [usdtToken, btcToken] = await Promise.all([
+    viem.deployContract('ERC20MockDecimals', [6n]),
+    viem.deployContract('ERC20MockDecimals', [18n]),
+  ]);
   await Promise.all(wallets.map((user) => usdtToken.write.mint([user.account.address, maxUint112])));
   await Promise.all(wallets.map((wallet) => btcToken.write.mint([wallet.account.address, maxUint112])));
   return { usdtToken, btcToken };

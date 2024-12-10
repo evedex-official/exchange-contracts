@@ -7,4 +7,5 @@ module.exports = {
   BTC_USD_SYMBOL: 'BTC/USD',
   USDT_COLLATERAL_INDEX: 0,
   BTC_COLLATERAL_INDEX: 1,
+  INT_PRECISION: 10n ** 8n,
 };
