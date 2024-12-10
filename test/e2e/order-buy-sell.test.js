@@ -3,27 +3,16 @@
 const { upgrades } = require('hardhat');
 const { generateSuit, restoreSuit } = require('../helpers/generate-suit');
 const { maxUint256 } = require('viem');
-const {
-  createSession,
-  createOrderExtended,
-  signOrder,
-  parsePrice,
-  calculateBoundaryOrderAmount,
-} = require('../helpers/utils');
+const { createSession, createOrderExtended, signOrder, calculateBoundaryOrderAmount } = require('../helpers/utils');
 const { writeContract } = require('viem/actions');
 const { BUY_SIDE, BTC_USD_INDEX, USDT_COLLATERAL_INDEX, SELL_SIDE } = require('../helpers/constants');
+const { USDT_DEPOSIT_AMOUNT, BTC_PRICE, USDT_PRICE, ORDER_LEVERAGE } = require('./order-by-sell.config');
 
-const flow = 'deposit -> create session -> margin level check -> buy order -> sell order -> withdraw';
+const flow = 'deposit -> create session -> buy order -> sell order -> withdraw';
 
 describe(flow, () => {
   before(upgrades.silenceWarnings);
 
-  const btcPrice = parsePrice(100_000);
-  const usdtPrice = parsePrice(1.0);
-  const btcDecimals = 18n;
-  const usdtDecimals = 6n;
-  const usdtDepositAmount = 100n * 10n ** usdtDecimals;
-  const orderLeverage = 100n;
   // simulate the heap of the matcher
   const matcherState = {
     buyOrder: null,
@@ -43,13 +32,13 @@ describe(flow, () => {
       functionName: 'approve',
       address: usdtToken.address,
       abi: usdtToken.abi,
-      args: [depositDex.address, usdtDepositAmount],
+      args: [depositDex.address, USDT_DEPOSIT_AMOUNT],
     });
     await writeContract(alice, {
       functionName: 'depositCollateral',
       address: depositDex.address,
       abi: depositDex.abi,
-      args: [usdtToken.address, usdtDepositAmount],
+      args: [usdtToken.address, USDT_DEPOSIT_AMOUNT],
     });
   });
 
@@ -59,13 +48,13 @@ describe(flow, () => {
       functionName: 'approve',
       address: usdtToken.address,
       abi: usdtToken.abi,
-      args: [depositDex.address, usdtDepositAmount],
+      args: [depositDex.address, USDT_DEPOSIT_AMOUNT],
     });
     await writeContract(bob, {
       functionName: 'depositCollateral',
       address: depositDex.address,
       abi: depositDex.abi,
-      args: [usdtToken.address, usdtDepositAmount],
+      args: [usdtToken.address, USDT_DEPOSIT_AMOUNT],
     });
   });
 
@@ -103,26 +92,25 @@ describe(flow, () => {
     const instrumentPrices = [
       {
         index: BTC_USD_INDEX,
-        price: btcPrice, // BTC price
+        price: BTC_PRICE, // BTC price
       },
     ];
     const collateralPrices = [
       {
         collateral: usdtToken.address,
-        price: usdtPrice, // USDT price
+        price: USDT_PRICE, // USDT price
       },
       {
         collateral: btcToken.address,
-        price: btcPrice, // BTC price (if BTC is used as collateral)
+        price: BTC_PRICE, // BTC price (if BTC is used as collateral)
       },
     ];
     const buyOrderAmount = await calculateBoundaryOrderAmount({
       eveDexContract: eveDex,
       instrumentPrices,
       userWallet: alice,
-      leverage: orderLeverage,
+      leverage: ORDER_LEVERAGE,
       instrumentIndex: BTC_USD_INDEX,
-      instrumentDecimals: btcDecimals,
       collateralPrices,
     });
 
@@ -134,8 +122,8 @@ describe(flow, () => {
       instrumentIndex: BTC_USD_INDEX,
       side: BUY_SIDE,
       amount: buyOrderAmount,
-      price: btcPrice,
-      leverage: orderLeverage,
+      price: BTC_PRICE,
+      leverage: ORDER_LEVERAGE,
       userSession: aliceSessionWallet.account.address,
     });
 
@@ -155,26 +143,25 @@ describe(flow, () => {
     const instrumentPrices = [
       {
         index: BTC_USD_INDEX,
-        price: btcPrice, // BTC price
+        price: BTC_PRICE, // BTC price
       },
     ];
     const collateralPrices = [
       {
         collateral: usdtToken.address,
-        price: usdtPrice, // USDT price
+        price: USDT_PRICE, // USDT price
       },
       {
         collateral: btcToken.address,
-        price: btcPrice, // BTC price (if BTC is used as collateral)
+        price: BTC_PRICE, // BTC price (if BTC is used as collateral)
       },
     ];
     const sellOrderAmount = await calculateBoundaryOrderAmount({
       eveDexContract: eveDex,
       instrumentPrices,
       userWallet: bob,
-      leverage: orderLeverage,
+      leverage: ORDER_LEVERAGE,
       instrumentIndex: BTC_USD_INDEX,
-      instrumentDecimals: btcDecimals,
       collateralPrices,
     });
 
@@ -186,8 +173,8 @@ describe(flow, () => {
       instrumentIndex: BTC_USD_INDEX,
       side: SELL_SIDE,
       amount: sellOrderAmount,
-      price: btcPrice,
-      leverage: orderLeverage,
+      price: BTC_PRICE,
+      leverage: ORDER_LEVERAGE,
       userSession: bobSessionWallet.account.address,
     });
 
@@ -213,17 +200,17 @@ describe(flow, () => {
       instrumentPrices: [
         {
           index: BTC_USD_INDEX,
-          price: btcPrice,
+          price: BTC_PRICE,
         },
       ],
       collateralPrices: [
         {
           collateral: usdtToken.address,
-          price: usdtPrice,
+          price: USDT_PRICE,
         },
         {
           collateral: btcToken.address,
-          price: btcPrice,
+          price: BTC_PRICE,
         },
       ],
     };
@@ -233,7 +220,7 @@ describe(flow, () => {
       functionName: 'fillOrders',
       address: eveDex.address,
       abi: eveDex.abi,
-      args: [buyOrder, sellOrder, btcPrice, buyOrder.order.amount, fullPrices, historyTimestamp, historySearchHint],
+      args: [buyOrder, sellOrder, BTC_PRICE, buyOrder.order.amount, fullPrices, historyTimestamp, historySearchHint],
     });
   });
 });
