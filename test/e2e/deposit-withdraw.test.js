@@ -6,7 +6,8 @@ const { expect } = require('chai');
 const { createWithdrawOrder, signWithdrawOrder, createSession } = require('../helpers/utils');
 const { zeroAddress, maxUint256 } = require('viem');
 const { writeContract, readContract } = require('viem/actions');
-const { BTC_USD_INDEX } = require('../helpers/constants');
+const { BTC_USD_INDEX, INT_PRECISION } = require('../helpers/constants');
+const { DEPOSIT_AMOUNT, USDT_PRICE, BTC_PRICE, WITHDRAW_AMOUNT } = require('./deposit-withdraw.config');
 
 /**
  * Basic flow of moving funds between user's account and depositDex contract
@@ -16,12 +17,6 @@ const flow = 'deposit -> create session -> withdraw';
 describe(flow, () => {
   before(upgrades.silenceWarnings);
 
-  const depositAmount = 1n;
-  const withdrawAmount = depositAmount;
-  const pricePrecision = 100_000_000n;
-  const usdtPrice = 1n;
-  const btcPrice = 95_000n;
-
   it('deposit usdt', async () => {
     const { usdtToken, alice, depositDex } = await generateSuit(flow);
 
@@ -29,7 +24,7 @@ describe(flow, () => {
       functionName: 'approve',
       address: usdtToken.address,
       abi: usdtToken.abi,
-      args: [depositDex.address, depositAmount],
+      args: [depositDex.address, DEPOSIT_AMOUNT],
     });
 
     // deposit usdt as collateral
@@ -37,7 +32,7 @@ describe(flow, () => {
       functionName: 'depositCollateral',
       address: depositDex.address,
       abi: depositDex.abi,
-      args: [usdtToken.address, depositAmount],
+      args: [usdtToken.address, DEPOSIT_AMOUNT],
     });
   });
 
@@ -48,7 +43,7 @@ describe(flow, () => {
       functionName: 'approve',
       address: btcToken.address,
       abi: btcToken.abi,
-      args: [depositDex.address, depositAmount],
+      args: [depositDex.address, DEPOSIT_AMOUNT],
     });
 
     // deposit btc as collateral
@@ -56,7 +51,7 @@ describe(flow, () => {
       functionName: 'depositCollateral',
       address: depositDex.address,
       abi: depositDex.abi,
-      args: [btcToken.address, depositAmount],
+      args: [btcToken.address, DEPOSIT_AMOUNT],
     });
   });
 
@@ -66,11 +61,11 @@ describe(flow, () => {
     const collateralPriceData = [
       {
         collateral: usdtToken.address,
-        price: usdtPrice * pricePrecision,
+        price: USDT_PRICE,
       },
       {
         collateral: btcToken.address,
-        price: btcPrice * pricePrecision,
+        price: BTC_PRICE,
       },
     ];
 
@@ -81,8 +76,8 @@ describe(flow, () => {
       args: [alice.account.address, collateralPriceData],
     });
 
-    const expectedBalance = depositAmount * usdtPrice + depositAmount * btcPrice;
-    expect(expectedBalance).to.deep.equal(totalBalance);
+    const expectedBalance = DEPOSIT_AMOUNT * USDT_PRICE + DEPOSIT_AMOUNT * BTC_PRICE;
+    expect(expectedBalance / INT_PRECISION).to.deep.equal(totalBalance);
   });
 
   it('create session', async () => {
@@ -117,7 +112,7 @@ describe(flow, () => {
       accountAddress: alice.account.address,
       collateralAddress: usdtToken.address,
       depositDexAddress: depositDex.address,
-      amount: withdrawAmount,
+      amount: WITHDRAW_AMOUNT,
       session: zeroAddress,
       expiration: Math.floor(Date.now() / 1000) + 3600,
     });
@@ -147,17 +142,17 @@ describe(flow, () => {
       instrumentPrices: [
         {
           index: BTC_USD_INDEX,
-          price: btcPrice * pricePrecision,
+          price: BTC_PRICE,
         },
       ],
       collateralPrices: [
         {
           collateral: usdtToken.address,
-          price: usdtPrice * pricePrecision,
+          price: USDT_PRICE,
         },
         {
           collateral: btcToken.address,
-          price: btcPrice * pricePrecision,
+          price: BTC_PRICE,
         },
       ],
     };
@@ -186,7 +181,7 @@ describe(flow, () => {
       args: [alice.account.address],
     });
 
-    expect(aliceBalanceAfter).to.deep.equal(aliceBalanceBefore + withdrawAmount);
+    expect(aliceBalanceAfter).to.deep.equal(aliceBalanceBefore + WITHDRAW_AMOUNT);
   });
 
   // create withdraw order signed by session
@@ -197,7 +192,7 @@ describe(flow, () => {
       accountAddress: alice.account.address,
       collateralAddress: btcToken.address,
       depositDexAddress: depositDex.address,
-      amount: withdrawAmount,
+      amount: WITHDRAW_AMOUNT,
       session: aliceSessionWallet.account.address,
       expiration: Math.floor(Date.now() / 1000) + 3600, // 1 hour from now
     });
@@ -227,17 +222,17 @@ describe(flow, () => {
       instrumentPrices: [
         {
           index: BTC_USD_INDEX,
-          price: btcPrice * pricePrecision,
+          price: BTC_PRICE,
         },
       ],
       collateralPrices: [
         {
           collateral: usdtToken.address,
-          price: usdtPrice * pricePrecision,
+          price: USDT_PRICE,
         },
         {
           collateral: btcToken.address,
-          price: btcPrice * pricePrecision,
+          price: BTC_PRICE,
         },
       ],
     };
@@ -266,6 +261,6 @@ describe(flow, () => {
       args: [alice.account.address],
     });
 
-    expect(aliceBalanceAfter).to.deep.equal(aliceBalanceBefore + withdrawAmount);
+    expect(aliceBalanceAfter).to.deep.equal(aliceBalanceBefore + WITHDRAW_AMOUNT);
   });
 });

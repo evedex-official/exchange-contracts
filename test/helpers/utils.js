@@ -133,6 +133,9 @@ const parsePrice = (priceFloat, precision = 100_000_000) => {
   return BigInt(Math.round(priceFloat * precision));
 };
 
+/**
+ * Calculates maximum FIRST order amount. This action should be done by matcher.
+ */
 const calculateBoundaryOrderAmount = async ({
   eveDexContract,
   userWallet,
