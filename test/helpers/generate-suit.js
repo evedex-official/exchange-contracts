@@ -2,8 +2,8 @@
 
 const { viemDeployWithLibraries, viemDeployProxyWithLibraries } = require('./viemify');
 const { viem } = require('hardhat');
-const { zeroHash } = require('viem');
-const { parseEther } = require('viem/utils');
+const { zeroHash, maxUint112 } = require('viem');
+const { BTC_USD_SYMBOL } = require('./constants');
 
 const suits = {};
 
@@ -14,9 +14,12 @@ const prepareWallets = async () => {
 };
 
 const prepareTokens = async (wallets) => {
-  const [usdtToken, btcToken] = await Promise.all([viem.deployContract('ERC20Mock'), viem.deployContract('ERC20Mock')]);
-  await Promise.all(wallets.map((user) => usdtToken.write.mint([user.account.address, parseEther('100')])));
-  await Promise.all(wallets.map((wallet) => btcToken.write.mint([wallet.account.address, parseEther('100')])));
+  const [usdtToken, btcToken] = await Promise.all([
+    viem.deployContract('ERC20MockDecimals', [6n]),
+    viem.deployContract('ERC20MockDecimals', [18n]),
+  ]);
+  await Promise.all(wallets.map((user) => usdtToken.write.mint([user.account.address, maxUint112])));
+  await Promise.all(wallets.map((wallet) => btcToken.write.mint([wallet.account.address, maxUint112])));
   return { usdtToken, btcToken };
 };
 
@@ -53,16 +56,18 @@ const prepareContracts = async ({ owner, matcher, usdtToken, btcToken, fundingRa
     eveDex.write.grantRole([zeroHash, owner.account.address]),
     eveDex.write.grantRole([matcherRole, matcher.account.address]),
     sessions.write.grantRole([validatorRole, depositDex.address]),
+    sessions.write.grantRole([validatorRole, eveDex.address]),
     vault.write.grantRole([withdrawRole, depositDex.address]),
-    depositDex.write.setCollateralConfigs([[usdtToken.address], [true]]),
-    depositDex.write.setCollateralConfigs([[btcToken.address], [true]]),
-    eveDex.write.addInstrument([
-      'BTC/USD',
-      10, //leverage
-      0, //dailyFRLong
-      0, //dailyFRShort
-      0, //timestamp
-    ]),
+  ]);
+  // positions of collaterals and instruments selected according to test/helpers/constants.js
+  await depositDex.write.setCollateralConfigs([[usdtToken.address], [true]]);
+  await depositDex.write.setCollateralConfigs([[btcToken.address], [true]]);
+  await eveDex.write.addInstrument([
+    BTC_USD_SYMBOL,
+    100, //leverage
+    86400, //dailyFRLong
+    86400, //dailyFRShort
+    Math.floor(Date.now() / 1000), //timestamp
   ]);
 
   return { orderLib, sessions, vault, depositDex, eveDex };
