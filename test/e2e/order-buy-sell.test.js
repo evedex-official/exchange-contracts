@@ -6,7 +6,7 @@ const { maxUint256 } = require('viem');
 const { createSession, createOrderExtended, signOrder, calculateBoundaryOrderAmount } = require('../helpers/utils');
 const { writeContract } = require('viem/actions');
 const { BUY_SIDE, BTC_USD_INDEX, USDT_COLLATERAL_INDEX, SELL_SIDE } = require('../helpers/constants');
-const { USDT_DEPOSIT_AMOUNT, BTC_PRICE, USDT_PRICE, ORDER_LEVERAGE } = require('./order-by-sell.config');
+const { USDT_DEPOSIT_AMOUNT, BTC_PRICE, USDT_PRICE, ORDER_LEVERAGE } = require('./order-buy-sell.config');
 
 const flow = 'deposit -> create session -> buy order -> sell order -> withdraw';
 

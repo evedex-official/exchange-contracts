@@ -134,7 +134,7 @@ const parsePrice = (priceFloat, precision = 100_000_000) => {
 };
 
 /**
- * Calculates maximum FIRST order amount. This action should be done by matcher.
+ * Calculate the maximum  FIRST position size that maintains margin above the stop-out level
  */
 const calculateBoundaryOrderAmount = async ({
   eveDexContract,
@@ -144,18 +144,11 @@ const calculateBoundaryOrderAmount = async ({
   instrumentIndex,
   leverage,
 }) => {
-  const [, equity, margin] = await readContract(userWallet, {
-    functionName: 'calculateMarginLevel',
-    address: eveDexContract.address,
-    abi: eveDexContract.abi,
-    args: [
-      userWallet.account.address, // Bob's address
-      instrumentPrices, // Current instrument prices
-      collateralPrices, // Current collateral prices
-      true, // Check prices flag
-      Math.floor(Date.now() / 1000), // Historical timestamp
-      0n, // History search hint (optimization for gas)
-    ],
+  const { equity, margin } = await calculateMarginLevel({
+    eveDexContract,
+    userWallet,
+    instrumentPrices,
+    collateralPrices,
   });
   const soLevel = await readContract(userWallet, {
     functionName: 'soLevel',
@@ -165,10 +158,43 @@ const calculateBoundaryOrderAmount = async ({
   });
   const instrumentPrice = instrumentPrices[instrumentIndex].price;
 
-  // Calculate the maximum position size that maintains margin above the stop-out level
+  // first formula that comes to the head
+  // const requiredMargin = (margin * soLevel) / 100n;
+  // // Check if equity is sufficient to cover the required margin
+  // if (equity <= requiredMargin) {
+  //   throw new Error('Insufficient equity to cover required margin');
+  // }
+  // // Calculate the maximum position size
+  // const positionSize = (leverage * (equity - requiredMargin) * INT_PRECISION) / instrumentPrice;
+  // return positionSize;
+
+  // formula used in contracts
   const positionSize =
     (leverage * (equity * 100n - margin * soLevel - 1n) * INT_PRECISION) / (soLevel * instrumentPrice);
   return positionSize;
+};
+
+const calculateMarginLevel = async ({
+  eveDexContract,
+  userWallet,
+  instrumentPrices,
+  collateralPrices,
+  addressToCheck = userWallet.account.address,
+}) => {
+  const [marginLevel, equity, margin, pnls, frs] = await readContract(userWallet, {
+    functionName: 'calculateMarginLevel',
+    address: eveDexContract.address,
+    abi: eveDexContract.abi,
+    args: [
+      addressToCheck,
+      instrumentPrices, // Current instrument prices
+      collateralPrices, // Current collateral prices
+      true, // Check prices flag
+      Math.floor(Date.now() / 1000), // Historical timestamp
+      0n, // History search hint (optimization for gas)
+    ],
+  });
+  return { marginLevel, equity, margin, pnls, frs };
 };
 
 module.exports = {
@@ -180,4 +206,5 @@ module.exports = {
   signOrder,
   parsePrice,
   calculateBoundaryOrderAmount,
+  calculateMarginLevel,
 };
