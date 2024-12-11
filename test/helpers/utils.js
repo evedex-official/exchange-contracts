@@ -129,8 +129,12 @@ const removeSession = async ({ userWallet, sessionManagerContract, sessionAccoun
   });
 };
 
-const parsePrice = (priceFloat, precision = 100_000_000) => {
-  return BigInt(Math.round(priceFloat * precision));
+const parsePrice = (priceFloat, { precisionDecimals = 8n, tokenDecimals = 0n } = {}) => {
+  const shift = Number(10n ** precisionDecimals);
+  const priceShifted = BigInt(Math.round(priceFloat * shift));
+  return tokenDecimals > precisionDecimals
+    ? priceShifted / 10n ** (tokenDecimals - precisionDecimals)
+    : priceShifted * 10n ** (precisionDecimals - tokenDecimals);
 };
 
 /**
@@ -230,6 +234,8 @@ const signMultiLiquidationOrder = async ({ wallet, order, contractAddress }) => 
   return signature;
 };
 
+const absBn = (value) => (value < 0n ? -value : value);
+
 module.exports = {
   createWithdrawOrder,
   signWithdrawOrder,
@@ -242,4 +248,5 @@ module.exports = {
   calculateMarginLevel,
   createMultiLiquidationOrder,
   signMultiLiquidationOrder,
+  absBn,
 };

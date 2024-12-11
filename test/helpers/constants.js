@@ -8,4 +8,6 @@ module.exports = {
   USDT_COLLATERAL_INDEX: 0,
   BTC_COLLATERAL_INDEX: 1,
   INT_PRECISION: 10n ** 8n,
+  USDT_DECIMALS: 6n,
+  BTC_DECIMALS: 8n,
 };
