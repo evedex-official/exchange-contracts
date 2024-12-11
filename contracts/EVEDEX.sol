@@ -291,13 +291,15 @@ contract EVEDEX is BaseDEX, IEVEDEX {
       _INT_PRECISION;
 
     address collateral = fullPrices.collateralPrices[collateralIndex].collateral;
-    uint112 collateralPrice = fullPrices.collateralPrices[collateralIndex].price;
-    int112 balance = _getBalance(accountToLiquidate, collateral, collateralPrice);
-    balance += pnl + fr;
-    liquidationFee = _calculateLiquidationFee(accountToLiquidatePosition);
+    int112 collateralPrice = int112(fullPrices.collateralPrices[collateralIndex].price);
+    int112 balance = _getBalance(accountToLiquidate, collateral);
+    balance += ((pnl + fr) * _INT_PRECISION) / collateralPrice;
+    liquidationFee =
+      (_calculateLiquidationFee(accountToLiquidatePosition) * _UINT_PRECISION) /
+      uint112(collateralPrice);
 
     balance -= int112(liquidationFee);
-    int112 balanceOfLiquidator = _getBalance(liquidator, collateral, collateralPrice);
+    int112 balanceOfLiquidator = _getBalance(liquidator, collateral);
 
     // If it's the last instrument that user have liquidator pays for user's negative balance
     if (_activeInstruments[accountToLiquidate].length() == 1 && balance < 0) {
@@ -330,7 +332,7 @@ contract EVEDEX is BaseDEX, IEVEDEX {
       accountToLiquidate,
       index,
       uint112(liquidationFee),
-      _getBalance(accountToLiquidate, collateral, collateralPrice),
+      _getBalance(accountToLiquidate, collateral),
       pnl,
       fr
     );
@@ -412,43 +414,33 @@ contract EVEDEX is BaseDEX, IEVEDEX {
       sellOrder.order.matcherFee = uint64(
         (uint256(sellOrder.order.matcherFee) * filledAmount) / sellOrder.order.amount
       );
-      int112 buyOrderMatcherFee = int112(uint112(buyOrder.order.matcherFee));
-      int112 sellOrderMatcherFee = int112(uint112(sellOrder.order.matcherFee));
+      int112 buyOrderMatcherFee = int112(
+        (uint112(buyOrder.order.matcherFee) * _UINT_PRECISION) /
+          uint112(fullPrices.collateralPrices[buyOrder.collateralIndex].price)
+      );
+      int112 sellOrderMatcherFee = int112(
+        (uint112(sellOrder.order.matcherFee) * _UINT_PRECISION) /
+          uint112(fullPrices.collateralPrices[buyOrder.collateralIndex].price)
+      );
       _setBalance(
         buyOrder.order.senderAddress,
         buyOrder.order.collateral,
-        _getBalance(
-          buyOrder.order.senderAddress,
-          buyOrder.order.collateral,
-          uint112(fullPrices.collateralPrices[buyOrder.collateralIndex].price)
-        ) - buyOrderMatcherFee
+        _getBalance(buyOrder.order.senderAddress, buyOrder.order.collateral) - buyOrderMatcherFee
       );
       _setBalance(
         sellOrder.order.senderAddress,
         sellOrder.order.collateral,
-        _getBalance(
-          sellOrder.order.senderAddress,
-          sellOrder.order.collateral,
-          uint112(fullPrices.collateralPrices[sellOrder.collateralIndex].price)
-        ) - sellOrderMatcherFee
+        _getBalance(sellOrder.order.senderAddress, sellOrder.order.collateral) - sellOrderMatcherFee
       );
       _setBalance(
         buyOrder.order.matcherAddress,
         buyOrder.order.collateral,
-        _getBalance(
-          buyOrder.order.matcherAddress,
-          buyOrder.order.collateral,
-          uint112(fullPrices.collateralPrices[buyOrder.collateralIndex].price)
-        ) + buyOrderMatcherFee
+        _getBalance(buyOrder.order.matcherAddress, buyOrder.order.collateral) + buyOrderMatcherFee
       );
       _setBalance(
         sellOrder.order.matcherAddress,
         sellOrder.order.collateral,
-        _getBalance(
-          sellOrder.order.matcherAddress,
-          sellOrder.order.collateral,
-          uint112(fullPrices.collateralPrices[sellOrder.collateralIndex].price)
-        ) + sellOrderMatcherFee
+        _getBalance(sellOrder.order.matcherAddress, sellOrder.order.collateral) + sellOrderMatcherFee
       );
     }
 
@@ -520,7 +512,7 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     int112 realizedFRCollateral;
     int112 realizedPNL;
     address collateral = fullPrices.collateralPrices[collateralIndex].collateral;
-    uint112 collateralPrice = fullPrices.collateralPrices[collateralIndex].price;
+    int112 collateralPrice = int112(fullPrices.collateralPrices[collateralIndex].price);
     if (changePositionSide) {
       realizedFRCollateral =
         (getAccountFR(positionOwner, index, historyTimestamp, historySearchHint) *
@@ -530,12 +522,14 @@ contract EVEDEX is BaseDEX, IEVEDEX {
       _setBalance(
         positionOwner,
         collateral,
-        _getBalance(positionOwner, collateral, collateralPrice) + realizedFRCollateral + realizedPNL
+        _getBalance(positionOwner, collateral) +
+          ((realizedFRCollateral + realizedPNL) * _INT_PRECISION) /
+          collateralPrice
       );
       _setBalance(
         fundingRateAccount,
         collateral,
-        _getBalance(fundingRateAccount, collateral, collateralPrice) - realizedFRCollateral
+        _getBalance(fundingRateAccount, collateral) - (realizedFRCollateral * _INT_PRECISION) / collateralPrice
       );
       posData.frAccumulated = 0;
       posData.positionAvgPrice = uint80(uint112(price));
@@ -558,12 +552,14 @@ contract EVEDEX is BaseDEX, IEVEDEX {
       _setBalance(
         positionOwner,
         collateral,
-        _getBalance(positionOwner, collateral, collateralPrice) + realizedFRCollateral + realizedPNL
+        _getBalance(positionOwner, collateral) +
+          ((realizedFRCollateral + realizedPNL) * _INT_PRECISION) /
+          collateralPrice
       );
       _setBalance(
         fundingRateAccount,
         collateral,
-        _getBalance(fundingRateAccount, collateral, collateralPrice) - realizedFRCollateral
+        _getBalance(fundingRateAccount, collateral) - (realizedFRCollateral * _INT_PRECISION) / collateralPrice
       );
       posData.frAccumulated = (frCurrent * newPosition) / posData.position;
     }
@@ -589,7 +585,7 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     emit PositionUpdate(
       index,
       positionOwner,
-      _getBalance(positionOwner, collateral, collateralPrice),
+      _getBalance(positionOwner, collateral),
       posData,
       realizedPNL,
       realizedFRCollateral

@@ -23,7 +23,7 @@ const prepareTokens = async (wallets) => {
   return { usdtToken, btcToken };
 };
 
-const prepareContracts = async ({ owner, matcher, usdtToken, btcToken, fundingRateAccount }) => {
+const prepareContracts = async ({ owner, matcher, usdtToken, btcToken, fundingRateAccount, eveDexConfig }) => {
   const [orderLib, sessions, vault] = await Promise.all([
     viemDeployWithLibraries('OrderValidationLib', []),
     viemDeployWithLibraries('SessionManager', [owner.account.address]),
@@ -39,7 +39,16 @@ const prepareContracts = async ({ owner, matcher, usdtToken, btcToken, fundingRa
   );
   const eveDex = await viemDeployProxyWithLibraries(
     'EVEDEX',
-    [owner.account.address, depositDex.address, sessions.address, fundingRateAccount.account.address, 128, 80, 100, 0],
+    [
+      owner.account.address,
+      depositDex.address,
+      sessions.address,
+      fundingRateAccount.account.address,
+      eveDexConfig.maxOpenPositions,
+      eveDexConfig.soLevel,
+      eveDexConfig.withdrawMarginLevel,
+      eveDexConfig.liquidationFeePercent,
+    ],
     depositDexLibraries,
     true,
     owner.account.address,
@@ -73,7 +82,12 @@ const prepareContracts = async ({ owner, matcher, usdtToken, btcToken, fundingRa
   return { orderLib, sessions, vault, depositDex, eveDex };
 };
 
-const generateSuit = async (id) => {
+const generateSuit = async (
+  id,
+  {
+    eveDexConfig: { maxOpenPositions = 128, soLevel = 80, withdrawMarginLevel = 100, liquidationFeePercent = 0 } = {},
+  } = {},
+) => {
   if (!id) throw new Error('Suit id is required');
   const { owner, alice, bob, liquidator, fundingRateAccount, matcher, aliceSessionWallet, bobSessionWallet } =
     await prepareWallets();
@@ -84,6 +98,12 @@ const generateSuit = async (id) => {
     usdtToken,
     btcToken,
     fundingRateAccount,
+    eveDexConfig: {
+      maxOpenPositions,
+      soLevel,
+      withdrawMarginLevel,
+      liquidationFeePercent,
+    },
   });
   suits[id] = {
     owner,
