@@ -1,9 +1,11 @@
 const { ethers, network, run, upgrades } = require('hardhat');
+const { maxUint112 } = require('viem');
 
 const config = require('../config.js');
+const { BTC_USD_SYMBOL } = require('../test/helpers/constants.js');
 
 async function main() {
-  const [deployer] = await ethers.getSigners();
+  const [deployer, alice, bob, liquidator, matcher] = await ethers.getSigners();
   console.log('Deployer address:', deployer.address);
 
   const orderLib = await deployAndVerify('OrderValidationLib', []);
@@ -12,7 +14,7 @@ async function main() {
   const vault = await deployAndVerify('EveVault', [deployer.address]);
   const deposit = await deployProxyWithLibraries('DepositDEX', [], libraries, false, deployer.address);
   const dex = await deployProxyWithLibraries(
-    'EveDEX',
+    'EVEDEX',
     [
       deployer.address,
       await deposit.getAddress(),
@@ -27,19 +29,48 @@ async function main() {
     true,
     deployer.address,
   );
-  console.log('EveDEX is initialized');
+  console.log('EVEDEX is initialized');
 
   await deposit.initialize(await dex.getAddress(), await vault.getAddress());
   console.log('DepositDEX is initialized');
 
   await dex.grantRole(ethers.ZeroHash, config.defaultAdmin);
-  console.log(`EveDEX: default admin added: ${config.defaultAdmin}`);
+  console.log(`EVEDEX: default admin added: ${config.defaultAdmin}`);
   const matcherRole = await dex.MATCHER_ROLE();
   await dex.grantRole(matcherRole, config.defaultMatcher);
-  console.log(`EveDEX: default matcher added: ${config.defaultMatcher}`);
+  console.log(`EVEDEX: default matcher added: ${config.defaultMatcher}`);
   const validatorRole = await sessions.VALIDATOR_ROLE();
   await sessions.grantRole(validatorRole, await dex.getAddress());
-  console.log('SessionManager: EveDEX is added as validator');
+  console.log('SessionManager: EVEDEX is added as validator');
+
+  // Testnet deploy helpers
+
+  const wallets = [deployer, alice, bob, liquidator, matcher];
+
+  const { usdtToken, btcToken } = await deployTokenMocks(wallets);
+
+  await deposit.setCollateralConfigs([await usdtToken.getAddress()], [true]);
+  await deposit.setCollateralConfigs([await btcToken.getAddress()], [true]);
+  await dex.addInstrument(
+    BTC_USD_SYMBOL,
+    100, //leverage
+    86400, //dailyFRLong
+    86400, //dailyFRShort
+    Math.floor(Date.now() / 1000), //timestamp
+  );
+}
+
+async function deployTokenMocks(wallets) {
+  const usdtToken = await deployAndVerify('ERC20MockDecimals', [6n]);
+  const btcToken = await deployAndVerify('ERC20MockDecimals', [18n]);
+
+  await Promise.all(wallets.map((user) => usdtToken.mint(user.address, maxUint112)));
+  await Promise.all(wallets.map((wallet) => btcToken.mint(wallet.address, maxUint112)));
+
+  return {
+    usdtToken,
+    btcToken,
+  };
 }
 
 async function deployAndVerify(contractName, args) {
@@ -97,7 +128,7 @@ async function deployProxyWithLibraries(contractName, args, libraries, initializ
 
 async function verify(contractAddress, args) {
   const networkName = network.name;
-  if (networkName != 'hardhat') {
+  if (!['hardhat', 'localhost'].includes(networkName)) {
     console.log('Verifying contract...');
     try {
       await run('verify:verify', {

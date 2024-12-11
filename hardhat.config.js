@@ -3,6 +3,7 @@ require('@nomicfoundation/hardhat-toolbox-viem');
 require('@openzeppelin/hardhat-upgrades');
 require('@nomicfoundation/hardhat-chai-matchers');
 require('dotenv').config();
+const { task } = require('hardhat/config');
 const path = require('path');
 
 let config = require('./config.js');
