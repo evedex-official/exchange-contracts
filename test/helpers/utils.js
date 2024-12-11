@@ -2,7 +2,7 @@ const { domain, orderWithdrawalTypes, orderTypes, multiOrderLiquidationTypes } =
 const { signTypedData, readContract } = require('viem/actions');
 const { maxUint32, maxUint128, maxUint64, zeroHash } = require('viem');
 const { writeContract } = require('viem/actions');
-const { INT_PRECISION } = require('./constants');
+const { INT_PRECISION_EVEDEX } = require('./constants');
 
 const signWithdrawOrder = async ({ wallet, order, contractAddress }) => {
   const signature = await signTypedData(wallet, {
@@ -174,7 +174,7 @@ const calculateBoundaryOrderAmount = async ({
 
   // formula used in contracts
   const positionSize =
-    (leverage * (equity * 100n - margin * soLevel - 1n) * INT_PRECISION) / (soLevel * instrumentPrice);
+    (leverage * (equity * 100n - margin * soLevel - 1n) * INT_PRECISION_EVEDEX) / (soLevel * instrumentPrice);
   return positionSize;
 };
 

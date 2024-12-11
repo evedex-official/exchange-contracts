@@ -6,7 +6,7 @@ const { expect } = require('chai');
 const { createWithdrawOrder, signWithdrawOrder, createSession } = require('../helpers/utils');
 const { zeroAddress, maxUint256 } = require('viem');
 const { writeContract, readContract } = require('viem/actions');
-const { BTC_USD_INDEX, INT_PRECISION } = require('../helpers/constants');
+const { BTC_USD_INDEX, INT_PRECISION_DEPOSIT_DEX } = require('../helpers/constants');
 const { DEPOSIT_AMOUNT, USDT_PRICE, BTC_PRICE, WITHDRAW_AMOUNT } = require('./deposit-withdraw.config');
 
 /**
@@ -77,7 +77,7 @@ describe(flow, () => {
     });
 
     const expectedBalance = DEPOSIT_AMOUNT * USDT_PRICE + DEPOSIT_AMOUNT * BTC_PRICE;
-    expect(expectedBalance / INT_PRECISION).to.deep.equal(totalBalance);
+    expect(expectedBalance / INT_PRECISION_DEPOSIT_DEX).to.deep.equal(totalBalance);
   });
 
   it('create session', async () => {
