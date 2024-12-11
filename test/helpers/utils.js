@@ -1,4 +1,4 @@
-const { domain, orderWithdrawalTypes, orderTypes } = require('./eip712-types');
+const { domain, orderWithdrawalTypes, orderTypes, multiOrderLiquidationTypes } = require('./eip712-types');
 const { signTypedData, readContract } = require('viem/actions');
 const { maxUint32, maxUint128, maxUint64, zeroHash } = require('viem');
 const { writeContract } = require('viem/actions');
@@ -197,6 +197,39 @@ const calculateMarginLevel = async ({
   return { marginLevel, equity, margin, pnls, frs };
 };
 
+const createMultiLiquidationOrder = ({
+  accountToLiquidate,
+  liquidator,
+  collateral,
+  liquidationPrices,
+  prices,
+  leverage,
+  liquidationTimestamp = Math.floor(Date.now() / 1000),
+  expiration = Math.floor(Date.now() / 1000) + 3600,
+}) => {
+  return {
+    accountToLiquidate,
+    liquidator,
+    collateral,
+    liquidationPrices,
+    prices,
+    leverage,
+    liquidationTimestamp,
+    expiration,
+    signature: '0x',
+  };
+};
+
+const signMultiLiquidationOrder = async ({ wallet, order, contractAddress }) => {
+  const signature = await signTypedData(wallet, {
+    message: order,
+    types: multiOrderLiquidationTypes,
+    domain: await domain(contractAddress),
+    primaryType: 'MultiOrderLiquidation',
+  });
+  return signature;
+};
+
 module.exports = {
   createWithdrawOrder,
   signWithdrawOrder,
@@ -207,4 +240,6 @@ module.exports = {
   parsePrice,
   calculateBoundaryOrderAmount,
   calculateMarginLevel,
+  createMultiLiquidationOrder,
+  signMultiLiquidationOrder,
 };
