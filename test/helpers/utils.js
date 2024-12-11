@@ -2,7 +2,7 @@ const { domain, orderWithdrawalTypes, orderTypes, multiOrderLiquidationTypes } =
 const { signTypedData, readContract } = require('viem/actions');
 const { maxUint32, maxUint128, maxUint64, zeroHash } = require('viem');
 const { writeContract } = require('viem/actions');
-const { INT_PRECISION } = require('./constants');
+const { INT_PRECISION_EVEDEX } = require('./constants');
 
 const signWithdrawOrder = async ({ wallet, order, contractAddress }) => {
   const signature = await signTypedData(wallet, {
@@ -129,8 +129,12 @@ const removeSession = async ({ userWallet, sessionManagerContract, sessionAccoun
   });
 };
 
-const parsePrice = (priceFloat, precision = 100_000_000) => {
-  return BigInt(Math.round(priceFloat * precision));
+const parsePrice = (priceFloat, { precisionDecimals = 8n, tokenDecimals = 0n } = {}) => {
+  const shift = Number(10n ** precisionDecimals);
+  const priceShifted = BigInt(Math.round(priceFloat * shift));
+  return tokenDecimals > precisionDecimals
+    ? priceShifted / 10n ** (tokenDecimals - precisionDecimals)
+    : priceShifted * 10n ** (precisionDecimals - tokenDecimals);
 };
 
 /**
@@ -170,7 +174,7 @@ const calculateBoundaryOrderAmount = async ({
 
   // formula used in contracts
   const positionSize =
-    (leverage * (equity * 100n - margin * soLevel - 1n) * INT_PRECISION) / (soLevel * instrumentPrice);
+    (leverage * (equity * 100n - margin * soLevel - 1n) * INT_PRECISION_EVEDEX) / (soLevel * instrumentPrice);
   return positionSize;
 };
 
@@ -230,6 +234,8 @@ const signMultiLiquidationOrder = async ({ wallet, order, contractAddress }) => 
   return signature;
 };
 
+const absBn = (value) => (value < 0n ? -value : value);
+
 module.exports = {
   createWithdrawOrder,
   signWithdrawOrder,
@@ -242,4 +248,5 @@ module.exports = {
   calculateMarginLevel,
   createMultiLiquidationOrder,
   signMultiLiquidationOrder,
+  absBn,
 };

@@ -24,8 +24,12 @@ const {
   INITIAL_ORDER_SIZE_PERCENT,
 } = require('./liquidation.config');
 
-const flow = 'deposit -> create session -> buy/sell orders -> long order liquidation';
+const flow = 'deposit -> create session -> buy/sell orders -> order liquidation';
 
+/**
+ * There are two positions: long and short. The long position is opened by Alice, the short position is opened by Bob.
+ * One of the positions will be liquidated by the liquidator if the price of the instrument changes significantly.
+ */
 describe(flow, () => {
   before(upgrades.silenceWarnings);
 
