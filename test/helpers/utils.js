@@ -1,7 +1,6 @@
 const { domain, orderWithdrawalTypes, orderTypes, multiOrderLiquidationTypes } = require('./eip712-types');
-const { signTypedData, readContract } = require('viem/actions');
-const { maxUint32, maxUint128, maxUint64, zeroHash } = require('viem');
-const { writeContract } = require('viem/actions');
+const { signTypedData, readContract, writeContract } = require('viem/actions');
+const { maxUint32, maxUint128, maxUint64, zeroHash, encodeAbiParameters, keccak256, toBytes } = require('viem');
 const { INT_PRECISION_EVEDEX } = require('./constants');
 
 const signWithdrawOrder = async ({ wallet, order, contractAddress }) => {
@@ -89,6 +88,39 @@ const signOrder = async ({ wallet, order, contractAddress }) => {
     primaryType: 'Order',
   });
   return signature;
+};
+
+const getOrderDigest = ({ order }) => {
+  const ORDER_TYPEHASH = keccak256(
+    toBytes(
+      'Order(address senderAddress,address matcherAddress,address collateral,uint256 instrumentIndex,uint256 amount,uint256 price,uint16 leverage,uint256 matcherFee,uint256 expiration,uint8 side)',
+    ),
+  );
+  const encodedData = encodeAbiParameters(
+    [
+      { type: 'bytes32', name: 'ORDER_TYPEHASH' },
+      { type: 'address', name: 'senderAddress' },
+      { type: 'address', name: 'matcherAddress' },
+      { type: 'uint256', name: 'instrumentIndex' },
+      { type: 'uint256', name: 'amount' },
+      { type: 'uint256', name: 'price' },
+      { type: 'uint256', name: 'matcherFee' },
+      { type: 'uint256', name: 'expiration' },
+      { type: 'uint8', name: 'side' },
+    ],
+    [
+      ORDER_TYPEHASH,
+      order.senderAddress,
+      order.matcherAddress,
+      order.instrumentIndex,
+      order.amount,
+      order.price,
+      order.matcherFee,
+      order.expiration,
+      order.side,
+    ],
+  );
+  return keccak256(encodedData);
 };
 
 const createSession = async ({
@@ -249,4 +281,5 @@ module.exports = {
   createMultiLiquidationOrder,
   signMultiLiquidationOrder,
   absBn,
+  getOrderDigest,
 };
