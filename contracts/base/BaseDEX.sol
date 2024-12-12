@@ -209,24 +209,22 @@ abstract contract BaseDEX is
   ) internal view returns (FundingRateInfo memory) {
     uint256 len = _instrumentInfo[index].fundingRateData.length;
     if (len == 0) revert EmptyArrayToSearch();
-    if (_instrumentInfo[index].fundingRateData[searchHint].lastFRUpdateTime < timestamp)
+    if (_instrumentInfo[index].fundingRateData[searchHint].lastFRUpdateTime > timestamp)
       revert SearchWithHintFailed(searchHint);
 
     uint256 low = searchHint;
     uint256 high = len;
     while (low < high) {
       uint256 mid = Math.average(low, high);
-      if (_instrumentInfo[index].fundingRateData[mid].lastFRUpdateTime > timestamp) {
-        high = mid;
+      if (_instrumentInfo[index].fundingRateData[mid].lastFRUpdateTime < timestamp) {
+        unchecked {
+          low = mid + 1;
+        }
       } else {
-        low = mid + 1;
+        high = mid;
       }
     }
-
-    if (low > 0 && _instrumentInfo[index].fundingRateData[low - 1].lastFRUpdateTime == timestamp) {
-      low--;
-    }
-    if (low == len) revert SearchWithHintFailed(searchHint);
+    if (low == len) low--;
     return _instrumentInfo[index].fundingRateData[low];
   }
 

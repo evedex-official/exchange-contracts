@@ -301,7 +301,7 @@ describe(flow, () => {
           multiLiquidationOrder,
           { collateralPrices: currentCollateralPrices, instrumentPrices: currentInstrumentPrices },
           USDT_COLLATERAL_INDEX,
-          0n, // history timestamp
+          Math.trunc(Date.now() / 1000), // history timestamp
           0n, // history search hint
         ],
       });
