@@ -10,6 +10,8 @@ module.exports = {
   USDT_PRICE: parsePrice(1.0, {
     tokenDecimals: USDT_DECIMALS,
   }),
+  USDT_DEPOSIT_AMOUNT: 100_000n * 10n ** USDT_DECIMALS,
   ORDER_LEVERAGE: 100n,
-  ORDER_AMOUNT: 1n,
+  ORDER_AMOUNT: 10n,
+  NEW_ORDER_AMOUNT: 5n,
 };
