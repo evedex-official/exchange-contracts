@@ -235,8 +235,8 @@ library OrderValidationLib {
     return (digest, leaf);
   }
 
-  function _checkExpiration(uint256 timestamp) internal view {
-    if (timestamp < block.timestamp) revert InvalidExpiration();
+  function _checkExpiration(uint256 expirationTimestamp, uint256 currentTimestamp) internal pure {
+    if (expirationTimestamp < currentTimestamp) revert InvalidExpiration();
   }
 
   function _checkSignature(address signer, bytes32 digest, bytes memory signature) internal view {
@@ -247,16 +247,16 @@ library OrderValidationLib {
     if (!MerkleProof.verify(proof, root, leaf)) revert InvalidMerkleTree();
   }
 
-  function checkLiquidationOrder(OrderLiquidation memory liquidationOrder) public view {
-    _checkExpiration(liquidationOrder.expiration);
+  function checkLiquidationOrder(OrderLiquidation memory liquidationOrder, uint256 historyTimestamp) public view {
+    _checkExpiration(liquidationOrder.expiration, historyTimestamp);
     bytes32 digest = keccak256(
       abi.encodePacked("\x19\x01", buildDomainSeparator(), _getLiquidationOrderTypeValueHash(liquidationOrder))
     );
     _checkSignature(liquidationOrder.liquidator, digest, liquidationOrder.signature);
   }
 
-  function checkLiquidationOrder(MultiOrderLiquidation memory liquidationOrder) public view {
-    _checkExpiration(liquidationOrder.expiration);
+  function checkLiquidationOrder(MultiOrderLiquidation memory liquidationOrder, uint256 historyTimestamp) public view {
+    _checkExpiration(liquidationOrder.expiration, historyTimestamp);
     bytes32 digest = keccak256(
       abi.encodePacked("\x19\x01", buildDomainSeparator(), _getMultiLiquidationOrderTypeValueHash(liquidationOrder))
     );
@@ -264,7 +264,7 @@ library OrderValidationLib {
   }
 
   function checkWithdrawalOrder(OrderWithdrawal memory withdrawalOrder, address orderSigner) public view {
-    _checkExpiration(withdrawalOrder.expiration);
+    _checkExpiration(withdrawalOrder.expiration, block.timestamp);
     bytes32 digest = keccak256(
       abi.encodePacked("\x19\x01", buildDomainSeparator(), _getWithdrawalOrderTypeValueHash(withdrawalOrder))
     );
@@ -280,10 +280,11 @@ library OrderValidationLib {
     uint256 filledAmount,
     uint256 filledPrice,
     address allowedMatcher,
-    uint256 instrumentsLength
+    uint256 instrumentsLength,
+    uint256 historyTimestamp
   ) public view returns (bytes32 buyOrderDigest, bytes32 sellOrderDigest) {
-    _checkExpiration(buyOrder.expiration);
-    _checkExpiration(sellOrder.expiration);
+    _checkExpiration(buyOrder.expiration, historyTimestamp);
+    _checkExpiration(sellOrder.expiration, historyTimestamp);
 
     if (buyOrder.merkleRoot != 0x00) {
       bytes32 buyOrderLeaf;
