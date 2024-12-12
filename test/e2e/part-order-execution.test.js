@@ -108,6 +108,8 @@ describe(flow, () => {
   /**
    * price is fetched from LONG order
    * amount of the order is Math.min(aliceOrder.amount, bobOrder.amount)
+   *
+   * Smaller order will be filled completely, bigger order will be filled partially
    */
   it('matcher match orders', async () => {
     const { matcher, usdtToken, eveDex, btcToken } = await restoreSuit(flow);
