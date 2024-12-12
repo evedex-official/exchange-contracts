@@ -238,7 +238,7 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     uint256 historyTimestamp,
     uint256 historySearchHint
   ) external onlyRole(MATCHER_ROLE) {
-    OrderValidationLib.checkLiquidationOrder(liquidationOrder);
+    OrderValidationLib.checkLiquidationOrder(liquidationOrder, historyTimestamp);
 
     //TODO double calculation of pnl in checkMargin and then liquidationPosition
     (bool validMargin, ) = _checkMargin(
@@ -345,7 +345,7 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     uint256 historyTimestamp,
     uint256 historySearchHint
   ) external onlyRole(MATCHER_ROLE) {
-    OrderValidationLib.checkLiquidationOrder(liquidationOrder);
+    OrderValidationLib.checkLiquidationOrder(liquidationOrder, historyTimestamp);
     if (liquidationOrder.prices[0].index != liquidationOrder.index) revert PriceOfLiquidatedInstrumentNotFirst();
 
     (bool validMargin, ) = _checkMargin(
@@ -402,7 +402,8 @@ contract EVEDEX is BaseDEX, IEVEDEX {
         uint256(filledAmount),
         uint256(filledPrice),
         msg.sender,
-        instrumentsLength
+        instrumentsLength,
+        historyTimestamp
       );
 
       _fillOrder(buyOrderDigest, buyOrder.order.amount, filledAmount);

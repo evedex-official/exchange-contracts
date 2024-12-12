@@ -10,7 +10,7 @@ contract ERC20MockDecimals is ERC20 {
    * @dev Constructor to initialize the token name, symbol, and decimals.
    * @param decimals_ The number of decimals for the token, defaults to 18.
    */
-  constructor(uint8 decimals_) ERC20("ERC20MockDecimals", "M") {
+  constructor(string memory name_, uint8 decimals_) ERC20(name_, name_) {
     _decimals = decimals_;
   }
 

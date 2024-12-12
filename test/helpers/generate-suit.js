@@ -3,20 +3,41 @@
 const { viemDeployWithLibraries, viemDeployProxyWithLibraries } = require('./viemify');
 const { viem } = require('hardhat');
 const { zeroHash, maxUint112 } = require('viem');
-const { BTC_USD_SYMBOL } = require('./constants');
+const { BTC_USD_SYMBOL, USDT_DECIMALS, BTC_DECIMALS } = require('./constants');
 
 const suits = {};
 
 const prepareWallets = async () => {
-  const [owner, alice, bob, liquidator, fundingRateAccount, matcher, aliceSessionWallet, bobSessionWallet] =
-    await viem.getWalletClients();
-  return { owner, alice, bob, liquidator, fundingRateAccount, matcher, aliceSessionWallet, bobSessionWallet };
+  const [
+    owner,
+    alice,
+    bob,
+    carol,
+    liquidator,
+    fundingRateAccount,
+    matcher,
+    aliceSessionWallet,
+    bobSessionWallet,
+    carolSessionWallet,
+  ] = await viem.getWalletClients();
+  return {
+    owner,
+    alice,
+    bob,
+    carol,
+    liquidator,
+    fundingRateAccount,
+    matcher,
+    aliceSessionWallet,
+    bobSessionWallet,
+    carolSessionWallet,
+  };
 };
 
 const prepareTokens = async (wallets) => {
   const [usdtToken, btcToken] = await Promise.all([
-    viem.deployContract('ERC20MockDecimals', [6n]),
-    viem.deployContract('ERC20MockDecimals', [18n]),
+    viem.deployContract('ERC20MockDecimals', ['USDT', USDT_DECIMALS]),
+    viem.deployContract('ERC20MockDecimals', ['WBTC', BTC_DECIMALS]),
   ]);
   await Promise.all(wallets.map((user) => usdtToken.write.mint([user.account.address, maxUint112])));
   await Promise.all(wallets.map((wallet) => btcToken.write.mint([wallet.account.address, maxUint112])));
@@ -89,9 +110,28 @@ const generateSuit = async (
   } = {},
 ) => {
   if (!id) throw new Error('Suit id is required');
-  const { owner, alice, bob, liquidator, fundingRateAccount, matcher, aliceSessionWallet, bobSessionWallet } =
-    await prepareWallets();
-  const { usdtToken, btcToken } = await prepareTokens([owner, alice, bob, liquidator, fundingRateAccount, matcher]);
+  const {
+    owner,
+    alice,
+    bob,
+    carol,
+    liquidator,
+    fundingRateAccount,
+    matcher,
+    aliceSessionWallet,
+    bobSessionWallet,
+    carolSessionWallet,
+  } = await prepareWallets();
+  const { usdtToken, btcToken } = await prepareTokens([
+    owner,
+    alice,
+    bob,
+    carol,
+    liquidator,
+    fundingRateAccount,
+    matcher,
+    carolSessionWallet,
+  ]);
   const { orderLib, sessions, vault, depositDex, eveDex } = await prepareContracts({
     owner,
     matcher,
@@ -109,6 +149,7 @@ const generateSuit = async (
     owner,
     alice,
     bob,
+    carol,
     liquidator,
     fundingRateAccount,
     matcher,
@@ -121,6 +162,7 @@ const generateSuit = async (
     eveDex,
     aliceSessionWallet,
     bobSessionWallet,
+    carolSessionWallet,
   };
 
   return suits[id];

@@ -167,7 +167,7 @@ describe('EVEDEX contract', function () {
       orderPrice,
       orderAmount,
       { collateralPrices, instrumentPrices }, // fullPrices
-      0, // historyTimestamp
+      time.latest(), // historyTimestamp
       0, // historySearchHint
     );
 
@@ -321,7 +321,7 @@ describe('EVEDEX contract', function () {
       orderPrice,
       orderAmount1,
       { collateralPrices, instrumentPrices }, // fullPrices
-      0, // historyTimestamp
+      time.latest(), // historyTimestamp
       0, // historySearchHint
     );
 
@@ -336,7 +336,7 @@ describe('EVEDEX contract', function () {
       orderPrice,
       orderAmount2,
       { collateralPrices, instrumentPrices }, // fullPrices
-      0, // historyTimestamp
+      time.latest(), // historyTimestamp
       0, // historySearchHint
     );
 
@@ -417,7 +417,7 @@ describe('EVEDEX contract', function () {
       orderPrice,
       orderAmount,
       { collateralPrices, instrumentPrices }, // fullPrices
-      0, // historyTimestamp
+      time.latest(), // historyTimestamp
       0, // historySearchHint
     );
 
@@ -444,7 +444,7 @@ describe('EVEDEX contract', function () {
       depositDex.connect(matcher).withdrawComplete(
         signedWithdrawalOrderIncorrect,
         { collateralPrices, instrumentPrices }, // fullPrices
-        0, // historyTimestamp
+        time.latest(), // historyTimestamp
         0, // historySearchHint
       ),
     ).to.be.revertedWithCustomError(depositDex, 'InsufficientMargin');
@@ -452,7 +452,7 @@ describe('EVEDEX contract', function () {
     await depositDex.connect(matcher).withdrawComplete(
       signedWithdrawalOrderCorrect,
       { collateralPrices, instrumentPrices }, // fullPrices
-      0, // historyTimestamp
+      time.latest(), // historyTimestamp
       0, // historySearchHint
     );
 
@@ -534,7 +534,7 @@ describe('EVEDEX contract', function () {
       orderPrice,
       orderAmount,
       { collateralPrices, instrumentPrices }, // fullPrices
-      0, // historyTimestamp
+      time.latest(), // historyTimestamp
       0, // historySearchHint
     );
 
@@ -568,7 +568,7 @@ describe('EVEDEX contract', function () {
       liquidationOrder,
       { collateralPrices, instrumentPrices }, // fullPrices
       0, // collateralIndex
-      0, // historyTimestamp
+      time.latest(), // historyTimestamp
       0, // historySearchHint
     );
   });

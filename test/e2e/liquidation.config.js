@@ -1,11 +1,16 @@
 'use strict';
 
 const { parsePrice } = require('../helpers/utils');
+const { BTC_DECIMALS, USDT_DECIMALS } = require('../helpers/constants');
 
 module.exports = {
-  USDT_DEPOSIT_AMOUNT: 100n * 10n ** 6n, // collateral
-  BTC_INITIAL_PRICE: parsePrice(100_000), // price of the order
-  USDT_INITIAL_PRICE: parsePrice(1.0), // initial price of the usdt (used as a collateral)
+  USDT_DEPOSIT_AMOUNT: 100n * 10n ** USDT_DECIMALS, // collateral
+  BTC_INITIAL_PRICE: parsePrice(100_000, {
+    tokenDecimals: BTC_DECIMALS,
+  }), // price of the order
+  USDT_INITIAL_PRICE: parsePrice(1.0, {
+    tokenDecimals: USDT_DECIMALS,
+  }), // initial price of the usdt (used as a collateral)
   ORDER_LEVERAGE: 1n,
   INITIAL_ORDER_SIZE_PERCENT: 80n, // order size in percents of the margin level at stop-out boundary
 
@@ -36,6 +41,10 @@ module.exports = {
    * if ORDER_LEVERAGE is 1n, and INITIAL_ORDER_SIZE_PERCENT is 50n, then SHORT position should be
    * liquidated after the price raises above 180_000 (+80 %)
    */
-  BTC_CURRENT_PRICE: parsePrice(121_000), // current price. liquidation will happen if marginLevel <= soLevel
-  USDT_CURRENT_PRICE: parsePrice(1.0), // current price. liquidation will happen if marginLevel <= soLevel
+  BTC_CURRENT_PRICE: parsePrice(121_000, {
+    tokenDecimals: BTC_DECIMALS,
+  }), // current price. liquidation will happen if marginLevel <= soLevel
+  USDT_CURRENT_PRICE: parsePrice(1.0, {
+    tokenDecimals: USDT_DECIMALS,
+  }), // current price. liquidation will happen if marginLevel <= soLevel
 };

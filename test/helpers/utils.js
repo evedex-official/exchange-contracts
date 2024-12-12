@@ -1,8 +1,7 @@
 const { domain, orderWithdrawalTypes, orderTypes, multiOrderLiquidationTypes } = require('./eip712-types');
-const { signTypedData, readContract } = require('viem/actions');
-const { maxUint32, maxUint128, maxUint64, zeroHash } = require('viem');
-const { writeContract } = require('viem/actions');
-const { INT_PRECISION } = require('./constants');
+const { signTypedData, readContract, writeContract } = require('viem/actions');
+const { maxUint32, maxUint128, maxUint64, zeroHash, encodeAbiParameters, keccak256, toBytes } = require('viem');
+const { INT_PRECISION_EVEDEX } = require('./constants');
 
 const signWithdrawOrder = async ({ wallet, order, contractAddress }) => {
   const signature = await signTypedData(wallet, {
@@ -91,6 +90,39 @@ const signOrder = async ({ wallet, order, contractAddress }) => {
   return signature;
 };
 
+const getOrderDigest = ({ order }) => {
+  const ORDER_TYPEHASH = keccak256(
+    toBytes(
+      'Order(address senderAddress,address matcherAddress,address collateral,uint256 instrumentIndex,uint256 amount,uint256 price,uint16 leverage,uint256 matcherFee,uint256 expiration,uint8 side)',
+    ),
+  );
+  const encodedData = encodeAbiParameters(
+    [
+      { type: 'bytes32', name: 'ORDER_TYPEHASH' },
+      { type: 'address', name: 'senderAddress' },
+      { type: 'address', name: 'matcherAddress' },
+      { type: 'uint256', name: 'instrumentIndex' },
+      { type: 'uint256', name: 'amount' },
+      { type: 'uint256', name: 'price' },
+      { type: 'uint256', name: 'matcherFee' },
+      { type: 'uint256', name: 'expiration' },
+      { type: 'uint8', name: 'side' },
+    ],
+    [
+      ORDER_TYPEHASH,
+      order.senderAddress,
+      order.matcherAddress,
+      order.instrumentIndex,
+      order.amount,
+      order.price,
+      order.matcherFee,
+      order.expiration,
+      order.side,
+    ],
+  );
+  return keccak256(encodedData);
+};
+
 const createSession = async ({
   userWallet,
   sessionManagerContract,
@@ -129,8 +161,12 @@ const removeSession = async ({ userWallet, sessionManagerContract, sessionAccoun
   });
 };
 
-const parsePrice = (priceFloat, precision = 100_000_000) => {
-  return BigInt(Math.round(priceFloat * precision));
+const parsePrice = (priceFloat, { precisionDecimals = 8n, tokenDecimals = 0n } = {}) => {
+  const shift = Number(10n ** precisionDecimals);
+  const priceShifted = BigInt(Math.round(priceFloat * shift));
+  return tokenDecimals > precisionDecimals
+    ? priceShifted / 10n ** (tokenDecimals - precisionDecimals)
+    : priceShifted * 10n ** (precisionDecimals - tokenDecimals);
 };
 
 /**
@@ -170,7 +206,7 @@ const calculateBoundaryOrderAmount = async ({
 
   // formula used in contracts
   const positionSize =
-    (leverage * (equity * 100n - margin * soLevel - 1n) * INT_PRECISION) / (soLevel * instrumentPrice);
+    (leverage * (equity * 100n - margin * soLevel - 1n) * INT_PRECISION_EVEDEX) / (soLevel * instrumentPrice);
   return positionSize;
 };
 
@@ -230,6 +266,8 @@ const signMultiLiquidationOrder = async ({ wallet, order, contractAddress }) => 
   return signature;
 };
 
+const absBn = (value) => (value < 0n ? -value : value);
+
 module.exports = {
   createWithdrawOrder,
   signWithdrawOrder,
@@ -242,4 +280,6 @@ module.exports = {
   calculateMarginLevel,
   createMultiLiquidationOrder,
   signMultiLiquidationOrder,
+  absBn,
+  getOrderDigest,
 };
