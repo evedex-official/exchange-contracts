@@ -1,16 +1,17 @@
 import { useBlockNumber, useReadContract } from "wagmi";
-import { erc20Abi, Address, formatUnits } from "viem";
+import { Address, formatUnits } from "viem";
 
 import useToken from "./useToken";
+import { DepositDEX } from "../contracts";
 import { useEffect } from "react";
 
 export const useBalance = (tokenAddress: Address, userAddress: Address) => {
   const token = useToken(tokenAddress);
   const { data, isLoading, refetch } = useReadContract({
-    address: tokenAddress as Address,
-    functionName: "balanceOf",
-    abi: erc20Abi,
-    args: [userAddress as Address],
+    address: DepositDEX.address as Address,
+    functionName: "getBalance",
+    abi: DepositDEX.abi,
+    args: [userAddress, tokenAddress],
   });
 
   const { data: blockNumber } = useBlockNumber({ watch: true });
@@ -21,7 +22,7 @@ export const useBalance = (tokenAddress: Address, userAddress: Address) => {
 
   return {
     isLoading,
-    formatted: formatUnits(data || 0n, token.decimals),
+    formatted: formatUnits((data as bigint) || 0n, token.decimals),
     original: data,
     token,
   };

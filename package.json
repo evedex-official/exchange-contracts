@@ -19,7 +19,8 @@
     "export-abi": "hardhat export-abi --dir ./networks/abi",
     "export-deploy": "hardhat export-deployed --file ./networks/contracts.json --fields address,blockNumber,upgradable.proxyAdmin",
     "export-deploy-name": "hardhat export-deployed --file ./networks/contracts-networks.json --fields address,blockNumber,upgradable.proxyAdmin --group name",
-    "deploy:dex:localhost": "npx hardhat run scripts/dex-deploy.js --network localhost"
+    "deploy:dex:localhost": "npx hardhat run scripts/dex-deploy.js --network localhost",
+    "node:localhost": "npx hardhat node --port 8555"
   },
   "author": "",
   "repository": {

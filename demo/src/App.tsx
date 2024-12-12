@@ -1,6 +1,7 @@
 import { useAccount, useConnect, useDisconnect } from "wagmi";
 import DepositForm from "./forms/DepositForm";
-import Balances from "./components/Balances";
+import WalletBalances from "./components/WalletBalances";
+import DexBalances from "./components/DexBalances";
 
 function App() {
   const account = useAccount();
@@ -43,9 +44,10 @@ function App() {
           </div>
         </div>
       )}
-      <Balances />
+      <WalletBalances />
       <div>
         <DepositForm />
+        <DexBalances />
       </div>
     </>
   );

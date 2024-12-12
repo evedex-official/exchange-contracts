@@ -52,6 +52,10 @@ module.exports = {
     deployments: path.resolve(__dirname, './deployments'),
   },
   networks: {
+    localhost: {
+      chainId: 31337,
+      url: 'http://127.0.0.1:8555',
+    },
     hardhat: {
       initialBaseFeePerGas: 0,
       blockGasLimit: 10000000,

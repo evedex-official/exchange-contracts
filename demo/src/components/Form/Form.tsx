@@ -21,6 +21,7 @@ type FormProps = {
   initialValues: any;
   children: any;
   onSubmit: (values: any) => Promise<void>;
+  validationSchema?: any;
 };
 
 const Form: React.FC<FormProps> = ({
@@ -28,9 +29,14 @@ const Form: React.FC<FormProps> = ({
   initialValues,
   children,
   onSubmit,
+  validationSchema,
 }) => {
   return (
-    <Formik onSubmit={onSubmit} initialValues={initialValues}>
+    <Formik
+      onSubmit={onSubmit}
+      initialValues={initialValues}
+      validationSchema={validationSchema}
+    >
       <FormikForm>
         {title && <h2>{title}</h2>}
         <div>{children}</div>

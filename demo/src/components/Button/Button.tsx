@@ -5,8 +5,17 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   children: any;
 };
 
-const Button: React.FC<ButtonProps> = ({ isLoading, children, ...props }) => {
-  return <button {...props}>{isLoading ? "Loading..." : children}</button>;
+const Button: React.FC<ButtonProps> = ({
+  isLoading,
+  children,
+  type = "button",
+  ...props
+}) => {
+  return (
+    <button type={type} {...props}>
+      {isLoading ? "Loading..." : children}
+    </button>
+  );
 };
 
 export default Button;

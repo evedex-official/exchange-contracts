@@ -1,17 +1,18 @@
 # Demo
 
-## Copy and edit config
+Demo UI is working with localhost RPC Node `http://127.0.0.1:8555`.
+## Prepare config
 
-`cp config.example.js config.js` - in root folder
+Type in root folder - `cp config.example.js config.js`. Edit config if needed.
 
 ## Start node 
 
-`npm run node` - in root folder
+Open 1st terminal, then type in root folder to run local node - `npm run node:localhost`.
 
 ## Deploy smart contracts
 
-`npm run deploy` - in root folder
+Open 2nd terminal, then type in root folder to deploy contracts to local node - `npm run deploy:dex:localhost`.
 
-## Start frontend
+## UI
 
-`npm run dev`
+Move to demo folder and run UI - `npm run dev`

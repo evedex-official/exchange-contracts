@@ -15,7 +15,7 @@ const Balance: React.FC<BalanceProps> = ({ address }) => {
     "Loading..."
   ) : (
     <div>
-      {formatted} {token.symbol}
+      {token.name}: {formatted} {token.symbol}
     </div>
   );
 };
@@ -24,6 +24,7 @@ const Balances = () => {
   const tokens = [Usdt.address, Btc.address];
   return (
     <div>
+      <h4>Wallet Balances</h4>
       {tokens.map((address) => (
         <Balance key={address} address={address as Address} />
       ))}
