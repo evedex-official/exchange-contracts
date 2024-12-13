@@ -1,6 +1,6 @@
 # Demo
 
-Demo UI is working with localhost RPC Node `http://127.0.0.1:8555`.
+Demo UI is working with localhost RPC Node `http://127.0.0.1:8555`. First you need to add custom localhost network in Metamask.
 ## Prepare config
 
 Type in root folder - `cp config.example.js config.js`. Edit config if needed.
@@ -32,3 +32,8 @@ First 7 accounts are reserved for system roles and topped up with USDT and BTC m
 5 - alice session
 6 - bob session
 
+You can import this private keys in your Metamask to use with demo.
+
+## Troubleshooting
+
+When you restart your local node, you need to redeploy smart contracts and reset imported account in Metamask with "Clear activity tab" button and re-add custom localhost network if needed to reset account nonce and Metamask cache.
