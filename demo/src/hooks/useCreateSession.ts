@@ -15,6 +15,15 @@ const useCreateSession = () => {
     allowanceAllowed = maxUint128,
     limitWithdrawals = false,
     withdrawConfig = [],
+  }: {
+    sessionWallet: Address;
+    expirationTs: bigint;
+    limitMaxOrders: boolean;
+    ordersAllowed: bigint;
+    limitAllowance: boolean;
+    allowanceAllowed: bigint;
+    limitWithdrawals: boolean;
+    withdrawConfig: any[];
   }) => {
     const session = {
       user: address,

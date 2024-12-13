@@ -8,9 +8,9 @@ import { INT_PRECISION_EVEDEX } from "../constants";
 import useMarginLevel from "./useMarginLevel";
 
 const useBoundaryOrderAmount = (
-  instrumentPrices,
+  instrumentPrices: any,
   instrumentIndex: number,
-  collateralPrices,
+  collateralPrices: any,
   leverage: bigint
 ) => {
   const { equity, margin } = useMarginLevel(instrumentPrices, collateralPrices);

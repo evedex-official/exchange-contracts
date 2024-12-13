@@ -1,4 +1,4 @@
-import { Address, zeroHash } from "viem";
+import { Address, Hash, zeroAddress, zeroHash } from "viem";
 import { useAccount, useSignTypedData } from "wagmi";
 import {
   BTC_USD_INDEX,
@@ -24,6 +24,21 @@ const createOrderExtended = ({
   expiration = Math.floor(Date.now() / 1000) + 3600,
   merkleRoot = zeroHash,
   merkleProof = [],
+}: {
+  collateralIndex: number;
+  senderAddress: Address;
+  matcherAddress: Address;
+  collateral: Address;
+  instrumentIndex: number;
+  amount: bigint;
+  price: number;
+  side: number;
+  userSession: Address;
+  leverage?: bigint;
+  matcherFee?: bigint;
+  expiration?: number;
+  merkleRoot?: Hash;
+  merkleProof?: any[];
 }) => {
   return {
     collateralIndex,
@@ -54,7 +69,7 @@ const useSignOrder = () => {
   const signOrder = async ({
     amount,
     leverage = 100n,
-    sessionWallet,
+    senderWallet,
     side,
     collateral = Usdt.address,
     instrumentIndex = BTC_USD_INDEX,
@@ -62,15 +77,17 @@ const useSignOrder = () => {
   }: {
     amount: bigint;
     leverage: bigint;
-    sessionWallet: Address;
+    senderWallet: Address;
     side: number;
     collateral: Address;
     instrumentIndex: number;
     collateralIndex: number;
   }) => {
+    const userSession =
+      senderWallet === address ? zeroAddress : (address as Address);
     const { order } = createOrderExtended({
       collateralIndex,
-      senderAddress: address,
+      senderAddress: senderWallet,
       matcherAddress: MATCHER_ADDRESS,
       collateral,
       instrumentIndex,
@@ -78,13 +95,13 @@ const useSignOrder = () => {
       amount,
       price: btc,
       leverage,
-      userSession: sessionWallet,
+      userSession,
     });
     const data = {
       message: order,
       types: orderTypes,
       domain: domain(EveDEX.address as Address, chainId!),
-      primaryType: "Order",
+      primaryType: "Order" as any,
     };
     return await signTypedDataAsync(data);
   };

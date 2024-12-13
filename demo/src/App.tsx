@@ -43,6 +43,7 @@ function App() {
           </div>
           <div>
             <div>status: {account.status}</div>
+            <div>active address: {account.address}</div>
             <div>addresses: {JSON.stringify(account.addresses)}</div>
             <div>chainId: {account.chainId}</div>
           </div>

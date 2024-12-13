@@ -4,6 +4,7 @@ import * as yup from "yup";
 
 import Form, { Field } from "../../components/Form";
 import useCreateSession from "../../hooks/useCreateSession";
+import { toast } from "react-toastify";
 
 const validationSchema = yup.object({
   sessionWallet: yup.string().required(),
@@ -30,16 +31,21 @@ const initialValues = {
 const SessionForm: React.FC = () => {
   const { createSession } = useCreateSession();
   const onSubmit = async (values: any) => {
-    await createSession({
-      sessionWallet: values.sessionWallet,
-      expirationTs: BigInt(values.expirationTs),
-      limitMaxOrders: values.limitMaxOrders,
-      ordersAllowed: BigInt(values.ordersAllowed),
-      limitAllowance: values.limitAllowance,
-      allowanceAllowed: BigInt(values.allowanceAllowed),
-      limitWithdrawals: values.limitWithdrawals,
-      withdrawConfig: [],
-    });
+    try {
+      await createSession({
+        sessionWallet: values.sessionWallet,
+        expirationTs: BigInt(values.expirationTs),
+        limitMaxOrders: values.limitMaxOrders,
+        ordersAllowed: BigInt(values.ordersAllowed),
+        limitAllowance: values.limitAllowance,
+        allowanceAllowed: BigInt(values.allowanceAllowed),
+        limitWithdrawals: values.limitWithdrawals,
+        withdrawConfig: [],
+      });
+      toast.success("Session created.");
+    } catch (e) {
+      toast.error(`Error: ${(e as any).message}`);
+    }
   };
   return (
     <div>

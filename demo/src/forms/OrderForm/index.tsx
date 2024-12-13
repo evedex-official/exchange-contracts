@@ -7,23 +7,23 @@ import { Btc, Usdt } from "../../contracts";
 import { Address, parseUnits } from "viem";
 import useSignOrder from "../../hooks/useSignOrder";
 import {
-  BTC_COLLATERAL_INDEX,
+  BTC_USD_INDEX,
   BUY_SIDE,
   SELL_SIDE,
   USDT_COLLATERAL_INDEX,
 } from "../../constants";
-import useSession from "../../hooks/useSessions";
+// import useSession from "../../hooks/useSessions";
 
 const validationSchema = yup.object({
   address: yup.string().required(),
   orderType: yup.string().required(),
   amount: yup.number().required(),
   leverage: yup.number().required(),
-  session: yup.string().required(),
+  sender: yup.string().required(),
 });
 
 const initialValues = {
-  session: "",
+  sender: "",
   address: Btc.address,
   orderType: BUY_SIDE,
   leverage: 10,
@@ -42,20 +42,20 @@ const tokens = {
 const OrderForm: React.FC = () => {
   const [signedOrder, setSignedOrder] = useState<string | null>(null);
   const { signOrder } = useSignOrder();
-  const { data } = useSession();
-  const sessions: Address[] = data as Address[];
+  // const { data } = useSession();
+  // const sessions: Address[] = data as Address[];
   const onSubmit = async (values: any) => {
     const token = tokens[values.address];
 
     try {
       const dataToSign = {
+        senderWallet: values.sender,
         amount: parseUnits(values.amount.toString(), token.decimals),
-        sessionWallet: (data as any)[0] as Address,
         leverage: BigInt(values.leverage),
         collateral: values.address,
         collateralIndex: USDT_COLLATERAL_INDEX,
         side: values.orderType,
-        instrumentIndex: BTC_COLLATERAL_INDEX,
+        instrumentIndex: BTC_USD_INDEX,
       };
 
       const signedData = await signOrder(dataToSign);
@@ -76,7 +76,7 @@ const OrderForm: React.FC = () => {
         onSubmit={onSubmit}
         validationSchema={validationSchema}
       >
-        <Field
+        {/* <Field
           label="Session Wallet"
           name="session"
           fieldType="select"
@@ -87,7 +87,8 @@ const OrderForm: React.FC = () => {
               {session}
             </option>
           ))}
-        </Field>
+        </Field> */}
+        <Field label="Sender" name="sender" />
         <Field
           label="Token"
           name="address"
