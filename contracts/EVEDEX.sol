@@ -86,10 +86,6 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     uint256 historySearchHint
   ) public view override(BaseDEX, IEVEDEX) returns (int72) {
     FundingRateInfo memory fundingRateInfo = _getFundingRateInfo(index, historyTimestamp, historySearchHint);
-    // return
-    //   fundingRateInfo.shortFRStored +
-    //   int72(uint72(historyTimestamp - fundingRateInfo.lastFRUpdateTime)) *
-    //   fundingRateInfo.frShort;
     return fundingRateInfo.shortFRStored;
   }
 
@@ -99,10 +95,6 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     uint256 historySearchHint
   ) public view override(BaseDEX, IEVEDEX) returns (int72) {
     FundingRateInfo memory fundingRateInfo = _getFundingRateInfo(index, historyTimestamp, historySearchHint);
-    // return
-    //   fundingRateInfo.longFRStored +
-    //   int72(uint72(historyTimestamp - fundingRateInfo.lastFRUpdateTime)) *
-    //   fundingRateInfo.frLong;
     return fundingRateInfo.longFRStored;
   }
 
