@@ -216,6 +216,10 @@ describe(flow, () => {
   it('Matcher match Alice TP or SL order', async () => {
     const { eveDex, usdtToken, btcToken, matcher } = await restoreSuit(flow);
     const { aliceSlOrderExt, aliceTpOrderExt, bobOrderExt } = orders;
+    if (TRIGGER_BTC_PRICE > SL_ORDER_PRICE && TRIGGER_BTC_PRICE < TP_ORDER_PRICE) {
+      console.warn(`NOTHING TO TRIGGER! Price has not reached TP or SL order`);
+      return;
+    }
     const isUp = TRIGGER_BTC_PRICE > INITIAL_BTC_PRICE;
     const aliceOrderExt = isUp ? aliceTpOrderExt : aliceSlOrderExt;
     const instrumentPrice = isUp ? TP_ORDER_PRICE : SL_ORDER_PRICE;
