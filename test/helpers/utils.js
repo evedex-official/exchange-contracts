@@ -1,7 +1,14 @@
-const { domain, orderWithdrawalTypes, orderTypes, multiOrderLiquidationTypes } = require('./eip712-types');
+const {
+  domain,
+  orderWithdrawalTypes,
+  orderTypes,
+  multiOrderLiquidationTypes,
+  multiOrderTypes,
+} = require('./eip712-types');
 const { signTypedData, readContract, writeContract } = require('viem/actions');
-const { maxUint32, maxUint128, maxUint64, zeroHash, encodeAbiParameters, keccak256, toBytes } = require('viem');
-const { INT_PRECISION_EVEDEX } = require('./constants');
+const { maxUint32, maxUint128, maxUint64, zeroHash, encodeAbiParameters, keccak256 } = require('viem');
+const { INT_PRECISION_EVEDEX, ORDER_TYPEHASH } = require('./constants');
+const { StandardMerkleTree } = require('@openzeppelin/merkle-tree');
 
 const signWithdrawOrder = async ({ wallet, order, contractAddress }) => {
   const signature = await signTypedData(wallet, {
@@ -91,11 +98,6 @@ const signOrder = async ({ wallet, order, contractAddress }) => {
 };
 
 const getOrderDigest = ({ order }) => {
-  const ORDER_TYPEHASH = keccak256(
-    toBytes(
-      'Order(address senderAddress,address matcherAddress,address collateral,uint256 instrumentIndex,uint256 amount,uint256 price,uint16 leverage,uint256 matcherFee,uint256 expiration,uint8 side)',
-    ),
-  );
   const encodedData = encodeAbiParameters(
     [
       { type: 'bytes32', name: 'ORDER_TYPEHASH' },
@@ -121,6 +123,63 @@ const getOrderDigest = ({ order }) => {
     ],
   );
   return keccak256(encodedData);
+};
+
+const toMultiOrders = async ({ wallet, contractAddress, ordersExt }) => {
+  const leafEncoding = [
+    'bytes32',
+    'address',
+    'address',
+    'address',
+    'uint256',
+    'uint256',
+    'uint256',
+    'uint16',
+    'uint256',
+    'uint256',
+    'uint8',
+  ];
+  const values = ordersExt.map(({ order }) => [
+    ORDER_TYPEHASH,
+    order.senderAddress,
+    order.matcherAddress,
+    order.collateral,
+    order.instrumentIndex,
+    order.amount,
+    order.price,
+    order.leverage,
+    order.matcherFee,
+    order.expiration,
+    order.side,
+  ]);
+  const tree = StandardMerkleTree.of(values, leafEncoding);
+  const merkleRoot = tree.root;
+  const signature = await signMultiOrder({ wallet, merkleRoot, contractAddress });
+  const multiOrdersExt = [];
+  for (let i = 0; i < ordersExt.length; i++) {
+    const { order } = ordersExt[i];
+    const merkleProof = tree.getProof(i);
+    const multiOrder = {
+      ...order,
+      merkleRoot,
+      merkleProof,
+      signature,
+    };
+    multiOrdersExt.push({
+      collateralIndex: ordersExt[i].collateralIndex,
+      order: multiOrder,
+    });
+  }
+  return multiOrdersExt;
+};
+
+const signMultiOrder = async ({ wallet, merkleRoot, contractAddress }) => {
+  return await signTypedData(wallet, {
+    message: { merkleRoot },
+    types: multiOrderTypes,
+    domain: await domain(contractAddress),
+    primaryType: 'MultiOrder',
+  });
 };
 
 const createSession = async ({
@@ -282,4 +341,5 @@ module.exports = {
   signMultiLiquidationOrder,
   absBn,
   getOrderDigest,
+  toMultiOrders,
 };
