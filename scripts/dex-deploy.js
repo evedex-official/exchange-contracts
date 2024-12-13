@@ -5,7 +5,7 @@ const config = require('../config.js');
 const { BTC_USD_SYMBOL } = require('../test/helpers/constants.js');
 
 async function main() {
-  const [deployer, alice, bob, liquidator, matcher] = await ethers.getSigners();
+  const [deployer, alice, bob, liquidator, matcher, aliceSession, bobSession] = await ethers.getSigners();
   console.log('Deployer address:', deployer.address);
 
   const orderLib = await deployAndVerify('OrderValidationLib', []);
@@ -45,7 +45,7 @@ async function main() {
 
   // Testnet deploy helpers
 
-  const wallets = [deployer, alice, bob, liquidator, matcher];
+  const wallets = [deployer, alice, bob, liquidator, matcher, aliceSession, bobSession];
 
   const { usdtToken, btcToken } = await deployTokenMocks(wallets);
 
