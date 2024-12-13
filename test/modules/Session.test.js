@@ -72,6 +72,9 @@ describe('Testing SessionManager contract', function () {
       allowanceAllowed: ethers.parseEther('0.1'),
       limitWithdrawals: false,
     };
+    await expect(
+      session.connect(bob).setSession(aliceSession.address, newBobSession, config),
+    ).to.be.revertedWithCustomError(Session, 'InvalidSessionUser');
     expect(await session.connect(bob).setSession(bobSession.address, newBobSession, config))
       .to.emit(Session, 'SessionDataUpdated')
       .withArgs(bob.address, bobSession.address, anyValue);

@@ -1,5 +1,7 @@
 'use strict';
 
+const { keccak256, toBytes } = require('viem');
+
 module.exports = {
   BUY_SIDE: 1,
   SELL_SIDE: 0,
@@ -13,4 +15,9 @@ module.exports = {
   INT_PRECISION_DEPOSIT_DEX: 10n ** 8n,
   USDT_DECIMALS: 6n,
   BTC_DECIMALS: 8n,
+  ORDER_TYPEHASH: keccak256(
+    toBytes(
+      'Order(address senderAddress,address matcherAddress,address collateral,uint256 instrumentIndex,uint256 amount,uint256 price,uint16 leverage,uint256 matcherFee,uint256 expiration,uint8 side)',
+    ),
+  ),
 };

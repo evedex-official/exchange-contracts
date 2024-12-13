@@ -66,6 +66,8 @@ contract SessionManager is ISessionManager, AccessControlEnumerable {
   function setSession(address session, SessionValue calldata data, SessionWithdraw[] memory config) external {
     address user = _msgSender();
     if (data.user != user) revert InvalidSessionUser();
+    address currentOwner = _sessionData[session].values.user;
+    if (currentOwner != address(0) && currentOwner != user) revert InvalidSessionUser();
     _sessions[user].add(session);
     _updateSessionData(session, data);
     _updateSessionWithdraw(session, config);

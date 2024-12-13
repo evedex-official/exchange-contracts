@@ -4,11 +4,9 @@ pragma solidity ^0.8.21;
 import {IDepositDEX} from "./IDepositDEX.sol";
 
 struct FundingRateInfo {
-  int40 frLong; // Funding rate for long position - percentage of position per second. frLong = 10**11 => 100% per second
-  int40 frShort; // Funding rate for short position - percentage of position per second. frShort = 10**11 => 100% per second
   int72 longFRStored; // Accumulator for frLong
   int72 shortFRStored; // Accumulator for frShort
-  uint32 lastFRUpdateTime; // Last funding rate update time
+  uint48 lastFRUpdateTime; // Last funding rate update time
 }
 
 struct InstrumentInfo {
@@ -23,14 +21,7 @@ struct InstrumentData {
 
 interface IBaseDEX {
   event InstrumentUpdate(uint256 indexed index, string ticker, uint8 leverage);
-  event NewFundingRate(
-    uint256 indexed index,
-    int48 frLongPerSecond,
-    int48 frShortPerSecond,
-    int72 longFRStored,
-    int72 shortFRStored,
-    uint256 position
-  );
+  event NewFundingRate(uint256 indexed index, int72 longFRStored, int72 shortFRStored, uint256 position);
   event InstrumentDeleted(uint256 indexed index);
   event BasicParamsUpdate(
     address depositDex,
@@ -69,9 +60,9 @@ interface IBaseDEX {
   function addInstrument(
     string calldata ticker,
     uint8 leverage,
-    int256 dailyFRLong,
-    int256 dailyFRShort,
-    uint32 timestamp
+    int72 newFRLong,
+    int72 newFRShort,
+    uint48 timestamp
   ) external;
 
   function deleteInstrument() external;
@@ -80,10 +71,10 @@ interface IBaseDEX {
     uint256 index,
     string calldata ticker,
     uint8 leverage,
-    int256 dailyFRLong,
-    int256 dailyFRShort,
-    uint32 timestamp
+    int72 newFRLong,
+    int72 newFRShort,
+    uint48 timestamp
   ) external;
 
-  function setFR(uint256 index, int256 dailyFRLong, int256 dailyFRShort, uint32 timestamp) external;
+  function setFR(uint256 index, int72 newFRLong, int72 newFRShort, uint48 timestamp) external;
 }
