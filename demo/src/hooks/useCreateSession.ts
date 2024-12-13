@@ -29,7 +29,7 @@ const useCreateSession = () => {
       functionName: "setSession",
       address: SessionManager.address as Address,
       abi: SessionManager.abi,
-      args: [address, session, withdrawConfig],
+      args: [sessionWallet, session, withdrawConfig],
     });
   };
   return {
