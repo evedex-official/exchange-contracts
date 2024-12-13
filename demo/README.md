@@ -16,3 +16,19 @@ Open 2nd terminal, then type in root folder to deploy contracts to local node - 
 ## UI
 
 Move to demo folder and run UI - `npm run dev`
+
+
+## Accounts
+
+When local node starts, it shares 20 account private keys.
+
+First 7 accounts are reserved for system roles and topped up with USDT and BTC mocks in `dex-deploy.js` script.
+
+0 - deployer
+1 - alice
+2 - bob
+3 - matcher
+4 - liquidator
+5 - alice session
+6 - bob session
+
