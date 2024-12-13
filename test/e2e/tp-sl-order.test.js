@@ -7,21 +7,27 @@ const { writeContract } = require('viem/actions');
 const { createSession, createOrderExtended, signOrder, toMultiOrders } = require('../helpers/utils');
 const {
   USDT_DEPOSIT_AMOUNT,
-  BTC_PRICE,
-  ORDER_LEVERAGE,
   MARKET_ORDER_AMOUNT,
+  INITIAL_BTC_PRICE,
+  ORDER_LEVERAGE,
+  USDT_PRICE,
   TP_ORDER_AMOUNT,
   TP_ORDER_PRICE,
-  USDT_PRICE,
-} = require('./tp-order.config');
+  SL_ORDER_AMOUNT,
+  SL_ORDER_PRICE,
+  TRIGGER_BTC_PRICE,
+} = require('./tp-sl-order.config');
 
 /**
- * This test focuses on multi-order functionality, simulating Take Profit (TP) order.
+ * This test focuses on multi-order functionality, simulating Take Profit (TP) and Stop Loss (SL) orders.
  * - TP Order: Executes when the price reaches a higher threshold to secure profits.
+ * - SL Order: Executes when the price drops to a lower threshold to limit losses.
  *
- * We assume that Alice places a BUY market order and a TP SELL order
+ * We assume that Alice places a BUY market order and a TP (SL) SELL order.
+ * If price goes up, TP order will be triggered
+ * If price goes down, SL order will be triggered
  */
-const flow = 'deposit -> create sessions -> Multi-Order TP';
+const flow = 'deposit -> create sessions -> Multi-Order TP/SL';
 
 describe(flow, () => {
   before(upgrades.silenceWarnings);
@@ -30,6 +36,7 @@ describe(flow, () => {
     bobOrderExt: null,
     aliceMarketOrderExt: null,
     aliceTpOrderExt: null,
+    aliceSlOrderExt: null,
   };
 
   it('Alice and Bob deposit usdt', async () => {
@@ -65,7 +72,7 @@ describe(flow, () => {
     await Promise.all([create(alice, aliceSessionWallet), create(bob, bobSessionWallet)]);
   });
 
-  it('Alice create tp multi order', async () => {
+  it('Alice creates tp and sl multi order', async () => {
     const { eveDex, usdtToken, alice, matcher, aliceSessionWallet } = await restoreSuit(flow);
     const marketOrderExt = createOrderExtended({
       collateralIndex: USDT_COLLATERAL_INDEX,
@@ -75,7 +82,7 @@ describe(flow, () => {
       instrumentIndex: BTC_USD_INDEX,
       side: BUY_SIDE,
       amount: MARKET_ORDER_AMOUNT,
-      price: BTC_PRICE,
+      price: INITIAL_BTC_PRICE,
       leverage: ORDER_LEVERAGE,
       userSession: aliceSessionWallet.account.address,
     });
@@ -91,13 +98,26 @@ describe(flow, () => {
       leverage: ORDER_LEVERAGE,
       userSession: aliceSessionWallet.account.address,
     });
-    const [marketMultiOrderExt, tpMultiOrderExt] = await toMultiOrders({
-      ordersExt: [marketOrderExt, tpOrderExt],
+    const slOrderExt = createOrderExtended({
+      collateralIndex: USDT_COLLATERAL_INDEX,
+      senderAddress: alice.account.address,
+      matcherAddress: matcher.account.address,
+      collateral: usdtToken.address,
+      instrumentIndex: BTC_USD_INDEX,
+      side: SELL_SIDE,
+      amount: SL_ORDER_AMOUNT,
+      price: SL_ORDER_PRICE,
+      leverage: ORDER_LEVERAGE,
+      userSession: aliceSessionWallet.account.address,
+    });
+    const [marketMultiOrderExt, tpMultiOrderExt, slMultiOrderExt] = await toMultiOrders({
+      ordersExt: [marketOrderExt, tpOrderExt, slOrderExt],
       wallet: aliceSessionWallet,
       contractAddress: eveDex.address,
     });
     orders.aliceMarketOrderExt = marketMultiOrderExt;
     orders.aliceTpOrderExt = tpMultiOrderExt;
+    orders.aliceSlOrderExt = slMultiOrderExt;
   });
 
   it('Bob create market order', async () => {
@@ -110,7 +130,7 @@ describe(flow, () => {
       instrumentIndex: BTC_USD_INDEX,
       side: SELL_SIDE,
       amount: MARKET_ORDER_AMOUNT,
-      price: BTC_PRICE,
+      price: INITIAL_BTC_PRICE,
       leverage: ORDER_LEVERAGE,
       userSession: bobSessionWallet.account.address,
     });
@@ -128,7 +148,7 @@ describe(flow, () => {
     const instrumentPrices = [
       {
         index: BTC_USD_INDEX,
-        price: BTC_PRICE,
+        price: INITIAL_BTC_PRICE,
       },
     ];
     const collateralPrices = [
@@ -138,7 +158,7 @@ describe(flow, () => {
       },
       {
         collateral: btcToken.address,
-        price: BTC_PRICE,
+        price: INITIAL_BTC_PRICE,
       },
     ];
     const fullPrices = { instrumentPrices, collateralPrices };
@@ -151,7 +171,7 @@ describe(flow, () => {
       args: [
         aliceMarketOrderExt,
         bobOrderExt,
-        BTC_PRICE,
+        INITIAL_BTC_PRICE,
         aliceMarketOrderExt.order.amount,
         fullPrices,
         historyTimestamp,
@@ -161,12 +181,18 @@ describe(flow, () => {
   });
 
   /**
-   * Assume that price goes up and reaches TP order price
-   * Bob decides to place a buy market order
-   * Matcher should match Alice TP order with Bob market order
+   * After price change Bob decides to close his position and place a buy market order
+   * Matcher should match Alice SL or TP order with Bob market order
+   *
+   * Depending on TRIGGER_PRICE, TP or SL order will be triggered
    */
-  it('Bob create market order after price goes up', async () => {
+  it('Bob create market order after price changes', async () => {
     const { eveDex, usdtToken, bob, matcher, bobSessionWallet } = await restoreSuit(flow);
+
+    const isUp = TRIGGER_BTC_PRICE > INITIAL_BTC_PRICE;
+    const amount = isUp ? TP_ORDER_AMOUNT : SL_ORDER_AMOUNT;
+    const price = isUp ? TP_ORDER_PRICE : SL_ORDER_PRICE;
+
     const orderExt = createOrderExtended({
       collateralIndex: USDT_COLLATERAL_INDEX,
       senderAddress: bob.account.address,
@@ -174,8 +200,8 @@ describe(flow, () => {
       collateral: usdtToken.address,
       instrumentIndex: BTC_USD_INDEX,
       side: BUY_SIDE,
-      amount: TP_ORDER_AMOUNT,
-      price: TP_ORDER_PRICE,
+      amount,
+      price,
       leverage: ORDER_LEVERAGE,
       userSession: bobSessionWallet.account.address,
     });
@@ -187,13 +213,17 @@ describe(flow, () => {
     orders.bobOrderExt = orderExt;
   });
 
-  it('Matcher match Alice TP order', async () => {
+  it('Matcher match Alice TP or SL order', async () => {
     const { eveDex, usdtToken, btcToken, matcher } = await restoreSuit(flow);
-    const { aliceTpOrderExt, bobOrderExt } = orders;
+    const { aliceSlOrderExt, aliceTpOrderExt, bobOrderExt } = orders;
+    const isUp = TRIGGER_BTC_PRICE > INITIAL_BTC_PRICE;
+    const aliceOrderExt = isUp ? aliceTpOrderExt : aliceSlOrderExt;
+    const instrumentPrice = isUp ? TP_ORDER_PRICE : SL_ORDER_PRICE;
+
     const instrumentPrices = [
       {
         index: BTC_USD_INDEX,
-        price: TP_ORDER_PRICE,
+        price: instrumentPrice,
       },
     ];
     const collateralPrices = [
@@ -203,7 +233,7 @@ describe(flow, () => {
       },
       {
         collateral: btcToken.address,
-        price: TP_ORDER_PRICE,
+        price: instrumentPrice,
       },
     ];
     const fullPrices = { instrumentPrices, collateralPrices };
@@ -215,13 +245,14 @@ describe(flow, () => {
       abi: eveDex.abi,
       args: [
         bobOrderExt,
-        aliceTpOrderExt,
-        TP_ORDER_PRICE,
-        aliceTpOrderExt.order.amount,
+        aliceOrderExt,
+        instrumentPrice,
+        bobOrderExt.order.amount,
         fullPrices,
         historyTimestamp,
         historySearchHint,
       ],
     });
+    console.warn(`${isUp ? 'TP' : 'SL'} order triggered at price: ${instrumentPrice}`);
   });
 });
