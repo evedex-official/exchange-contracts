@@ -1,0 +1,40 @@
+import { useAccount, useWriteContract } from "wagmi";
+import { Address, maxUint32, maxUint64, maxUint128 } from "viem";
+
+import { SessionManager } from "../contracts";
+
+const useCreateSession = () => {
+  const { address } = useAccount();
+  const { writeContractAsync } = useWriteContract({});
+  const createSession = async ({
+    sessionWallet,
+    expirationTs = maxUint64,
+    limitMaxOrders = false,
+    ordersAllowed = maxUint32,
+    limitAllowance = true,
+    allowanceAllowed = maxUint128,
+    limitWithdrawals = false,
+    withdrawConfig = [],
+  }) => {
+    const session = {
+      user: address,
+      expiration: expirationTs,
+      limitMaxOrders,
+      ordersAllowed,
+      limitAllowance,
+      allowanceAllowed,
+      limitWithdrawals,
+    };
+    return await writeContractAsync({
+      functionName: "setSession",
+      address: SessionManager.address as Address,
+      abi: SessionManager.abi,
+      args: [address, session, withdrawConfig],
+    });
+  };
+  return {
+    createSession,
+  };
+};
+
+export default useCreateSession;

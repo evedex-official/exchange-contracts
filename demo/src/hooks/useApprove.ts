@@ -18,7 +18,7 @@ const useApprove = (source: Address, spender: Address) => {
     address: source as any,
     abi: erc20Abi,
   };
-  const { writeContract } = useWriteContract();
+  const { writeContractAsync } = useWriteContract();
   const { isLoading, data, refetch } = useReadContract({
     ...contractConfig,
     functionName: "allowance",
@@ -37,7 +37,7 @@ const useApprove = (source: Address, spender: Address) => {
   const onMaxApprove = async () => {
     try {
       setIsApproving(true);
-      const tx = await writeContract({
+      const tx = await writeContractAsync({
         ...contractConfig,
         functionName: "approve",
         args: [spender, maxUint256],

@@ -89,7 +89,6 @@ const DepositForm: React.FC = () => {
         fieldType="select"
         placeholder="Select"
       >
-        <option value=""></option>
         <option value={Usdt.address}>USDT</option>
         <option value={Btc.address}>BTC</option>
       </Field>

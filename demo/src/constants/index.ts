@@ -1,0 +1,13 @@
+export const BUY_SIDE = 1;
+export const SELL_SIDE = 0;
+export const BTC_USD_INDEX = 0;
+export const BTC_USD_SYMBOL = "BTC/USD";
+export const ETH_USD_INDEX = 1;
+export const ETH_USD_SYMBOL = "ETH/USD";
+export const USDT_COLLATERAL_INDEX = 0;
+export const BTC_COLLATERAL_INDEX = 1;
+export const INT_PRECISION_EVEDEX = 10n ** 8n;
+export const INT_PRECISION_DEPOSIT_DEX = 10n ** 8n;
+export const USDT_DECIMALS = 6n;
+export const BTC_DECIMALS = 8n;
+export const MATCHER_ADDRESS = import.meta.env.VITE_MATCHER_ADDRESS || "";

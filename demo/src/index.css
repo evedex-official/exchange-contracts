@@ -19,3 +19,48 @@
     color: #181818;
   }
 }
+
+* {
+  box-sizing: border-box;
+}
+
+.container {
+  margin: 0 auto;
+  padding-left: 15px;
+  padding-right: 15px;
+  max-width: 1200px;
+  width: 100%;
+}
+
+.form {
+  min-width: 200px;
+  margin-bottom: 20px;
+}
+
+.field {
+  margin-bottom: 10px;
+}
+
+.field-error {
+  margin-top: 5px;
+  color: #a00;
+  font-size: 12px;
+}
+
+.field-input input,
+.field-input select {
+  width: 100%;
+  padding: 5px;
+}
+
+.form button[type="submit"] {
+  margin-top: 10px;
+  width: 100%;
+  padding: 5px;
+}
+
+.account-header {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}

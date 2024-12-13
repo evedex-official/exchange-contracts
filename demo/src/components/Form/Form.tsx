@@ -16,6 +16,14 @@ const SubmitButton: React.FC<SubmitButtonProps> = ({ children }) => {
   );
 };
 
+const Errors = () => {
+  const { errors } = useFormikContext();
+  const errorsKeys = Object.keys(errors);
+  if (!errorsKeys.length) return null;
+
+  return <pre>{JSON.stringify(errors, null, 2)}</pre>;
+};
+
 type FormProps = {
   title?: any;
   initialValues: any;
@@ -37,10 +45,11 @@ const Form: React.FC<FormProps> = ({
       initialValues={initialValues}
       validationSchema={validationSchema}
     >
-      <FormikForm>
+      <FormikForm className="form">
         {title && <h2>{title}</h2>}
         <div>{children}</div>
         <SubmitButton>Submit</SubmitButton>
+        <Errors />
       </FormikForm>
     </Formik>
   );
