@@ -115,6 +115,7 @@ describe(flow, () => {
     });
 
     const buyOrderExtended = createOrderExtended({
+      orderId: 1n,
       collateralIndex: USDT_COLLATERAL_INDEX,
       senderAddress: alice.account.address,
       matcherAddress: matcher.account.address,
@@ -166,6 +167,7 @@ describe(flow, () => {
     });
 
     const sellOrderExtended = createOrderExtended({
+      orderId: 2n,
       collateralIndex: USDT_COLLATERAL_INDEX,
       senderAddress: bob.account.address,
       matcherAddress: matcher.account.address,

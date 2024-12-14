@@ -51,6 +51,7 @@ const createWithdrawOrder = ({ accountAddress, collateralAddress, amount, sessio
  * @param {Array<string>} [params.merkleProof=[]] - The Merkle proof for verifying the order (default: empty array).
  */
 const createOrderExtended = ({
+  orderId = 42n,
   collateralIndex,
   senderAddress,
   matcherAddress,
@@ -62,13 +63,14 @@ const createOrderExtended = ({
   userSession,
   leverage = 1n,
   matcherFee = 0n,
-  expiration = Math.floor(Date.now() / 1000) + 3600,
+  creationTime = Math.floor(Date.now() / 1000),
   merkleRoot = zeroHash,
   merkleProof = [],
 }) => {
   return {
     collateralIndex,
     order: {
+      orderId,
       senderAddress,
       matcherAddress,
       collateral,
@@ -77,7 +79,7 @@ const createOrderExtended = ({
       price,
       leverage,
       matcherFee,
-      expiration,
+      creationTime,
       side,
       userSession,
       merkleRoot,
@@ -101,24 +103,26 @@ const getOrderDigest = ({ order }) => {
   const encodedData = encodeAbiParameters(
     [
       { type: 'bytes32', name: 'ORDER_TYPEHASH' },
+      { type: 'uint256', name: 'orderId' },
       { type: 'address', name: 'senderAddress' },
       { type: 'address', name: 'matcherAddress' },
       { type: 'uint256', name: 'instrumentIndex' },
       { type: 'uint256', name: 'amount' },
       { type: 'uint256', name: 'price' },
       { type: 'uint256', name: 'matcherFee' },
-      { type: 'uint256', name: 'expiration' },
+      { type: 'uint256', name: 'creationTime' },
       { type: 'uint8', name: 'side' },
     ],
     [
       ORDER_TYPEHASH,
+      order.orderId,
       order.senderAddress,
       order.matcherAddress,
       order.instrumentIndex,
       order.amount,
       order.price,
       order.matcherFee,
-      order.expiration,
+      order.creationTime,
       order.side,
     ],
   );
@@ -128,6 +132,7 @@ const getOrderDigest = ({ order }) => {
 const toMultiOrders = async ({ wallet, contractAddress, ordersExt }) => {
   const leafEncoding = [
     'bytes32',
+    'uint256',
     'address',
     'address',
     'address',
@@ -141,6 +146,7 @@ const toMultiOrders = async ({ wallet, contractAddress, ordersExt }) => {
   ];
   const values = ordersExt.map(({ order }) => [
     ORDER_TYPEHASH,
+    order.orderId,
     order.senderAddress,
     order.matcherAddress,
     order.collateral,
@@ -149,7 +155,7 @@ const toMultiOrders = async ({ wallet, contractAddress, ordersExt }) => {
     order.price,
     order.leverage,
     order.matcherFee,
-    order.expiration,
+    order.creationTime,
     order.side,
   ]);
   const tree = StandardMerkleTree.of(values, leafEncoding);

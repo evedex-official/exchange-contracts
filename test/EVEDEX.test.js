@@ -106,11 +106,12 @@ describe('EVEDEX contract', function () {
     await depositDex.connect(alice).depositCollateral(tokenAddress, amount);
     await depositDex.connect(bob).depositCollateral(tokenAddress, amount);
 
-    const expiration = Math.floor(Date.now() / 1000) + 3600; // 1 hour from now
+    const creationTime = Math.floor(Date.now() / 1000);
     const orderAmount = await ethers.parseEther('4.166'); // 4.167 * 3000 (price) / 100 (leverage) * 80 (soLevel) = 100 (balance) * 1.0 (collateralPrice) * 100 (100%)
     const orderPrice = 300000000000;
 
     const aliceOrder = {
+      orderId: 42,
       senderAddress: alice.address,
       matcherAddress: matcher.address,
       collateral: tokenAddress,
@@ -119,13 +120,14 @@ describe('EVEDEX contract', function () {
       price: orderPrice,
       leverage: 100,
       matcherFee: 0,
-      expiration: expiration,
+      creationTime: creationTime,
       side: 1,
       userSession: ethers.ZeroAddress,
       merkleRoot: ethers.ZeroHash,
       merkleProof: [],
     };
     const bobOrder = {
+      orderId: 142,
       senderAddress: bob.address,
       matcherAddress: matcher.address,
       collateral: tokenAddress,
@@ -134,7 +136,7 @@ describe('EVEDEX contract', function () {
       price: orderPrice,
       leverage: 100,
       matcherFee: 0,
-      expiration: expiration,
+      creationTime: creationTime,
       side: 0,
       userSession: ethers.ZeroAddress,
       merkleRoot: ethers.ZeroHash,
@@ -187,12 +189,13 @@ describe('EVEDEX contract', function () {
     await depositDex.connect(alice).depositCollateral(tokenAddress, amount);
     await depositDex.connect(bob).depositCollateral(tokenAddress, amount);
 
-    const expiration = Math.floor(Date.now() / 1000) + 3600; // 1 hour from now
+    const creationTime = Math.floor(Date.now() / 1000);
     const orderAmount1 = await ethers.parseEther('1.0');
     const orderAmount2 = await ethers.parseEther('0.5');
     const orderPrice = 300000000000;
 
     const aliceOrder1 = {
+      orderId: 42,
       senderAddress: alice.address,
       matcherAddress: matcher.address,
       collateral: tokenAddress,
@@ -201,13 +204,14 @@ describe('EVEDEX contract', function () {
       price: orderPrice,
       leverage: 100,
       matcherFee: 0,
-      expiration: expiration,
+      creationTime: creationTime,
       side: 1,
       userSession: ethers.ZeroAddress,
       merkleRoot: ethers.ZeroHash,
       merkleProof: [],
     };
     const aliceOrder2 = {
+      orderId: 43,
       senderAddress: alice.address,
       matcherAddress: matcher.address,
       collateral: tokenAddress,
@@ -216,13 +220,14 @@ describe('EVEDEX contract', function () {
       price: orderPrice,
       leverage: 100,
       matcherFee: 0,
-      expiration: expiration,
+      creationTime: creationTime,
       side: 1,
       userSession: ethers.ZeroAddress,
       merkleRoot: ethers.ZeroHash,
       merkleProof: [],
     };
     const bobOrder = {
+      orderId: 143,
       senderAddress: bob.address,
       matcherAddress: matcher.address,
       collateral: tokenAddress,
@@ -231,7 +236,7 @@ describe('EVEDEX contract', function () {
       price: orderPrice,
       leverage: 100,
       matcherFee: 0,
-      expiration: expiration,
+      creationTime: creationTime,
       side: 0,
       userSession: ethers.ZeroAddress,
       merkleRoot: ethers.ZeroHash,
@@ -240,6 +245,7 @@ describe('EVEDEX contract', function () {
 
     const leafEncoding = [
       'bytes32',
+      'uint256',
       'address',
       'address',
       'address',
@@ -255,6 +261,7 @@ describe('EVEDEX contract', function () {
     const values = [
       [
         typehash,
+        aliceOrder1.orderId,
         aliceOrder1.senderAddress,
         aliceOrder1.matcherAddress,
         aliceOrder1.collateral,
@@ -263,11 +270,12 @@ describe('EVEDEX contract', function () {
         aliceOrder1.price,
         aliceOrder1.leverage,
         aliceOrder1.matcherFee,
-        aliceOrder1.expiration,
+        aliceOrder1.creationTime,
         aliceOrder1.side,
       ],
       [
         typehash,
+        aliceOrder2.orderId,
         aliceOrder2.senderAddress,
         aliceOrder2.matcherAddress,
         aliceOrder2.collateral,
@@ -276,7 +284,7 @@ describe('EVEDEX contract', function () {
         aliceOrder2.price,
         aliceOrder2.leverage,
         aliceOrder2.matcherFee,
-        aliceOrder2.expiration,
+        aliceOrder2.creationTime,
         aliceOrder2.side,
       ],
     ];
@@ -289,10 +297,10 @@ describe('EVEDEX contract', function () {
     const buyOrder1 = { ...aliceOrder1, signature: aliceSignature };
     const buyOrder2 = { ...aliceOrder2, signature: aliceSignature };
     for (const [i, v] of tree.entries()) {
-      if (v[5] === orderAmount1) {
+      if (v[6] === orderAmount1) {
         buyOrder1.merkleRoot = tree.root;
         buyOrder1.merkleProof = tree.getProof(i);
-      } else if (v[5] === orderAmount2) {
+      } else if (v[6] === orderAmount2) {
         buyOrder2.merkleRoot = tree.root;
         buyOrder2.merkleProof = tree.getProof(i);
       }
@@ -356,11 +364,13 @@ describe('EVEDEX contract', function () {
     await depositDex.connect(alice).depositCollateral(tokenAddress, amount);
     await depositDex.connect(bob).depositCollateral(tokenAddress, amount);
 
-    const expiration = Math.floor(Date.now() / 1000) + 3600; // 1 hour from now
+    const creationTime = Math.floor(Date.now() / 1000);
+    const expiration = Math.floor(Date.now() / 1000) + 3600;
     const orderAmount = await ethers.parseEther('3.166'); // 3.167 * 3000 (price) / 100 (leverage) * 1.0 (soLevel) = 94.98
     const orderPrice = 300000000000;
 
     const aliceOrder = {
+      orderId: 42,
       senderAddress: alice.address,
       matcherAddress: matcher.address,
       collateral: tokenAddress,
@@ -369,13 +379,14 @@ describe('EVEDEX contract', function () {
       price: orderPrice,
       leverage: 100,
       matcherFee: 0,
-      expiration: expiration,
+      creationTime: creationTime,
       side: 1,
       userSession: ethers.ZeroAddress,
       merkleRoot: ethers.ZeroHash,
       merkleProof: [],
     };
     const bobOrder = {
+      orderId: 142,
       senderAddress: bob.address,
       matcherAddress: matcher.address,
       collateral: tokenAddress,
@@ -384,7 +395,7 @@ describe('EVEDEX contract', function () {
       price: orderPrice,
       leverage: 100,
       matcherFee: 0,
-      expiration: expiration,
+      creationTime: creationTime,
       side: 0,
       userSession: ethers.ZeroAddress,
       merkleRoot: ethers.ZeroHash,
@@ -473,11 +484,13 @@ describe('EVEDEX contract', function () {
     await token.connect(liquidator).approve(await depositDex.getAddress(), ethers.parseEther('100000'));
     await depositDex.connect(liquidator).depositCollateral(tokenAddress, ethers.parseEther('10000'));
 
-    const expiration = Math.floor(Date.now() / 1000) + 3600; // 1 hour from now
+    const creationTime = Math.floor(Date.now() / 1000);
+    const expiration = Math.floor(Date.now() / 1000) + 3600;
     const orderAmount = await ethers.parseEther('3.75'); // 3.75 * 3000 (price) / 100 (leverage) * 0.8 (soLevel) = 90
     const orderPrice = 300000000000;
 
     const aliceOrder = {
+      orderId: 42,
       senderAddress: alice.address,
       matcherAddress: matcher.address,
       collateral: tokenAddress,
@@ -486,13 +499,14 @@ describe('EVEDEX contract', function () {
       price: orderPrice,
       leverage: 100,
       matcherFee: 0,
-      expiration: expiration,
+      creationTime: creationTime,
       side: 1,
       userSession: ethers.ZeroAddress,
       merkleRoot: ethers.ZeroHash,
       merkleProof: [],
     };
     const bobOrder = {
+      orderId: 142,
       senderAddress: bob.address,
       matcherAddress: matcher.address,
       collateral: tokenAddress,
@@ -501,7 +515,7 @@ describe('EVEDEX contract', function () {
       price: orderPrice,
       leverage: 100,
       matcherFee: 0,
-      expiration: expiration,
+      creationTime: creationTime,
       side: 0,
       userSession: ethers.ZeroAddress,
       merkleRoot: ethers.ZeroHash,
