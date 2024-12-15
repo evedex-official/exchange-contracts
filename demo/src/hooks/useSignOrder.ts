@@ -1,5 +1,5 @@
-import { Address, Hash, zeroAddress, zeroHash } from "viem";
-import { useAccount, useSignTypedData } from "wagmi";
+import { Address, Hash, PrivateKeyAccount, zeroAddress, zeroHash } from "viem";
+import { useAccount, useChainId, useSignTypedData } from "wagmi";
 import {
   BTC_USD_INDEX,
   USDT_COLLATERAL_INDEX,
@@ -62,46 +62,51 @@ const createOrderExtended = ({
 };
 
 const useSignOrder = () => {
-  const { address, chainId } = useAccount();
+  const chainId = useChainId();
   const { signTypedDataAsync } = useSignTypedData();
-  const { btc } = usePrices();
+  const { BTC } = usePrices();
 
   const signOrder = async ({
+    account,
     amount,
     leverage = 100n,
     senderWallet,
+    userSessionWallet,
+    matcherAddress,
     side,
     collateral = Usdt.address,
     instrumentIndex = BTC_USD_INDEX,
     collateralIndex = USDT_COLLATERAL_INDEX,
   }: {
+    account: PrivateKeyAccount;
     amount: bigint;
     leverage: bigint;
     senderWallet: Address;
+    userSessionWallet: Address;
+    matcherAddress: Address;
     side: number;
     collateral: Address;
     instrumentIndex: number;
     collateralIndex: number;
   }) => {
-    const userSession =
-      senderWallet === address ? zeroAddress : (address as Address);
     const { order } = createOrderExtended({
       collateralIndex,
       senderAddress: senderWallet,
-      matcherAddress: MATCHER_ADDRESS,
+      matcherAddress,
       collateral,
       instrumentIndex,
       side,
       amount,
-      price: btc,
+      price: BTC,
       leverage,
-      userSession,
+      userSession: userSessionWallet,
     });
     const data = {
       message: order,
       types: orderTypes,
       domain: domain(EveDEX.address as Address, chainId!),
       primaryType: "Order" as any,
+      account,
     };
     return await signTypedDataAsync(data);
   };

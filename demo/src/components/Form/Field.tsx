@@ -1,7 +1,7 @@
 import React from "react";
 import { useField } from "formik";
 
-type FieldProps = {
+export type FieldProps = {
   label?: string;
   name: string;
   placeholder?: string;

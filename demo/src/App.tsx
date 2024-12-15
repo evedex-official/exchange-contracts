@@ -1,58 +1,15 @@
-import { useAccount, useConnect, useDisconnect } from "wagmi";
+import { useClient } from "wagmi";
+
 import DepositForm from "./forms/DepositForm";
-import WalletBalances from "./components/WalletBalances";
-import DexBalances from "./components/DexBalances";
 import Sessions from "./components/Sessions";
 import OrderForm from "./forms/OrderForm";
+import Accounts from "./components/Accounts";
 
 function App() {
-  const account = useAccount();
-  const { connectors, connect, status, error } = useConnect();
-  const { disconnect } = useDisconnect();
-
-  const isConnected = account.status === "connected";
-
-  if (!isConnected) {
-    return (
-      <div className="container">
-        <h2>Connect</h2>
-        {connectors.map((connector) => (
-          <button
-            key={connector.uid}
-            onClick={() => connect({ connector })}
-            type="button"
-          >
-            {connector.name}
-          </button>
-        ))}
-        <div>{status}</div>
-        <div>{error?.message}</div>
-      </div>
-    );
-  }
-
+  const client = useClient();
   return (
     <div className="container">
-      {isConnected && (
-        <div className="account">
-          <div className="account-header">
-            <h2>Account</h2>
-            <button type="button" onClick={() => disconnect()}>
-              Disconnect
-            </button>
-          </div>
-          <div>
-            <div>status: {account.status}</div>
-            <div>active address: {account.address}</div>
-            <div>addresses: {JSON.stringify(account.addresses)}</div>
-            <div>chainId: {account.chainId}</div>
-          </div>
-        </div>
-      )}
-      <div>
-        <WalletBalances />
-        <DexBalances />
-      </div>
+      <Accounts />
       <hr />
       <div>
         <DepositForm />

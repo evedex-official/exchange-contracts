@@ -10,6 +10,7 @@ import App from "./App.tsx";
 import { config } from "./wagmi.ts";
 
 import "./index.css";
+import ConfigProvider from "./providers/ConfigProvider/index.tsx";
 
 globalThis.Buffer = Buffer;
 
@@ -17,11 +18,13 @@ const queryClient = new QueryClient();
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <WagmiProvider config={config}>
-      <QueryClientProvider client={queryClient}>
-        <App />
-        <ToastContainer />
-      </QueryClientProvider>
-    </WagmiProvider>
+    <ConfigProvider>
+      <WagmiProvider config={config}>
+        <QueryClientProvider client={queryClient}>
+          <App />
+          <ToastContainer />
+        </QueryClientProvider>
+      </WagmiProvider>
+    </ConfigProvider>
   </React.StrictMode>
 );

@@ -5,13 +5,27 @@ import {
   useWriteContract,
   useBlockNumber,
 } from "wagmi";
-import { Address, erc20Abi, maxUint256, formatUnits } from "viem";
+import {
+  Address,
+  erc20Abi,
+  maxUint256,
+  formatUnits,
+  PrivateKeyAccount,
+  zeroAddress,
+} from "viem";
 
 import useToken from "./useToken";
 import { toast } from "react-toastify";
 
-const useApprove = (source: Address, spender: Address) => {
-  const { address, isConnected } = useAccount();
+const useApprove = ({
+  account,
+  source,
+  spender,
+}: {
+  account?: PrivateKeyAccount;
+  source: Address;
+  spender: Address;
+}) => {
   const [isApproving, setIsApproving] = useState<boolean>(false);
   const token = useToken(source);
   const contractConfig = {
@@ -22,9 +36,9 @@ const useApprove = (source: Address, spender: Address) => {
   const { isLoading, data, refetch } = useReadContract({
     ...contractConfig,
     functionName: "allowance",
-    args: [address as Address, spender],
+    args: [account?.address || zeroAddress, spender],
     query: {
-      enabled: isConnected && !!source,
+      enabled: !!account?.address && !!source,
     },
   });
 
@@ -41,6 +55,7 @@ const useApprove = (source: Address, spender: Address) => {
         ...contractConfig,
         functionName: "approve",
         args: [spender, maxUint256],
+        account,
       });
       toast.success("Approved");
       return tx;

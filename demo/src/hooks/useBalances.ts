@@ -13,6 +13,7 @@ const useBalances = (tokens: Address[], address: Address) => {
     abi: erc20Abi,
     functionName: "balanceOf",
     args: [address],
+    defaultValue: 0n,
   }));
 
   const { data, isLoading, refetch } = useReadContracts({

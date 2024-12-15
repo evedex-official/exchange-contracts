@@ -1,15 +1,15 @@
 import React from "react";
+
 import { Btc, Usdt } from "../../contracts";
-import { Address } from "viem";
+import { Address, PrivateKeyAccount } from "viem";
 import { useBalance } from "../../hooks";
-import { useAccount } from "wagmi";
 
 type BalanceProps = {
   address: Address;
+  account: PrivateKeyAccount;
 };
 
-const Balance: React.FC<BalanceProps> = ({ address }) => {
-  const account = useAccount();
+const Balance: React.FC<BalanceProps> = ({ address, account }) => {
   const { formatted, token, isLoading } = useBalance(address, account.address!);
   return isLoading ? (
     "Loading..."
@@ -20,13 +20,17 @@ const Balance: React.FC<BalanceProps> = ({ address }) => {
   );
 };
 
-const Balances = () => {
+type BalancesProps = {
+  account: PrivateKeyAccount;
+};
+
+const Balances: React.FC<BalancesProps> = ({ account }) => {
   const tokens = [Usdt.address, Btc.address];
   return (
     <div>
       <h4>Wallet Balances</h4>
       {tokens.map((address) => (
-        <Balance key={address} address={address as Address} />
+        <Balance key={address} address={address as Address} account={account} />
       ))}
     </div>
   );

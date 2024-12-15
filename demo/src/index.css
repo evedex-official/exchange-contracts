@@ -64,3 +64,20 @@
   gap: 10px;
   align-items: center;
 }
+
+.collapse {
+}
+
+.collapse-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.collapse-content {
+  display: none;
+}
+
+.collapse-content--visible {
+  display: block;
+}

@@ -1,15 +1,15 @@
 import React from "react";
+import { Address, PrivateKeyAccount } from "viem";
+
 import { Btc, Usdt } from "../../contracts";
-import { Address } from "viem";
 import { useDexBalance } from "../../hooks";
-import { useAccount } from "wagmi";
 
 type BalanceProps = {
   address: Address;
+  account: PrivateKeyAccount;
 };
 
-const Balance: React.FC<BalanceProps> = ({ address }) => {
-  const account = useAccount();
+const Balance: React.FC<BalanceProps> = ({ address, account }) => {
   const { formatted, token, isLoading } = useDexBalance(
     address,
     account.address!
@@ -23,13 +23,17 @@ const Balance: React.FC<BalanceProps> = ({ address }) => {
   );
 };
 
-const DexBalances = () => {
+type DexBalancesProps = {
+  account: PrivateKeyAccount;
+};
+
+const DexBalances: React.FC<DexBalancesProps> = ({ account }) => {
   const tokens = [Usdt.address, Btc.address];
   return (
     <div>
       <h4>Dex Balances</h4>
       {tokens.map((address) => (
-        <Balance key={address} address={address as Address} />
+        <Balance key={address} address={address as Address} account={account} />
       ))}
     </div>
   );

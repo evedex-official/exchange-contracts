@@ -5,14 +5,13 @@ import {
   useBlockNumber,
   useReadContracts,
 } from "wagmi";
-import { AbiItem, Address } from "viem";
+import { AbiItem, Address, PrivateKeyAccount } from "viem";
 
 import { SessionManager } from "../contracts";
 import { convertCallsResult, getContractCalls } from "../helpers";
 import { CallConfig } from "../interfaces";
 
-const useSession = () => {
-  const { address } = useAccount();
+const useSession = (account?: PrivateKeyAccount) => {
   const {
     data: sessions,
     isLoading: isLoadingSessions,
@@ -21,7 +20,10 @@ const useSession = () => {
     functionName: "getSessions",
     address: SessionManager.address as Address,
     abi: SessionManager.abi,
-    args: [address],
+    args: [account?.address],
+    query: {
+      enabled: !!account,
+    },
   });
 
   // const {
