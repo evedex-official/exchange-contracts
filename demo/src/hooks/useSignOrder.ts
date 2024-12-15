@@ -108,7 +108,9 @@ const useSignOrder = () => {
       primaryType: "Order" as any,
       account,
     };
-    return await signTypedDataAsync(data);
+    const signature = await signTypedDataAsync(data);
+    order.signature = signature;
+    return order;
   };
 
   return { signOrder };

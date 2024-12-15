@@ -11,3 +11,8 @@ export const INT_PRECISION_DEPOSIT_DEX = 10n ** 8n;
 export const USDT_DECIMALS = 6n;
 export const BTC_DECIMALS = 8n;
 export const MATCHER_ADDRESS = import.meta.env.VITE_MATCHER_ADDRESS || "";
+
+export enum LC_STORAGE_KEY {
+  ORDERS = "EH-DEMO-ORDERS",
+  WITHDRAW_REQUESTS = "EH-DEMO-WITHDRAW-REQUESTS",
+}

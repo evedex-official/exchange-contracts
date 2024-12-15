@@ -1,9 +1,9 @@
 import React, { useState } from "react";
 import { toast } from "react-toastify";
 import * as yup from "yup";
-import { Address, parseUnits, zeroAddress } from "viem";
+import { parseUnits, zeroAddress } from "viem";
 
-import Form, { Field, FieldProps } from "../../components/Form";
+import Form, { Field } from "../../components/Form";
 import { Btc, Usdt } from "../../contracts";
 import useSignOrder from "../../hooks/useSignOrder";
 import {
@@ -13,34 +13,9 @@ import {
   USDT_COLLATERAL_INDEX,
 } from "../../constants";
 import Collapse from "../../components/Collapse";
-import useAccounts from "../../hooks/useAccounts";
-import { useField } from "formik";
-import useSession from "../../hooks/useSessions";
 import { useConfig } from "../../providers/ConfigProvider";
-
-type SessionFieldProps = FieldProps & {
-  dependsField: string;
-};
-
-const SessionField: React.FC<SessionFieldProps> = ({
-  dependsField,
-  ...props
-}) => {
-  const { alice, bob } = useAccounts();
-  const [field] = useField(dependsField);
-  const activeAccount = [alice, bob].find((w) => w.key === field.value);
-  const { data } = useSession(activeAccount?.wallet);
-
-  return (
-    <Field fieldType="select" {...props}>
-      {Object.keys(data || {}).map((key) => (
-        <option key={key} value={key}>
-          {key}
-        </option>
-      ))}
-    </Field>
-  );
-};
+import SessionField from "../../components/SessionFIeld/SessionField";
+import { useMatcherState } from "../../providers/MatcherProvider";
 
 const validationSchema = yup.object({
   address: yup.string().required(),
@@ -70,9 +45,9 @@ const tokens = {
 };
 
 const OrderForm: React.FC = () => {
+  const { addOrder } = useMatcherState();
   const { accounts, sessionWallets } = useConfig();
   const { alice, bob, matcher } = accounts;
-  const [signedOrder, setSignedOrder] = useState<string | null>(null);
   const { signOrder } = useSignOrder();
   const onSubmit = async (values: any) => {
     const token = tokens[values.address];
@@ -102,9 +77,9 @@ const OrderForm: React.FC = () => {
         matcherAddress: matcher.wallet.address,
       };
 
-      const signedData = await signOrder(dataToSign);
+      const signedOrder = await signOrder(dataToSign);
 
-      setSignedOrder(signedData);
+      addOrder(signedOrder);
 
       toast.success(`Order placed.`);
     } catch (e) {
@@ -163,7 +138,6 @@ const OrderForm: React.FC = () => {
           max={100}
         />
       </Form>
-      <div>Signed order data: {signedOrder}</div>
     </Collapse>
   );
 };

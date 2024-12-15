@@ -1,5 +1,6 @@
 import React from "react";
 import Button from "../Button";
+import classNames from "../../helpers/classnames";
 
 type CollapseProps = {
   children: any;
@@ -8,11 +9,9 @@ type CollapseProps = {
 
 const Collapse: React.FC<CollapseProps> = ({ title, children }) => {
   const [show, setShow] = React.useState<boolean>(true);
-  const contentClassNames = ["collapse-content"];
-  if (show) {
-    contentClassNames.push("collapse-content--visible");
-  }
-  const contentClassName = contentClassNames.join(" ");
+  const contentClassName = classNames("collapse-content", {
+    "collapse-content--visible": show,
+  });
   const toggleShow = () => setShow((prev) => !prev);
   return (
     <div className="collapse">

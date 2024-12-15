@@ -9,7 +9,7 @@ import Collapse from "../../components/Collapse";
 import useAccounts from "../../hooks/useAccounts";
 import { useField } from "formik";
 import useSession from "../../hooks/useSessions";
-import BooleanSelectField from "../../components/BooleanSelect";
+import BooleanSelectField from "../../components/BooleanSelectField";
 import { useConfig } from "../../providers/ConfigProvider";
 
 const SessionsInfo = () => {

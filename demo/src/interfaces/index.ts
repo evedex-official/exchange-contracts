@@ -12,3 +12,7 @@ export type CallConfig = {
   args?: any[];
   defaultValue?: any;
 };
+
+export type WithdrawalRequest = {};
+
+export type Order = {};
