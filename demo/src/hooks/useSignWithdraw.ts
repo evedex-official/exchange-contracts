@@ -1,4 +1,4 @@
-import { Address, PrivateKeyAccount } from "viem";
+import { Address, Hex, PrivateKeyAccount } from "viem";
 import { useChainId, useSignTypedData, useWriteContract } from "wagmi";
 import { DepositDEX } from "../contracts";
 import { domain, orderWithdrawalTypes } from "../helpers/eip721";
@@ -22,11 +22,11 @@ const createWithdrawRequest = ({
     amount,
     session,
     expiration,
-    signature: "0x",
+    signature: "0x" as Hex,
   };
 };
 
-const useWithdraw = () => {
+const useSignWithdraw = () => {
   const chainId = useChainId();
   const { signTypedDataAsync } = useSignTypedData();
   const { writeContractAsync } = useWriteContract();
@@ -35,7 +35,6 @@ const useWithdraw = () => {
     account,
     amount,
     collateralAddress,
-
     withdrawerWallet,
     userSessionWallet,
   }: {
@@ -52,6 +51,7 @@ const useWithdraw = () => {
       session: userSessionWallet,
       expiration: Math.floor(Date.now() / 1000) + 3600,
     });
+
     const data = {
       message: request,
       types: orderWithdrawalTypes,
@@ -61,7 +61,7 @@ const useWithdraw = () => {
     };
     const signature = await signTypedDataAsync(data);
 
-    request.signature = signature;
+    request.signature = signature as Hex;
 
     const tx = await writeContractAsync({
       functionName: "withdrawRequest",
@@ -77,4 +77,4 @@ const useWithdraw = () => {
   return { signWithdraw };
 };
 
-export default useWithdraw;
+export default useSignWithdraw;

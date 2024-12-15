@@ -5,7 +5,7 @@ const config = require('../config.js');
 const { BTC_USD_SYMBOL } = require('../test/helpers/constants.js');
 
 async function main() {
-  const [deployer, alice, bob, liquidator, matcher, aliceSession, bobSession] = await ethers.getSigners();
+  const [deployer, alice, bob, liquidator, matcher] = await ethers.getSigners();
   console.log('Deployer address:', deployer.address);
 
   const orderLib = await deployAndVerify('OrderValidationLib', []);
@@ -37,20 +37,32 @@ async function main() {
   await dex.grantRole(ethers.ZeroHash, config.defaultAdmin);
   console.log(`EVEDEX: default admin added: ${config.defaultAdmin}`);
   const matcherRole = await dex.MATCHER_ROLE();
-  await dex.grantRole(matcherRole, config.defaultMatcher);
-  console.log(`EVEDEX: default matcher added: ${config.defaultMatcher}`);
+  // await dex.grantRole(matcherRole, config.defaultMatcher);
+  // console.log(`EVEDEX: default matcher added: ${config.defaultMatcher}`);
+  await dex.grantRole(matcherRole, matcher.address);
+  console.log(`EVEDEX: matcher added: ${matcher.address}`);
+
   const validatorRole = await sessions.VALIDATOR_ROLE();
   await sessions.grantRole(validatorRole, await dex.getAddress());
   console.log('SessionManager: EVEDEX is added as validator');
 
+  const withdrawerRole = await vault.WITHDRAWER_ROLE();
+  await vault.grantRole(withdrawerRole, await deposit.getAddress());
+  console.log('Vault: DepositDEX is added as withdrawer');
+
   // Testnet deploy helpers
 
-  const wallets = [deployer, alice, bob, liquidator, matcher, aliceSession, bobSession];
+  const wallets = [deployer, alice, bob, liquidator, matcher];
 
   const { usdtToken, btcToken } = await deployTokenMocks(wallets);
 
-  await deposit.setCollateralConfigs([await usdtToken.getAddress()], [true]);
-  await deposit.setCollateralConfigs([await btcToken.getAddress()], [true]);
+  const usdtAddress = await usdtToken.getAddress();
+  const btcAddress = await btcToken.getAddress();
+
+  await deposit.setCollateralConfigs([usdtAddress, btcAddress], [true, true]);
+
+  console.log(`USDT (${usdtAddress}) and BTC (${btcAddress}) added as collaterals.`);
+
   await dex.addInstrument(
     BTC_USD_SYMBOL,
     100, //leverage
@@ -58,6 +70,8 @@ async function main() {
     86400, //dailyFRShort
     Math.floor(Date.now() / 1000), //timestamp
   );
+
+  console.log(`BTC_USD_SYMBOL:${BTC_USD_SYMBOL} added as instrument`);
 }
 
 async function deployTokenMocks(wallets) {

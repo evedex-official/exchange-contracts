@@ -36,8 +36,8 @@ const Account: React.FC<AccountProps> = ({ accountKey, account }) => {
 };
 
 const Accounts = () => {
-  const { owner, alice, bob, matcher, liquidator } = useAccounts();
-  const accs = [owner, alice, bob, matcher, liquidator];
+  const { owner, alice, bob, liquidator, matcher } = useAccounts();
+  const accs = [owner, alice, bob, liquidator, matcher];
   return (
     <Collapse title="Accounts">
       <div className="accounts-list">

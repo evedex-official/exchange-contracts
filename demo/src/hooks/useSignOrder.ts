@@ -31,7 +31,7 @@ const createOrderExtended = ({
   collateral: Address;
   instrumentIndex: number;
   amount: bigint;
-  price: number;
+  price: bigint;
   side: number;
   userSession: Address;
   leverage?: bigint;

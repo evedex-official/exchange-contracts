@@ -42,3 +42,14 @@ export const convertCallsResult = (
     return acc;
   }, {} as { [x: string]: any });
 };
+
+export const parsePrice = (
+  priceFloat: number,
+  { precisionDecimals = 8n, tokenDecimals = 0n } = {}
+): bigint => {
+  const shift = Number(10n ** precisionDecimals);
+  const priceShifted = BigInt(Math.round(priceFloat * shift));
+  return tokenDecimals > precisionDecimals
+    ? priceShifted / 10n ** (tokenDecimals - precisionDecimals)
+    : priceShifted * 10n ** (precisionDecimals - tokenDecimals);
+};

@@ -69,7 +69,7 @@ const WithdrawForm: React.FC = () => {
 
       const { request, tx } = await signWithdraw({
         collateralAddress: values.token,
-        amount: parseUnits(values.amount, token.decimals),
+        amount: parseUnits(values.amount.toString(), token.decimals),
         withdrawerWallet: activeAccount.wallet.address,
         userSessionWallet: values.session || zeroAddress,
         account: activeAccount.wallet,

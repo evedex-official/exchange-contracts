@@ -81,3 +81,9 @@
 .collapse-content--visible {
   display: block;
 }
+
+.withdraw-request {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}

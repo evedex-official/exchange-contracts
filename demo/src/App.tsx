@@ -52,8 +52,8 @@ function App() {
   ];
   return (
     <div className="container">
-      {/* <Accounts />
-      <hr /> */}
+      <Accounts />
+      <hr />
       <Tabs tabs={tabs} />
     </div>
   );

@@ -1,6 +1,7 @@
 import React, { useContext, createContext } from "react";
-import { Hash, PrivateKeyAccount } from "viem";
+import { Hash, Hex, PrivateKeyAccount } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
+import { parsePrice } from "../../helpers";
 
 const sessionWallets = [
   "0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba",
@@ -20,9 +21,17 @@ const sessionWallets = [
   "0xdf57089febbacf7ba0bc227dafbffa9fc08a93fdc68e1e42411a14efcf23656e",
 ].map((pk) => privateKeyToAccount(pk as Hash));
 
+const roles: Hex[] = [
+  "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
+  "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d",
+  "0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a",
+  "0x7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6",
+  "0x47e179ec197488593b187f80a00eb0da91f1b9d0b13f8733639f19c30a34926a",
+];
+
 type PricesConfig = {
-  BTC: number;
-  USDT: number;
+  BTC: bigint;
+  USDT: bigint;
 };
 
 type InstrumentsConfig = {
@@ -48,8 +57,12 @@ const ConfigContext = createContext<ConfigType>({
   accounts: {},
   sessionWallets: [],
   prices: {
-    BTC: 100_000,
-    USDT: 0.9,
+    BTC: parsePrice(100_000, {
+      tokenDecimals: 18n,
+    }),
+    USDT: parsePrice(0.9, {
+      tokenDecimals: 6n,
+    }),
   },
   instruments: {
     BTC_USD: 0,
@@ -65,38 +78,32 @@ const ConfigProvider: React.FC<ConfigProviderProps> = ({ children }) => {
   const [accounts, setAcccounts] = React.useState<AccountsConfig>({
     owner: {
       key: "Owner",
-      wallet: privateKeyToAccount(
-        "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
-      ),
+      wallet: privateKeyToAccount(roles[0]),
     },
     alice: {
       key: "Alice",
-      wallet: privateKeyToAccount(
-        "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d"
-      ),
+      wallet: privateKeyToAccount(roles[1]),
     },
     bob: {
       key: "Bob",
-      wallet: privateKeyToAccount(
-        "0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a"
-      ),
-    },
-    matcher: {
-      key: "Matcher",
-      wallet: privateKeyToAccount(
-        "0x7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6"
-      ),
+      wallet: privateKeyToAccount(roles[2]),
     },
     liquidator: {
       key: "Liquidator",
-      wallet: privateKeyToAccount(
-        "0x47e179ec197488593b187f80a00eb0da91f1b9d0b13f8733639f19c30a34926a"
-      ),
+      wallet: privateKeyToAccount(roles[3]),
+    },
+    matcher: {
+      key: "Matcher",
+      wallet: privateKeyToAccount(roles[4]),
     },
   });
   const [prices, setPrices] = React.useState<PricesConfig>({
-    BTC: 100_000,
-    USDT: 0.9,
+    BTC: parsePrice(100_000, {
+      tokenDecimals: 18n,
+    }),
+    USDT: parsePrice(0.9, {
+      tokenDecimals: 6n,
+    }),
   });
   const [instruments, setInstruments] = React.useState<InstrumentsConfig>({});
 
