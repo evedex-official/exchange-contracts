@@ -18,16 +18,14 @@ Move to demo folder and run UI - `npm run dev`
 
 ## Accounts
 
-When local node starts, it shares 20 account private keys.
+When local node starts, it shares 20 account private keys. These private keys are used in demo app.
 
-First 7 accounts are reserved for system roles and topped up with USDT and BTC mocks in `dex-deploy.js` script.
+First 5 accounts are reserved for system roles and topped up with USDT and BTC mocks in `dex-deploy.js` script.
 
 0 - deployer
 1 - alice
 2 - bob
 3 - matcher
 4 - liquidator
-5 - alice session
-6 - bob session
 
-These private keys are used in demo app.
+Rest of accounts are available as session wallets.

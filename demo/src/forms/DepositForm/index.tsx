@@ -19,15 +19,15 @@ import Collapse from "../../components/Collapse";
 const AccountBalances = () => {
   const { alice, bob } = useAccounts();
   const [accountField] = useField("account");
-  const activeWallet = [alice, bob].find(
+  const activeAccount = [alice, bob].find(
     (w) => w.key === (accountField as any)?.value
   );
-  if (!activeWallet) return null;
+  if (!activeAccount) return null;
 
   return (
     <>
-      <WalletBalances account={activeWallet.account} />
-      <DexBalances account={activeWallet.account} />
+      <WalletBalances account={activeAccount.wallet} />
+      <DexBalances account={activeAccount.wallet} />
       <hr />
     </>
   );
@@ -36,9 +36,9 @@ const AccountBalances = () => {
 const AllowanceNote = () => {
   const { values } = useFormikContext<any>();
   const { alice, bob } = useAccounts();
-  const activeWallet = [alice, bob].find((w) => w.key === values.account);
+  const activeAccount = [alice, bob].find((w) => w.key === values.account);
   const { allowance, onMaxApprove, isApproving } = useApprove({
-    account: activeWallet?.account,
+    account: activeAccount?.wallet,
     source: values.token as Address,
     spender: DepositDEX.address as Address,
   });
@@ -85,7 +85,7 @@ const DepositForm: React.FC = () => {
   const { alice, bob } = useAccounts();
   const onSubmit = async (values: any) => {
     const token = tokens[values.token];
-    const activeWallet = [alice, bob].find((w) => w.key === values.account);
+    const activeAccount = [alice, bob].find((w) => w.key === values.account);
 
     try {
       const args = {
@@ -96,7 +96,7 @@ const DepositForm: React.FC = () => {
           values.token,
           parseUnits(values.amount.toString(), token.decimals),
         ],
-        account: activeWallet?.account,
+        account: activeAccount?.wallet,
       };
 
       const tx = await writeContractAsync(args);
@@ -120,9 +120,9 @@ const DepositForm: React.FC = () => {
           fieldType="select"
           placeholder="Select"
         >
-          {[alice, bob].map((wallet) => (
-            <option key={wallet.key} value={wallet.key}>
-              {wallet.key} ({wallet.account.address})
+          {[alice, bob].map((account) => (
+            <option key={account.key} value={account.key}>
+              {account.key} ({account.wallet.address})
             </option>
           ))}
         </Field>

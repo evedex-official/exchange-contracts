@@ -4,7 +4,6 @@ import { PrivateKeyAccount } from "viem";
 import useAccounts from "../../hooks/useAccounts";
 import { useBalances } from "../../hooks";
 import { Btc, Usdt } from "../../contracts";
-import Button from "../Button";
 import Collapse from "../Collapse";
 
 type AccountProps = {
@@ -19,7 +18,7 @@ const Account: React.FC<AccountProps> = ({ accountKey, account }) => {
   );
   return (
     <div>
-      <div>
+      {/* <div>
         <strong>{accountKey}</strong> (
         <span>
           USDT: {isLoading ? "Loading..." : balances[Usdt.address].toString()}
@@ -28,36 +27,22 @@ const Account: React.FC<AccountProps> = ({ accountKey, account }) => {
           Bitcoin: {isLoading ? "Loading..." : balances[Btc.address].toString()}
         </span>
         )
+      </div> */}
+      <div>
+        <strong>{accountKey}</strong>: {account.address}
       </div>
-      <div>{account.address}</div>
     </div>
   );
 };
 
 const Accounts = () => {
-  const {
-    owner,
-    alice,
-    bob,
-    matcher,
-    liquidator,
-    aliceSession,
-    bobSession,
-  } = useAccounts();
-  const accs = [
-    owner,
-    alice,
-    bob,
-    matcher,
-    liquidator,
-    aliceSession,
-    bobSession,
-  ];
+  const { owner, alice, bob, matcher, liquidator } = useAccounts();
+  const accs = [owner, alice, bob, matcher, liquidator];
   return (
     <Collapse title="Accounts">
       <div className="accounts-list">
         {accs.map((acc) => (
-          <Account key={acc.key} account={acc.account} accountKey={acc.key} />
+          <Account key={acc.key} account={acc.wallet} accountKey={acc.key} />
         ))}
       </div>
     </Collapse>

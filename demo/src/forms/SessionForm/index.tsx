@@ -9,12 +9,14 @@ import Collapse from "../../components/Collapse";
 import useAccounts from "../../hooks/useAccounts";
 import { useField } from "formik";
 import useSession from "../../hooks/useSessions";
+import BooleanSelectField from "../../components/BooleanSelect";
+import { useConfig } from "../../providers/ConfigProvider";
 
 const SessionsInfo = () => {
   const { alice, bob } = useAccounts();
   const [field] = useField("account");
-  const activeWallet = [alice, bob].find((w) => w.key === field.value);
-  const { data, isLoading } = useSession(activeWallet?.account);
+  const activeAccount = [alice, bob].find((w) => w.key === field.value);
+  const { data, isLoading } = useSession(activeAccount?.wallet);
   const parsedData = React.useMemo(() => {
     return Object.keys(data || {}).reduce((acc, key) => {
       const localItem = data[key];
@@ -31,7 +33,7 @@ const SessionsInfo = () => {
     }, {} as any);
   }, [data]);
 
-  if (!activeWallet) return null;
+  if (!activeAccount) return null;
   return (
     <div>
       <div>Sessions</div>
@@ -68,6 +70,7 @@ const initialValues = {
 };
 
 const SessionForm: React.FC = () => {
+  const { sessionWallets } = useConfig();
   const { alice, bob } = useAccounts();
   const { createSession } = useCreateSession();
   const onSubmit = async (values: any) => {
@@ -76,14 +79,14 @@ const SessionForm: React.FC = () => {
       if (!activeWallet) return;
 
       await createSession({
-        account: activeWallet?.account,
+        account: activeWallet?.wallet,
         sessionWallet: values.sessionWallet,
         expirationTs: BigInt(values.expirationTs),
-        limitMaxOrders: values.limitMaxOrders,
+        limitMaxOrders: Boolean(values.limitMaxOrders),
         ordersAllowed: BigInt(values.ordersAllowed),
-        limitAllowance: values.limitAllowance,
+        limitAllowance: Boolean(values.limitAllowance),
         allowanceAllowed: BigInt(values.allowanceAllowed),
-        limitWithdrawals: values.limitWithdrawals,
+        limitWithdrawals: Boolean(values.limitWithdrawals),
         withdrawConfig: [],
       });
       toast.success("Session created.");
@@ -104,20 +107,26 @@ const SessionForm: React.FC = () => {
           fieldType="select"
           placeholder="Select"
         >
-          {[alice, bob].map((wallet) => (
-            <option key={wallet.key} value={wallet.key}>
-              {wallet.key} ({wallet.account.address})
+          {[alice, bob].map((account) => (
+            <option key={account.key} value={account.key}>
+              {account.key} ({account.wallet.address})
             </option>
           ))}
         </Field>
         <SessionsInfo />
-        <Field label="Session wallet" name="sessionWallet" />
+        <Field label="Session wallet" name="sessionWallet" fieldType="select">
+          {sessionWallets.map((w) => (
+            <option key={w.address} value={w.address}>
+              {w.address}
+            </option>
+          ))}
+        </Field>
         <Field label="Expiration" name="expirationTs" />
-        <Field label="Limit max orders" name="limitMaxOrders" />
+        <BooleanSelectField label="Limit max orders" name="limitMaxOrders" />
         <Field label="Orders allowed" name="ordersAllowed" />
-        <Field label="Limit allowance" name="limitAllowance" />
+        <BooleanSelectField label="Limit allowance" name="limitAllowance" />
         <Field label="Allowance allowed" name="allowanceAllowed" />
-        <Field label="Limit withdrawals" name="limitWithdrawals" />
+        <BooleanSelectField label="Limit withdrawals" name="limitWithdrawals" />
       </Form>
     </Collapse>
   );

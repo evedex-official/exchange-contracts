@@ -16,6 +16,7 @@ import Collapse from "../../components/Collapse";
 import useAccounts from "../../hooks/useAccounts";
 import { useField } from "formik";
 import useSession from "../../hooks/useSessions";
+import { useConfig } from "../../providers/ConfigProvider";
 
 type SessionFieldProps = FieldProps & {
   dependsField: string;
@@ -27,8 +28,8 @@ const SessionField: React.FC<SessionFieldProps> = ({
 }) => {
   const { alice, bob } = useAccounts();
   const [field] = useField(dependsField);
-  const activeWallet = [alice, bob].find((w) => w.key === field.value);
-  const { data } = useSession(activeWallet?.account);
+  const activeAccount = [alice, bob].find((w) => w.key === field.value);
+  const { data } = useSession(activeAccount?.wallet);
 
   return (
     <Field fieldType="select" {...props}>
@@ -69,29 +70,28 @@ const tokens = {
 };
 
 const OrderForm: React.FC = () => {
-  const { alice, bob, aliceSession, bobSession, matcher } = useAccounts();
+  const { accounts, sessionWallets } = useConfig();
+  const { alice, bob, matcher } = accounts;
   const [signedOrder, setSignedOrder] = useState<string | null>(null);
   const { signOrder } = useSignOrder();
   const onSubmit = async (values: any) => {
     const token = tokens[values.address];
 
-    const activeWallet = [alice, bob].find((w) => w.key === values.account);
-    if (!activeWallet) return;
+    const activeAccount = [alice, bob].find((w) => w.key === values.account);
+    if (!activeAccount) return;
 
-    const sessionWallet = [aliceSession, bobSession].find(
-      (w) => w.account.address.toLowerCase() === values.session.toLowerCase()
+    const sessionAccount = sessionWallets.find(
+      (a) => a.address.toLowerCase() === values.session.toLowerCase()
     );
 
-    const account = !!sessionWallet
-      ? sessionWallet.account
-      : activeWallet.account;
+    const account = !!sessionAccount ? sessionAccount : activeAccount.wallet;
 
     try {
       const dataToSign = {
         account,
-        senderWallet: activeWallet.account.address,
-        userSessionWallet: sessionWallet
-          ? sessionWallet.account.address
+        senderWallet: activeAccount.wallet.address,
+        userSessionWallet: sessionAccount
+          ? sessionAccount.address
           : zeroAddress,
         amount: parseUnits(values.amount.toString(), token.decimals),
         leverage: BigInt(values.leverage),
@@ -99,7 +99,7 @@ const OrderForm: React.FC = () => {
         collateralIndex: USDT_COLLATERAL_INDEX,
         side: values.orderType,
         instrumentIndex: BTC_USD_INDEX,
-        matcherAddress: matcher.account.address,
+        matcherAddress: matcher.wallet.address,
       };
 
       const signedData = await signOrder(dataToSign);
@@ -125,9 +125,9 @@ const OrderForm: React.FC = () => {
           fieldType="select"
           placeholder="Select"
         >
-          {[alice, bob].map((wallet) => (
-            <option key={wallet.key} value={wallet.key}>
-              {wallet.key} ({wallet.account.address})
+          {[alice, bob].map((account) => (
+            <option key={account.key} value={account.key}>
+              {account.key} ({account.wallet.address})
             </option>
           ))}
         </Field>
