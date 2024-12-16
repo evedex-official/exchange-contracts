@@ -230,6 +230,7 @@ describe(flow, () => {
     }
 
     const orderExtended = createOrderExtended({
+      orderId: 142n,
       collateralIndex: USDT_COLLATERAL_INDEX,
       senderAddress: alice.account.address,
       matcherAddress: matcher.account.address,
@@ -240,7 +241,7 @@ describe(flow, () => {
       price: BTC_PRICE,
       leverage: ORDER_LEVERAGE,
       userSession: aliceSessionWallet.account.address,
-      expiration: Math.floor(Date.now() / 1000) + 300,
+      creationTime: Math.floor(Date.now() / 1000),
     });
     const signature = await signOrder({
       wallet: aliceSessionWallet,

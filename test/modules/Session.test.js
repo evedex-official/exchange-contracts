@@ -152,6 +152,7 @@ describe('Testing SessionManager contract', function () {
 
     const amount = ethers.parseEther('0.06');
     const order1 = {
+      orderId: 42,
       senderAddress: alice.address,
       matcherAddress: owner.address,
       collateral: usdt.address,
@@ -160,7 +161,7 @@ describe('Testing SessionManager contract', function () {
       price: 1000,
       leverage: 5,
       matcherFee: 10,
-      expiration: timestamp + 200,
+      creationTime: timestamp + 200,
       side: 0,
       userSession: aliceSession.address,
       merkleRoot: ethers.ZeroHash,
@@ -179,6 +180,7 @@ describe('Testing SessionManager contract', function () {
     expect(storedSession.allowanceAllowed).to.be.equal(allowance - amount);
 
     const order2 = {
+      orderId: 43,
       senderAddress: bob.address,
       matcherAddress: owner.address,
       collateral: usdt.address,
@@ -187,7 +189,7 @@ describe('Testing SessionManager contract', function () {
       price: 1000,
       leverage: 5,
       matcherFee: 10,
-      expiration: timestamp + 200,
+      creationTime: timestamp + 200,
       side: 0,
       userSession: aliceSession.address,
       merkleRoot: ethers.ZeroHash,
@@ -207,6 +209,7 @@ describe('Testing SessionManager contract', function () {
 
     const amount2 = ethers.parseEther('0.01');
     const order3 = {
+      orderId: 44,
       senderAddress: alice.address,
       matcherAddress: owner.address,
       collateral: usdt.address,
@@ -215,7 +218,7 @@ describe('Testing SessionManager contract', function () {
       price: 1000,
       leverage: 5,
       matcherFee: 10,
-      expiration: timestamp + 1000,
+      creationTime: timestamp + 1000,
       side: 0,
       userSession: aliceSession.address,
       merkleRoot: ethers.ZeroHash,
@@ -228,6 +231,7 @@ describe('Testing SessionManager contract', function () {
       'SessionExpired',
     );
     const order4 = {
+      orderId: 45,
       senderAddress: alice.address,
       matcherAddress: owner.address,
       collateral: usdt.address,
@@ -236,7 +240,7 @@ describe('Testing SessionManager contract', function () {
       price: 1000,
       leverage: 5,
       matcherFee: 10,
-      expiration: timestamp + 300,
+      creationTime: timestamp + 300,
       side: 0,
       userSession: aliceSession.address,
       merkleRoot: ethers.ZeroHash,
@@ -265,6 +269,7 @@ describe('Testing SessionManager contract', function () {
       limitWithdrawals: false,
     };
     const order5 = {
+      orderId: 46,
       senderAddress: alice.address,
       matcherAddress: owner.address,
       collateral: usdt.address,
@@ -273,7 +278,7 @@ describe('Testing SessionManager contract', function () {
       price: 1000,
       leverage: 5,
       matcherFee: 10,
-      expiration: timestamp + 10000,
+      creationTime: timestamp + 10000,
       side: 0,
       userSession: aliceSession.address,
       merkleRoot: ethers.ZeroHash,

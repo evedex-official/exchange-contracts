@@ -129,7 +129,7 @@ contract SessionManager is ISessionManager, AccessControlEnumerable {
 
     _checkOwnership(order.senderAddress, session);
     _checkAllowance(order, session);
-    _checkTimestamp(order.expiration, session);
+    _checkTimestamp(order.creationTime, session);
     _checkTotalOrders(order, session);
 
     emit SessionDataUpdated(user, session, _sessionData[session].values);
@@ -166,10 +166,10 @@ contract SessionManager is ISessionManager, AccessControlEnumerable {
     if (!_sessions[account].contains(session)) revert SessionNotFound();
   }
 
-  function _checkTimestamp(uint256 orderExpiration, address session) internal view {
+  function _checkTimestamp(uint256 orderCreation, address session) internal view {
     SessionValue storage data = _sessionData[session].values;
     uint256 expiration = data.expiration;
-    if (expiration > 0 && orderExpiration > expiration) revert SessionExpired();
+    if (expiration > 0 && orderCreation > expiration) revert SessionExpired();
   }
 
   function _checkAllowance(Order calldata order, address session) internal {
