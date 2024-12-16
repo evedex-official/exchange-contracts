@@ -7,7 +7,7 @@ import { parseUnits, zeroAddress } from "viem";
 import { Btc, Usdt } from "../../contracts";
 
 import useAccounts from "../../hooks/useAccounts";
-import useSignWithdraw from "../../hooks/useSignWithdraw";
+import useWithdraw from "../../hooks/useWithdraw";
 
 import Form, { Field } from "../../components/Form";
 import WalletBalances from "../../components/WalletBalances";
@@ -58,7 +58,7 @@ const tokens = {
 
 const WithdrawForm: React.FC = () => {
   const { addWithdrawRequest } = useMatcherState();
-  const { signWithdraw } = useSignWithdraw();
+  const { withdrawRequest } = useWithdraw();
   const { alice, bob } = useAccounts();
   const onSubmit = async (values: any) => {
     const token = tokens[values.token];
@@ -67,7 +67,7 @@ const WithdrawForm: React.FC = () => {
     try {
       if (!activeAccount) return;
 
-      const { request, tx } = await signWithdraw({
+      const { request, tx } = await withdrawRequest({
         collateralAddress: values.token,
         amount: parseUnits(values.amount.toString(), token.decimals),
         withdrawerWallet: activeAccount.wallet.address,

@@ -1,65 +1,13 @@
-import { Address, Hash, PrivateKeyAccount, zeroAddress, zeroHash } from "viem";
-import { useAccount, useChainId, useSignTypedData } from "wagmi";
-import {
-  BTC_USD_INDEX,
-  USDT_COLLATERAL_INDEX,
-  MATCHER_ADDRESS,
-} from "../constants";
-import { EveDEX, Usdt } from "../contracts";
-import { orderTypes, domain } from "../helpers/eip721";
+import { Address, PrivateKeyAccount } from "viem";
+import { useChainId, useSignTypedData } from "wagmi";
+import { BTC_USD_INDEX, USDT_COLLATERAL_INDEX } from "../constants";
+import { Usdt } from "../contracts";
 import usePrices from "./usePrices";
-
-const createOrderExtended = ({
-  collateralIndex,
-  senderAddress,
-  matcherAddress,
-  collateral,
-  instrumentIndex,
-  amount,
-  price,
-  side,
-  userSession,
-  leverage = 1n,
-  matcherFee = 0n,
-  expiration = Math.floor(Date.now() / 1000) + 3600,
-  merkleRoot = zeroHash,
-  merkleProof = [],
-}: {
-  collateralIndex: number;
-  senderAddress: Address;
-  matcherAddress: Address;
-  collateral: Address;
-  instrumentIndex: number;
-  amount: bigint;
-  price: bigint;
-  side: number;
-  userSession: Address;
-  leverage?: bigint;
-  matcherFee?: bigint;
-  expiration?: number;
-  merkleRoot?: Hash;
-  merkleProof?: any[];
-}) => {
-  return {
-    collateralIndex,
-    order: {
-      senderAddress,
-      matcherAddress,
-      collateral,
-      instrumentIndex,
-      amount,
-      price,
-      leverage,
-      matcherFee,
-      expiration,
-      side,
-      userSession,
-      merkleRoot,
-      merkleProof,
-      signature: "0x",
-    },
-  };
-};
+import { getRandom } from "../helpers";
+import {
+  createOrderExtended,
+  createOrderDataToSign,
+} from "../helpers/contract-data-helpers";
 
 const useSignOrder = () => {
   const chainId = useChainId();
@@ -89,7 +37,8 @@ const useSignOrder = () => {
     instrumentIndex: number;
     collateralIndex: number;
   }) => {
-    const { order } = createOrderExtended({
+    const orderExtended = createOrderExtended({
+      orderId: getRandom(1, 999999999),
       collateralIndex,
       senderAddress: senderWallet,
       matcherAddress,
@@ -102,15 +51,12 @@ const useSignOrder = () => {
       userSession: userSessionWallet,
     });
     const data = {
-      message: order,
-      types: orderTypes,
-      domain: domain(EveDEX.address as Address, chainId!),
-      primaryType: "Order" as any,
+      ...createOrderDataToSign(orderExtended.order, chainId!),
       account,
     };
     const signature = await signTypedDataAsync(data);
-    order.signature = signature;
-    return order;
+    orderExtended.order.signature = signature;
+    return orderExtended;
   };
 
   return { signOrder };

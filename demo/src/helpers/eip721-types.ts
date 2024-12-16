@@ -21,6 +21,7 @@ export const orderWithdrawalTypes = {
 
 export const orderTypes = {
   Order: [
+    { name: "orderId", type: "uint256" },
     { name: "senderAddress", type: "address" },
     { name: "matcherAddress", type: "address" },
     { name: "collateral", type: "address" },
@@ -29,7 +30,7 @@ export const orderTypes = {
     { name: "price", type: "uint256" },
     { name: "leverage", type: "uint16" },
     { name: "matcherFee", type: "uint256" },
-    { name: "expiration", type: "uint256" },
+    { name: "creationTime", type: "uint256" },
     { name: "side", type: "uint8" },
   ],
 };
@@ -54,7 +55,7 @@ export const multiOrderLiquidationTypes = {
   ],
 };
 
-const orderLiquidationTypes = {
+export const orderLiquidationTypes = {
   OrderLiquidation: [
     { name: "accountToLiquidate", type: "address" },
     { name: "liquidator", type: "address" },

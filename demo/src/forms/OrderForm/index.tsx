@@ -7,7 +7,7 @@ import Form, { Field } from "../../components/Form";
 import { Btc, Usdt } from "../../contracts";
 import useSignOrder from "../../hooks/useSignOrder";
 import {
-  BTC_USD_INDEX,
+  BTC_COLLATERAL_INDEX,
   BUY_SIDE,
   SELL_SIDE,
   USDT_COLLATERAL_INDEX,
@@ -16,11 +16,13 @@ import Collapse from "../../components/Collapse";
 import { useConfig } from "../../providers/ConfigProvider";
 import SessionField from "../../components/SessionFIeld/SessionField";
 import { useMatcherState } from "../../providers/MatcherProvider";
+import useInstruments from "../../hooks/useInstruments";
 
 const validationSchema = yup.object({
   address: yup.string().required(),
   session: yup.string(),
   account: yup.string().required(),
+  instrument: yup.number().required(),
   orderType: yup.string().required(),
   amount: yup.number().required(),
   leverage: yup.number().required(),
@@ -29,6 +31,7 @@ const validationSchema = yup.object({
 const initialValues = {
   account: "",
   session: "",
+  instrument: "",
   address: Btc.address,
   orderType: BUY_SIDE,
   leverage: 10,
@@ -46,6 +49,7 @@ const tokens = {
 
 const OrderForm: React.FC = () => {
   const { addOrder } = useMatcherState();
+  const { instruments } = useInstruments();
   const { accounts, sessionWallets } = useConfig();
   const { alice, bob, matcher } = accounts;
   const { signOrder } = useSignOrder();
@@ -61,6 +65,11 @@ const OrderForm: React.FC = () => {
 
     const account = !!sessionAccount ? sessionAccount : activeAccount.wallet;
 
+    const collateralIndex =
+      values.collateral === Usdt.address
+        ? USDT_COLLATERAL_INDEX
+        : BTC_COLLATERAL_INDEX;
+
     try {
       const dataToSign = {
         account,
@@ -70,10 +79,10 @@ const OrderForm: React.FC = () => {
           : zeroAddress,
         amount: parseUnits(values.amount.toString(), token.decimals),
         leverage: BigInt(values.leverage),
-        collateral: values.address,
-        collateralIndex: USDT_COLLATERAL_INDEX,
+        collateral: values.collateral,
+        collateralIndex: collateralIndex,
         side: values.orderType,
-        instrumentIndex: BTC_USD_INDEX,
+        instrumentIndex: values.instrument,
         matcherAddress: matcher.wallet.address,
       };
 
@@ -112,8 +121,20 @@ const OrderForm: React.FC = () => {
           dependsField="account"
         />
         <Field
-          label="Token"
-          name="address"
+          label="Instrument"
+          name="instrument"
+          fieldType="select"
+          placeholder="Select"
+        >
+          {Object.keys(instruments).map((key) => (
+            <option key={key} value={key}>
+              {instruments[parseInt(key)].ticker}
+            </option>
+          ))}
+        </Field>
+        <Field
+          label="Collateral"
+          name="collateral"
           fieldType="select"
           placeholder="Select"
         >

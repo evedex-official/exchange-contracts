@@ -4,6 +4,7 @@ import { Address } from "viem";
 import { WithdrawalRequest, Order } from "../../interfaces";
 import usePersistedState from "../../hooks/usePersistedState";
 import { LC_STORAGE_KEY } from "../../constants";
+import { OrderExtended } from "../../helpers/event-horizon-types";
 
 type MatcherStateType = {
   withdrawalRequests: {
@@ -40,14 +41,15 @@ const MatcherStateProvider: React.FC<MatcherStateProviderProps> = ({
 }) => {
   const [orders, setOrders] = usePersistedState<any>({}, LC_STORAGE_KEY.ORDERS);
 
-  const addOrder = (order: any) => {
+  const addOrder = (orderExtended: OrderExtended) => {
+    const { collateralIndex, order } = orderExtended;
     setOrders((prevState: any) => ({
       ...prevState,
       [order.instrumentIndex]: {
         ...(prevState[order.instrumentIndex] || {}),
         [order.side]: [
           ...((prevState[order.instrumentIndex] || {})[order.side] || []),
-          order,
+          { collateralIndex, order },
         ],
       },
     }));

@@ -1,11 +1,11 @@
 import Sessions from "./components/Sessions";
-import Accounts from "./components/Accounts";
 import WithdrawalRequests from "./components/WithdrawalRequests";
 import Orders from "./components/Orders";
 import DepositForm from "./forms/DepositForm";
 import WithdrawForm from "./forms/WithdrawForm";
 import OrderForm from "./forms/OrderForm";
 import Tabs from "./components/Tabs";
+import Config from "./components/Config";
 
 const Wallet = () => {
   return (
@@ -52,7 +52,7 @@ function App() {
   ];
   return (
     <div className="container">
-      <Accounts />
+      <Config />
       <hr />
       <Tabs tabs={tabs} />
     </div>

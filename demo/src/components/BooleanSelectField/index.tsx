@@ -14,8 +14,8 @@ const BooleanSelectField: React.FC<BooleanSelectFieldProps> = ({
 }) => {
   return (
     <Field fieldType="select" placeholder="Select" {...props}>
-      <option value={0}>{yesLabel}</option>
-      <option value={1}>{noLabel}</option>
+      <option value={1}>{yesLabel}</option>
+      <option value={0}>{noLabel}</option>
     </Field>
   );
 };

@@ -1,5 +1,5 @@
 import React from "react";
-import { maxUint128, maxUint32, maxUint64 } from "viem";
+import { maxUint128, maxUint256, maxUint32, maxUint64 } from "viem";
 import * as yup from "yup";
 
 import Form, { Field } from "../../components/Form";
@@ -11,6 +11,7 @@ import { useField } from "formik";
 import useSession from "../../hooks/useSessions";
 import BooleanSelectField from "../../components/BooleanSelectField";
 import { useConfig } from "../../providers/ConfigProvider";
+import { Btc, Usdt } from "../../contracts";
 
 const SessionsInfo = () => {
   const { alice, bob } = useAccounts();
@@ -61,11 +62,11 @@ const initialValues = {
   sessionWallet: "",
   account: "",
   expirationTs: maxUint64.toString(),
-  limitMaxOrders: false,
+  limitMaxOrders: 0,
   ordersAllowed: maxUint32.toString(),
-  limitAllowance: false,
+  limitAllowance: 0,
   allowanceAllowed: maxUint128.toString(),
-  limitWithdrawals: false,
+  limitWithdrawals: 0,
   withdrawConfig: [],
 };
 
@@ -87,7 +88,16 @@ const SessionForm: React.FC = () => {
         limitAllowance: Boolean(values.limitAllowance),
         allowanceAllowed: BigInt(values.allowanceAllowed),
         limitWithdrawals: Boolean(values.limitWithdrawals),
-        withdrawConfig: [],
+        withdrawConfig: [
+          {
+            collateral: Usdt.address,
+            amount: maxUint256,
+          },
+          {
+            collateral: Btc.address,
+            amount: maxUint256,
+          },
+        ],
       });
       toast.success("Session created.");
     } catch (e) {

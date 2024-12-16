@@ -1,6 +1,7 @@
 import React, { useContext, createContext } from "react";
 import { Hash, Hex, PrivateKeyAccount } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
+
 import { parsePrice } from "../../helpers";
 
 const sessionWallets = [
@@ -30,12 +31,8 @@ const roles: Hex[] = [
 ];
 
 type PricesConfig = {
-  BTC: bigint;
-  USDT: bigint;
-};
-
-type InstrumentsConfig = {
-  [key: string]: number;
+  BTC: number;
+  USDT: number;
 };
 
 type AccountsConfig = {
@@ -49,7 +46,6 @@ export type ConfigType = {
   accounts: AccountsConfig;
   sessionWallets: PrivateKeyAccount[];
   prices: PricesConfig;
-  instruments: InstrumentsConfig;
   onChange: (name: string, value: any) => void;
 };
 
@@ -63,9 +59,6 @@ const ConfigContext = createContext<ConfigType>({
     USDT: parsePrice(0.9, {
       tokenDecimals: 6n,
     }),
-  },
-  instruments: {
-    BTC_USD: 0,
   },
   onChange: (_name: string, _value: any) => {},
 });
@@ -97,29 +90,21 @@ const ConfigProvider: React.FC<ConfigProviderProps> = ({ children }) => {
       wallet: privateKeyToAccount(roles[4]),
     },
   });
-  const [prices, setPrices] = React.useState<PricesConfig>({
-    BTC: parsePrice(100_000, {
-      tokenDecimals: 18n,
-    }),
-    USDT: parsePrice(0.9, {
-      tokenDecimals: 6n,
-    }),
+  const [prices, setPrices] = React.useState<{ [x: string]: number }>({
+    BTC: 100_000,
+    USDT: 0.9,
   });
-  const [instruments, setInstruments] = React.useState<InstrumentsConfig>({});
 
   const onChange = (name: string, value: any) => {
     if (name === "accounts") {
       setAcccounts(value);
     } else if (name === "prices") {
       setPrices(value);
-    } else if (name === "instruments") {
-      setInstruments(value);
     }
   };
   const value: ConfigType = {
     accounts,
     prices,
-    instruments,
     sessionWallets,
     onChange,
   };

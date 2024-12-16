@@ -87,3 +87,16 @@
   justify-content: space-between;
   align-items: center;
 }
+
+.config {
+  display: flex;
+  gap: 20px;
+}
+
+.config-accounts {
+  flex: 1;
+}
+
+.config-prices {
+  flex: 1;
+}

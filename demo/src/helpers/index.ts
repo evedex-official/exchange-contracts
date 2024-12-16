@@ -29,8 +29,10 @@ export const convertCallsResult = (
     | undefined
 ) => {
   return calls.reduce((acc, callConfig, index) => {
-    acc[callConfig.key] = callConfig.defaultValue;
-    if (data) {
+    if (typeof callConfig.defaultValue !== "undefined") {
+      acc[callConfig.key] = callConfig.defaultValue;
+    }
+    if (typeof data !== "undefined") {
       const call = data[index];
       if (call.status === "success") {
         acc[callConfig.key] = callConfig.format
@@ -52,4 +54,8 @@ export const parsePrice = (
   return tokenDecimals > precisionDecimals
     ? priceShifted / 10n ** (tokenDecimals - precisionDecimals)
     : priceShifted * 10n ** (precisionDecimals - tokenDecimals);
+};
+
+export const getRandom = (min: number, max: number) => {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
 };

@@ -1,4 +1,4 @@
-import { Address } from "viem";
+import { Address, AbiItem } from "viem";
 
 // contract addresses initially deployed on clean node, replace if needed
 import OrderValidationLibJson from "../../../artifacts/contracts/lib/OrderValidationLib.sol/OrderValidationLib.json";
@@ -11,35 +11,35 @@ import BtcJson from "../../../artifacts/contracts/mock/ERC20MockDecimals.sol/ERC
 
 export const OrderValidationLib = {
   address: "0x5FbDB2315678afecb367f032d93F642f64180aa3" as Address,
-  abi: OrderValidationLibJson.abi,
+  abi: OrderValidationLibJson.abi as AbiItem[],
 };
 
 export const SessionManager = {
   address: "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512" as Address,
-  abi: SessionManagerJson.abi,
+  abi: SessionManagerJson.abi as AbiItem[],
 };
 
 export const EveVault = {
   address: "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0" as Address,
-  abi: EveVaultJson.abi,
+  abi: EveVaultJson.abi as AbiItem[],
 };
 
 export const EveDEX = {
   address: "0x0165878A594ca255338adfa4d48449f69242Eb8F" as Address,
-  abi: EveDexJson.abi,
+  abi: EveDexJson.abi as AbiItem[],
 };
 
 export const DepositDEX = {
   address: "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9" as Address,
-  abi: DepositDexJson.abi,
+  abi: DepositDexJson.abi as AbiItem[],
 };
 
 export const Usdt = {
   address: "0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0" as Address,
-  abi: UsdtJson.abi,
+  abi: UsdtJson.abi as AbiItem[],
 };
 
 export const Btc = {
   address: "0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82" as Address,
-  abi: BtcJson.abi,
+  abi: BtcJson.abi as AbiItem[],
 };
