@@ -97,7 +97,7 @@ const prepareContracts = async ({ owner, matcher, usdtToken, btcToken, fundingRa
     100, //leverage
     86400, //dailyFRLong
     86400, //dailyFRShort
-    Math.floor(Date.now() / 1000), //timestamp
+    Math.floor(Date.now() / 1000) - 100, //timestamp
   ]);
 
   return { orderLib, sessions, vault, depositDex, eveDex };
