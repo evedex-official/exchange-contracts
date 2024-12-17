@@ -278,7 +278,6 @@ describe(flow, () => {
     const { alice, bob, eveDex } = await restoreSuit(flow);
     const currentTimestamp = newFrTimestamp;
 
-    // right after order execution fr should not be accumulated
     const aliceFr = await readContract(alice, {
       abi: eveDex.abi,
       address: eveDex.address,
