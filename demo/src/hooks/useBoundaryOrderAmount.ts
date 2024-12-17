@@ -1,27 +1,60 @@
-import { useReadContract } from "wagmi";
+import { useReadContracts } from "wagmi";
 import { Address } from "viem";
 
 import { EveDEX } from "../contracts";
 
 import { INT_PRECISION_EVEDEX } from "../constants";
 
-import useMarginLevel from "./useMarginLevel";
+import { CallConfig } from "../interfaces";
+import { convertCallsResult, getContractCalls } from "../helpers";
 
 const useBoundaryOrderAmount = (
+  address: Address,
   instrumentPrices: any,
   instrumentIndex: number,
   collateralPrices: any,
   leverage: bigint
 ) => {
-  const { equity, margin } = useMarginLevel(instrumentPrices, collateralPrices);
+  const calls: CallConfig[] = [
+    {
+      key: "soLevel",
+      functionName: "soLevel",
+      args: [],
+    },
+    {
+      key: "marginLevel",
+      functionName: "calculateMarginLevel",
+      args: [
+        address,
+        instrumentPrices, // Current instrument prices
+        collateralPrices, // Current collateral prices
+        true, // Check prices flag
+        Math.floor(Date.now() / 1000), // Historical timestamp
+        0n, // History search hint (optimization for gas)
+      ],
+      format: (value: any) => {
+        const [marginLevel, equity, margin, pnls, frs] = value;
+        return { marginLevel, equity, margin, pnls, frs } as {
+          marginLevel: bigint;
+          equity: bigint;
+          margin: bigint;
+        };
+      },
+    },
+  ];
 
-  const { data } = useReadContract({
-    functionName: "soLevel",
-    address: EveDEX.address as Address,
+  const contractCalls = getContractCalls(calls, {
+    address: EveDEX.address,
     abi: EveDEX.abi,
-    args: [],
   });
-  const soLevel: bigint = (data as bigint) || 0n;
+
+  const { data } = useReadContracts({
+    contracts: contractCalls,
+  });
+  const { soLevel, marginLevel } = convertCallsResult(calls, data);
+
+  const { equity, margin } = marginLevel as { equity: bigint; margin: bigint };
+
   const instrumentPrice = instrumentPrices[instrumentIndex].price as bigint;
 
   // first formula that comes to the head

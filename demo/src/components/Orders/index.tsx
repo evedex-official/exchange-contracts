@@ -6,7 +6,11 @@ import { getContractCalls } from "../../helpers";
 import { EveDEX } from "../../contracts";
 import useInstruments from "../../hooks/useInstruments";
 import { BUY_SIDE, SELL_SIDE } from "../../constants";
-import { Instrument, OrderExtended } from "../../helpers/event-horizon-types";
+import {
+  Instrument,
+  InstrumentExtended,
+  OrderExtended,
+} from "../../helpers/event-horizon-types";
 import Button from "../Button";
 import useFillOrders from "../../hooks/useFillOrders";
 import { toast } from "react-toastify";
@@ -32,7 +36,7 @@ const Order: React.FC<OrderProps> = ({
 };
 
 type InstrumentOrdersProps = {
-  instrument: Instrument;
+  instrument: InstrumentExtended;
   buyOrders: OrderExtended[];
   sellOrders: OrderExtended[];
 };
@@ -127,15 +131,13 @@ const AllOrders: React.FC = () => {
 
   return (
     <Collapse title="Orders">
-      {Object.keys(instruments).map((instrumentKey) => {
-        const instrumentIndex = parseInt(instrumentKey);
-        const instrument = instruments[instrumentIndex];
-        const instrumentOrders = orders[instrumentIndex] || {};
-        const buyOrders = instrumentOrders[BUY_SIDE];
-        const sellOrders = instrumentOrders[SELL_SIDE];
+      {instruments.map((instrument) => {
+        const instrumentOrders = orders[instrument.index] || {};
+        const buyOrders = instrumentOrders[BUY_SIDE] || [];
+        const sellOrders = instrumentOrders[SELL_SIDE] || [];
         return (
           <InstrumentOrders
-            key={instrumentIndex}
+            key={instrument.index}
             instrument={instrument}
             buyOrders={buyOrders}
             sellOrders={sellOrders}

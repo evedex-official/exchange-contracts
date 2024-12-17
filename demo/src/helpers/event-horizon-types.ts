@@ -53,3 +53,16 @@ export type Instrument = {
   ticker: string;
   leverage: number;
 };
+
+export type Token = {
+  symbol: string;
+  decimals: number;
+  address: Address;
+};
+
+export type InstrumentExtended = Instrument & {
+  index: number;
+  token0: Token;
+  token1: Token;
+  priceToken: Address;
+};

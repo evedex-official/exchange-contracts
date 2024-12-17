@@ -4,7 +4,6 @@ import { Address } from "viem";
 import { EveDEX } from "../contracts";
 
 const useMarginLevel = (instrumentPrices: any, collateralPrices: any) => {
-  const { address } = useAccount();
   const { data } = useReadContract({
     functionName: "calculateMarginLevel",
     address: EveDEX.address as Address,

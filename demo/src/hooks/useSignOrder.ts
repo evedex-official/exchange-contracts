@@ -12,7 +12,6 @@ import {
 const useSignOrder = () => {
   const chainId = useChainId();
   const { signTypedDataAsync } = useSignTypedData();
-  const { BTC } = usePrices();
 
   const signOrder = async ({
     account,
@@ -22,6 +21,7 @@ const useSignOrder = () => {
     userSessionWallet,
     matcherAddress,
     side,
+    instrumentPrice,
     collateral = Usdt.address,
     instrumentIndex = BTC_USD_INDEX,
     collateralIndex = USDT_COLLATERAL_INDEX,
@@ -29,6 +29,7 @@ const useSignOrder = () => {
     account: PrivateKeyAccount;
     amount: bigint;
     leverage: bigint;
+    instrumentPrice: bigint;
     senderWallet: Address;
     userSessionWallet: Address;
     matcherAddress: Address;
@@ -46,7 +47,7 @@ const useSignOrder = () => {
       instrumentIndex,
       side,
       amount,
-      price: BTC,
+      price: instrumentPrice,
       leverage,
       userSession: userSessionWallet,
     });

@@ -1,11 +1,35 @@
 import { useReadContract, useReadContracts } from "wagmi";
-import { EveDEX } from "../contracts";
+import { Address } from "viem";
+
+import { Btc, EveDEX, Usdt } from "../contracts";
 import { convertCallsResult, getContractCalls } from "../helpers";
-import { Instrument } from "../helpers/event-horizon-types";
+import {
+  Instrument,
+  InstrumentExtended,
+  Token,
+} from "../helpers/event-horizon-types";
 
 const contractConfig = {
   abi: EveDEX.abi,
   address: EveDEX.address,
+};
+
+const instrumentsConfig: {
+  [x: string]: { token0: Token; token1: Token; priceToken: Address };
+} = {
+  "BTC/USD": {
+    token0: {
+      address: Btc.address,
+      symbol: "BTC",
+      decimals: 18,
+    },
+    token1: {
+      address: Usdt.address,
+      symbol: "USDT",
+      decimals: 6,
+    },
+    priceToken: Btc.address,
+  },
 };
 
 const useInstruments = () => {
@@ -42,8 +66,18 @@ const useInstruments = () => {
     [x: number]: Instrument;
   };
 
+  const instrumentsExtended: InstrumentExtended[] = [];
+
+  Object.entries(instruments).forEach(([key, value]) => {
+    instrumentsExtended.push({
+      index: parseInt(key),
+      ...value,
+      ...instrumentsConfig[value.ticker],
+    });
+  });
+
   return {
-    instruments: instruments,
+    instruments: instrumentsExtended,
     isLoading: isLoading || isLoadingInstrumentsLength,
   };
 };

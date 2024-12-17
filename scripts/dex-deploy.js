@@ -45,6 +45,8 @@ async function main() {
   const validatorRole = await sessions.VALIDATOR_ROLE();
   await sessions.grantRole(validatorRole, await dex.getAddress());
   console.log('SessionManager: EVEDEX is added as validator');
+  await sessions.grantRole(validatorRole, await deposit.getAddress());
+  console.log('SessionManager: DepositDEX is added as validator');
 
   const withdrawerRole = await vault.WITHDRAWER_ROLE();
   await vault.grantRole(withdrawerRole, await deposit.getAddress());

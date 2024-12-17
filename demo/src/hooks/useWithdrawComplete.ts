@@ -9,7 +9,7 @@ import { BTC_USD_INDEX } from "../constants";
 import usePrices from "./usePrices";
 
 const useWithdrawComplete = () => {
-  const { BTC: BTC_PRICE, USDT: USDT_PRICE } = usePrices();
+  const prices = usePrices();
   const { writeContractAsync } = useWriteContract();
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
@@ -20,17 +20,17 @@ const useWithdrawComplete = () => {
     instrumentPrices: [
       {
         index: BTC_USD_INDEX,
-        price: BTC_PRICE,
+        price: prices[Btc.address],
       },
     ],
     collateralPrices: [
       {
         collateral: Usdt.address,
-        price: USDT_PRICE,
+        price: prices[Usdt.address],
       },
       {
         collateral: Btc.address,
-        price: BTC_PRICE,
+        price: prices[Btc.address],
       },
     ],
   };

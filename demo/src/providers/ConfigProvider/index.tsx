@@ -1,8 +1,9 @@
 import React, { useContext, createContext } from "react";
-import { Hash, Hex, PrivateKeyAccount } from "viem";
+import { Address, Hash, Hex, PrivateKeyAccount } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 
 import { parsePrice } from "../../helpers";
+import { Btc, Usdt } from "../../contracts";
 
 const sessionWallets = [
   "0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba",
@@ -31,8 +32,7 @@ const roles: Hex[] = [
 ];
 
 type PricesConfig = {
-  BTC: number;
-  USDT: number;
+  [address: Address]: number;
 };
 
 type AccountsConfig = {
@@ -53,8 +53,8 @@ const ConfigContext = createContext<ConfigType>({
   accounts: {},
   sessionWallets: [],
   prices: {
-    BTC: 100_000,
-    USDT: 0.9,
+    [Btc.address]: 100_000,
+    [Usdt.address]: 0.9,
   },
   onChange: (_name: string, _value: any) => {},
 });
@@ -87,8 +87,8 @@ const ConfigProvider: React.FC<ConfigProviderProps> = ({ children }) => {
     },
   });
   const [prices, setPrices] = React.useState<{ [x: string]: number }>({
-    BTC: 100_000,
-    USDT: 0.9,
+    [Btc.address]: 100_000,
+    [Usdt.address]: 0.9,
   });
 
   const onChange = (name: string, value: any) => {

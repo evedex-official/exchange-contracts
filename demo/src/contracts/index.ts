@@ -35,11 +35,11 @@ export const DepositDEX = {
 };
 
 export const Usdt = {
-  address: "0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0" as Address,
+  address: "0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82" as Address,
   abi: UsdtJson.abi as AbiItem[],
 };
 
 export const Btc = {
-  address: "0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82" as Address,
+  address: "0x9A676e781A523b5d0C0e43731313A708CB607508" as Address,
   abi: BtcJson.abi as AbiItem[],
 };

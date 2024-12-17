@@ -6,20 +6,17 @@ import { parseUnits, zeroAddress } from "viem";
 import Form, { Field } from "../../components/Form";
 import { Btc, Usdt } from "../../contracts";
 import useSignOrder from "../../hooks/useSignOrder";
-import {
-  BTC_COLLATERAL_INDEX,
-  BUY_SIDE,
-  SELL_SIDE,
-  USDT_COLLATERAL_INDEX,
-} from "../../constants";
+import { BUY_SIDE, SELL_SIDE } from "../../constants";
 import Collapse from "../../components/Collapse";
 import { useConfig } from "../../providers/ConfigProvider";
 import SessionField from "../../components/SessionFIeld/SessionField";
 import { useMatcherState } from "../../providers/MatcherProvider";
 import useInstruments from "../../hooks/useInstruments";
+import useCollaterals from "../../hooks/useCollaterals";
+import usePrices from "../../hooks/usePrices";
 
 const validationSchema = yup.object({
-  address: yup.string().required(),
+  collateral: yup.string().required(),
   session: yup.string(),
   account: yup.string().required(),
   instrument: yup.number().required(),
@@ -32,58 +29,68 @@ const initialValues = {
   account: "",
   session: "",
   instrument: "",
-  address: Btc.address,
+  collateral: Usdt.address,
   orderType: BUY_SIDE,
   leverage: 10,
-  amount: 10,
-};
-
-const tokens = {
-  [Usdt.address]: {
-    decimals: 6,
-  },
-  [Btc.address]: {
-    decimals: 18,
-  },
+  amount: 0.01,
 };
 
 const OrderForm: React.FC = () => {
   const { addOrder } = useMatcherState();
   const { instruments } = useInstruments();
+  const { collaterals } = useCollaterals();
   const { accounts, sessionWallets } = useConfig();
   const { alice, bob, matcher } = accounts;
   const { signOrder } = useSignOrder();
+  const prices = usePrices();
   const onSubmit = async (values: any) => {
-    const token = tokens[values.address];
-
     const activeAccount = [alice, bob].find((w) => w.key === values.account);
-    if (!activeAccount) return;
-
-    const sessionAccount = sessionWallets.find(
-      (a) => a.address.toLowerCase() === values.session.toLowerCase()
+    const collateral = collaterals.find(
+      (collateral) => (collateral.address = values.collateral)
     );
-
-    const account = !!sessionAccount ? sessionAccount : activeAccount.wallet;
-
-    const collateralIndex =
-      values.collateral === Usdt.address
-        ? USDT_COLLATERAL_INDEX
-        : BTC_COLLATERAL_INDEX;
+    const instrument = instruments.find((i) => i.index == values.instrument);
 
     try {
+      if (!instrument)
+        throw new Error(`Instrument not found: ${values.instrument}`);
+      if (!collateral)
+        throw new Error(`Collateral not found: ${values.collateral}`);
+      if (!activeAccount) return;
+
+      const instrumentPrice = prices[instrument.priceToken];
+
+      console.log(
+        "instrumentPrice",
+        instrumentPrice,
+        instrument.priceToken,
+        prices[instrument.priceToken]
+      );
+
+      if (!instrumentPrice) throw new Error("No instrument price");
+
+      const sessionAccount = sessionWallets.find(
+        (a) => a.address.toLowerCase() === values.session.toLowerCase()
+      );
+
+      const account = !!sessionAccount ? sessionAccount : activeAccount.wallet;
+
       const dataToSign = {
         account,
         senderWallet: activeAccount.wallet.address,
         userSessionWallet: sessionAccount
           ? sessionAccount.address
           : zeroAddress,
-        amount: parseUnits(values.amount.toString(), token.decimals),
+        amount: parseUnits(
+          values.amount.toString(),
+          instrument.token0.decimals
+        ),
         leverage: BigInt(values.leverage),
-        collateral: values.collateral,
-        collateralIndex: collateralIndex,
+        collateral: collateral.address,
+        collateralIndex: collateral.index,
         side: values.orderType,
         instrumentIndex: values.instrument,
         matcherAddress: matcher.wallet.address,
+        instrumentPrice: instrumentPrice,
       };
 
       const signedOrder = await signOrder(dataToSign);
@@ -138,8 +145,11 @@ const OrderForm: React.FC = () => {
           fieldType="select"
           placeholder="Select"
         >
-          <option value={Usdt.address}>USDT</option>
-          <option value={Btc.address}>BTC</option>
+          {collaterals.map((collateral) => (
+            <option key={collateral.address} value={collateral.address}>
+              {collateral.symbol}
+            </option>
+          ))}
         </Field>
         <Field
           label="Side"

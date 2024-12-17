@@ -1,5 +1,5 @@
-import React from "react";
-import { Address, formatUnits, Hash } from "viem";
+import React, { useEffect } from "react";
+import { Address, formatUnits, Hash, zeroAddress } from "viem";
 import {
   RequestStatus,
   WithdrawalRequestContract,
@@ -16,7 +16,7 @@ import useAccounts from "../../hooks/useAccounts";
 import { toast } from "react-toastify";
 import { convertCallsResult, getContractCalls } from "../../helpers";
 import { DepositDEX } from "../../contracts";
-import { useReadContracts } from "wagmi";
+import { useBlockNumber, useReadContracts } from "wagmi";
 import { getWithdrawalRequestHash } from "../../helpers/contract-data-helpers";
 import { CallConfig } from "../../interfaces";
 
@@ -50,8 +50,15 @@ const WithdrawalRequest: React.FC<{ request: WithdrawalRequestExtended }> = ({
     <>
       <div className="withdraw-request">
         <div>
-          {formatUnits(request.amount, decimals)} {symbol} until{" "}
-          {new Date(request.expiration * 1000).toString()}
+          <span>
+            {formatUnits(request.amount, decimals)} {symbol}.
+          </span>{" "}
+          <span>
+            Valid until {new Date(request.expiration * 1000).toString()}.
+          </span>{" "}
+          {request.session !== zeroAddress ? (
+            <span>(Session:{request.session})</span>
+          ) : null}
         </div>
         <Button disabled={isDisabled} onClick={onConfirm} isLoading={isLoading}>
           {buttonText}
@@ -91,12 +98,18 @@ const useWithdrawRequests = (address: Address) => {
     address: DepositDEX.address,
   });
 
-  const { data, isLoading } = useReadContracts({
+  const { data, isLoading, refetch } = useReadContracts({
     contracts: contractCalls,
     query: {
       enabled: !!address && requests.length > 0,
     },
   });
+
+  const { data: blockNumber } = useBlockNumber({ watch: true });
+
+  useEffect(() => {
+    refetch();
+  }, [blockNumber]);
 
   const contractsRequests = convertCallsResult(calls, data) as {
     [hash: Hash]: WithdrawalRequestContract;

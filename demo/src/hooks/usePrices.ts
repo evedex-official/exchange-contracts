@@ -1,18 +1,23 @@
+import { Address } from "viem";
 import { parsePrice } from "../helpers";
 
 import { useConfig } from "../providers/ConfigProvider";
+import useCollaterals from "./useCollaterals";
 
 const usePrices = () => {
   const { prices } = useConfig();
+  const { collaterals } = useCollaterals();
 
-  return {
-    BTC: parsePrice(prices.BTC, {
-      tokenDecimals: 18n,
-    }),
-    USDT: parsePrice(prices.USDT, {
-      tokenDecimals: 6n,
-    }),
-  };
+  const parsedPrices = collaterals.reduce((acc, collateral) => {
+    acc[collateral.address] = parsePrice(prices[collateral.address], {
+      tokenDecimals: BigInt(collateral.decimals),
+    });
+    return acc;
+  }, {} as { [x: Address]: bigint });
+
+  console.log("parsedPrices", parsedPrices, prices, collaterals);
+
+  return parsedPrices;
 };
 
 export default usePrices;
