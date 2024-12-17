@@ -35,8 +35,24 @@ contract DepositDEX is IDepositDEX, UUPSUpgradeable {
     _setBasicParams(baseDex_, vault_);
   }
 
+  function getCollaterals() external view returns (address[] memory) {
+    return _collaterals.values();
+  }
+
+  function getCollateralsAt(uint256 index) external view returns (address) {
+    return _collaterals.at(index);
+  }
+
+  function getCollateralsLength() external view returns (uint256) {
+    return _collaterals.length();
+  }
+
   function getWithdrawRequest(bytes32 orderHash) external view returns (WithdrawRequest memory) {
     return _withdrawRequests[orderHash];
+  }
+
+  function getWithdrawOrderHash(OrderWithdrawal calldata order) public pure returns (bytes32) {
+    return keccak256(abi.encode(order));
   }
 
   function depositCollateral(address collateral, uint112 amount) external {
@@ -99,10 +115,6 @@ contract DepositDEX is IDepositDEX, UUPSUpgradeable {
   function _requestStatusChange(bytes32 _orderHash, RequestStatus _status) internal {
     _withdrawRequests[_orderHash].status = _status;
     emit WithdrawRequestStatusUpdated(_orderHash, uint8(_status));
-  }
-
-  function getWithdrawOrderHash(OrderWithdrawal calldata order) public pure returns (bytes32) {
-    return keccak256(abi.encode(order));
   }
 
   function withdrawRequestCancel(OrderWithdrawal calldata order) external {
