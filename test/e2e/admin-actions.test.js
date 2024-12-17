@@ -285,7 +285,7 @@ describe(flow, () => {
       functionName: 'getAccountFR',
     });
 
-    const expectedAliceFr = (NEW_BTC_FR_LONG * ORDER_AMOUNT) / FR_PRECISION - 1n;
+    const expectedAliceFr = (NEW_BTC_FR_LONG * ORDER_AMOUNT) / FR_PRECISION;
     expect(aliceFr).to.equal(expectedAliceFr);
 
     const bobFr = await readContract(bob, {
