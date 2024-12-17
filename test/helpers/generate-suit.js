@@ -44,7 +44,7 @@ const prepareTokens = async (wallets) => {
   return { usdtToken, btcToken };
 };
 
-const prepareContracts = async ({ owner, matcher, usdtToken, btcToken, fundingRateAccount, eveDexConfig }) => {
+const prepareContracts = async ({ owner, matcher, usdtToken, btcToken, fundingRateAccount, eveDexConfig, initInstrumentConfig }) => {
   const [orderLib, sessions, vault] = await Promise.all([
     viemDeployWithLibraries('OrderValidationLib', []),
     viemDeployWithLibraries('SessionManager', [owner.account.address]),
@@ -92,12 +92,18 @@ const prepareContracts = async ({ owner, matcher, usdtToken, btcToken, fundingRa
   // positions of collaterals and instruments selected according to test/helpers/constants.js
   await depositDex.write.setCollateralConfigs([[usdtToken.address], [true]]);
   await depositDex.write.setCollateralConfigs([[btcToken.address], [true]]);
+  const {
+    symbol,
+    leverage,
+    dailyFRLong,
+    dailyFRShort,
+  } = initInstrumentConfig;
   await eveDex.write.addInstrument([
-    BTC_USD_SYMBOL,
-    100, //leverage
-    86400, //dailyFRLong
-    86400, //dailyFRShort
-    Math.floor(Date.now() / 1000), //timestamp
+    symbol,
+    leverage, //leverage
+    dailyFRLong, //dailyFRLong
+    dailyFRShort, //dailyFRShort
+    Math.floor(Date.now() / 1000) - 100, //timestamp
   ]);
 
   return { orderLib, sessions, vault, depositDex, eveDex };
@@ -107,6 +113,7 @@ const generateSuit = async (
   id,
   {
     eveDexConfig: { maxOpenPositions = 128, soLevel = 80, withdrawMarginLevel = 100, liquidationFeePercent = 0 } = {},
+    initInstrumentConfig: { symbol = BTC_USD_SYMBOL, leverage = 100, dailyFRLong = 0, dailyFRShort = 0 } = {},
   } = {},
 ) => {
   if (!id) throw new Error('Suit id is required');
@@ -143,6 +150,12 @@ const generateSuit = async (
       soLevel,
       withdrawMarginLevel,
       liquidationFeePercent,
+    },
+    initInstrumentConfig: {
+      symbol,
+      leverage,
+      dailyFRLong,
+      dailyFRShort,
     },
   });
   suits[id] = {

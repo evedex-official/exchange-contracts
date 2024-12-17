@@ -20,4 +20,5 @@ module.exports = {
       'Order(uint256 orderId,address senderAddress,address matcherAddress,address collateral,uint256 instrumentIndex,uint256 amount,uint256 price,uint16 leverage,uint256 matcherFee,uint256 creationTime,uint8 side)',
     ),
   ),
+  FR_PRECISION: 10n ** 11n,
 };
