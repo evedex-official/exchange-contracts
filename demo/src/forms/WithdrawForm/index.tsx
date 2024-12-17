@@ -15,6 +15,8 @@ import DexBalances from "../../components/DexBalances";
 import Collapse from "../../components/Collapse";
 import SessionField from "../../components/SessionFIeld/SessionField";
 import { useMatcherState } from "../../providers/MatcherProvider";
+import useSession from "../../hooks/useSessions";
+import { useConfig } from "../../providers/ConfigProvider";
 
 const AccountBalances = () => {
   const { alice, bob } = useAccounts();
@@ -60,6 +62,7 @@ const WithdrawForm: React.FC = () => {
   const { addWithdrawRequest } = useMatcherState();
   const { withdrawRequest } = useWithdraw();
   const { alice, bob } = useAccounts();
+  const { sessionWallets } = useConfig();
   const onSubmit = async (values: any) => {
     const token = tokens[values.token];
     const activeAccount = [alice, bob].find((w) => w.key === values.account);
@@ -67,11 +70,16 @@ const WithdrawForm: React.FC = () => {
     try {
       if (!activeAccount) return;
 
+      const userSession = values.session;
+      const userSessionAccount = values.session
+        ? sessionWallets.find((wallet) => wallet.address === userSession)
+        : undefined;
+
       const { request, tx } = await withdrawRequest({
         collateralAddress: values.token,
         amount: parseUnits(values.amount.toString(), token.decimals),
-        withdrawerWallet: activeAccount.wallet.address,
-        userSessionWallet: values.session || zeroAddress,
+        accountAddress: activeAccount.wallet.address,
+        userSessionAccount: userSessionAccount,
         account: activeAccount.wallet,
       });
 

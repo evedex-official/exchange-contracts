@@ -1,4 +1,4 @@
-import { Address, Hex, PrivateKeyAccount } from "viem";
+import { Address, Hex, PrivateKeyAccount, zeroAddress } from "viem";
 import { useChainId, useSignTypedData, useWriteContract } from "wagmi";
 import { DepositDEX } from "../contracts";
 import {
@@ -15,26 +15,29 @@ const useWithdraw = () => {
     account,
     amount,
     collateralAddress,
-    withdrawerWallet,
-    userSessionWallet,
+    accountAddress,
+    userSessionAccount,
   }: {
     account: PrivateKeyAccount;
     amount: bigint;
     collateralAddress: Address;
-    withdrawerWallet: Address;
-    userSessionWallet: Address;
+    accountAddress: Address;
+    userSessionAccount?: PrivateKeyAccount;
   }) => {
+    const session = userSessionAccount?.address || zeroAddress;
     const request = createWithdrawRequest({
-      accountAddress: withdrawerWallet,
+      accountAddress,
       collateralAddress,
       amount,
-      session: userSessionWallet,
+      session,
       expiration: Math.floor(Date.now() / 1000) + 3600,
     });
 
+    const signerAccount = userSessionAccount || account;
+
     const data = {
       ...createWithdrawDataToSign(request, chainId),
-      account,
+      account: signerAccount,
     };
     const signature = await signTypedDataAsync(data);
 
@@ -47,8 +50,8 @@ const useWithdraw = () => {
     account: PrivateKeyAccount;
     amount: bigint;
     collateralAddress: Address;
-    withdrawerWallet: Address;
-    userSessionWallet: Address;
+    accountAddress: Address;
+    userSessionAccount?: PrivateKeyAccount;
   }) => {
     const request = await signWithdrawRequest(args);
 

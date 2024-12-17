@@ -53,12 +53,8 @@ const ConfigContext = createContext<ConfigType>({
   accounts: {},
   sessionWallets: [],
   prices: {
-    BTC: parsePrice(100_000, {
-      tokenDecimals: 18n,
-    }),
-    USDT: parsePrice(0.9, {
-      tokenDecimals: 6n,
-    }),
+    BTC: 100_000,
+    USDT: 0.9,
   },
   onChange: (_name: string, _value: any) => {},
 });

@@ -1,10 +1,12 @@
 import { useWriteContract } from "wagmi";
-import { WithdrawalRequest } from "../interfaces";
 import { PrivateKeyAccount } from "viem";
-import usePrices from "./usePrices";
+import { useState } from "react";
+
+import { WithdrawalRequest } from "../helpers/event-horizon-types";
 import { Btc, DepositDEX, Usdt } from "../contracts";
 import { BTC_USD_INDEX } from "../constants";
-import { useState } from "react";
+
+import usePrices from "./usePrices";
 
 const useWithdrawComplete = () => {
   const { BTC: BTC_PRICE, USDT: USDT_PRICE } = usePrices();
