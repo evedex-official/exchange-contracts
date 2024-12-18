@@ -1,22 +1,26 @@
 import React from "react";
-import { useMatcherState } from "../../providers/MatcherProvider";
-import Collapse from "../Collapse";
 import { useReadContracts } from "wagmi";
-import { getContractCalls } from "../../helpers";
+import { toast } from "react-toastify";
+import { formatUnits } from "viem";
+
 import { EveDEX } from "../../contracts";
-import useInstruments, {
-  useInstrumentsPrices,
-} from "../../hooks/useInstruments";
 import { BUY_SIDE, SELL_SIDE } from "../../constants";
+
+import { getContractCalls } from "../../helpers";
 import {
-  Instrument,
   InstrumentExtended,
   OrderExtended,
 } from "../../helpers/event-horizon-types";
-import Button from "../Button";
+
+import { useMatcherState } from "../../providers/MatcherProvider";
+import useInstruments, {
+  useInstrumentsPrices,
+} from "../../hooks/useInstruments";
 import useFillOrders from "../../hooks/useFillOrders";
-import { toast } from "react-toastify";
-import { formatUnits, parseUnits } from "viem";
+
+import Collapse from "../Collapse";
+import Button from "../Button";
+import useOrderInfo from "../../hooks/useOrderInfo";
 
 type OrderProps = {
   order: OrderExtended;
@@ -33,11 +37,21 @@ const Order: React.FC<OrderProps> = ({
   const instrumentsPrices = useInstrumentsPrices();
   const { instruments } = useInstruments();
   const instrument = instruments.find((i) => i.index == order.instrumentIndex);
+  const {
+    data: { filledAmount },
+  } = useOrderInfo(order);
   if (!instrument) return null;
+  const filledPercent = Number((filledAmount * 100n) / BigInt(order.amount));
+  const isFilled = filledPercent === 100;
   return (
     <div>
       <label>
-        <input type="checkbox" checked={checked} onChange={onSelect} />{" "}
+        <input
+          type="checkbox"
+          disabled={isFilled}
+          checked={checked}
+          onChange={onSelect}
+        />{" "}
         {/* <pre>
         {JSON.stringify(order, null, 2)}
       </pre> */}
@@ -45,7 +59,8 @@ const Order: React.FC<OrderProps> = ({
           {order.side === BUY_SIDE ? "Buy" : "Sell"}{" "}
           {formatUnits(order.amount, instrument.token.decimals)}{" "}
           {instrument.token.symbol} x{order.leverage.toString()} / 1{" "}
-          {instrument.token.symbol} {"="} {order.price.toString()}
+          {instrument.token.symbol} {"="} {order.price.toString()}{" "}
+          <span>({filledPercent}% filled)</span>
         </span>
       </label>
     </div>

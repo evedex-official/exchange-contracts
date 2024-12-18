@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { toast } from "react-toastify";
 import * as yup from "yup";
 import { parseUnits, zeroAddress } from "viem";
@@ -15,6 +15,27 @@ import useInstruments from "../../hooks/useInstruments";
 import useCollaterals from "../../hooks/useCollaterals";
 import usePrices from "../../hooks/usePrices";
 import { Collateral } from "../../helpers/event-horizon-types";
+import { useField } from "formik";
+
+const PriceField: React.FC<{
+  name: string;
+  label: string;
+  instrumentFieldName: string;
+}> = ({ name, label, instrumentFieldName }) => {
+  const prices = usePrices();
+  const { instruments } = useInstruments();
+  const [instrumentField] = useField(instrumentFieldName);
+  const [_, meta, helpers] = useField(name);
+  const instrument = instruments.find((i) => i.index == instrumentField.value);
+  const instrumentPrice = instrument ? prices[instrument.token.address] : 0;
+
+  useEffect(() => {
+    if (!meta.touched) {
+      helpers.setValue(instrumentPrice);
+    }
+  }, [meta.touched, instrumentPrice]);
+  return <Field name={name} label={label} />;
+};
 
 const validationSchema = yup.object({
   collateral: yup.string().required(),
@@ -24,6 +45,7 @@ const validationSchema = yup.object({
   orderType: yup.string().required(),
   amount: yup.number().required(),
   leverage: yup.number().required(),
+  price: yup.number().required(),
 });
 
 const initialValues = {
@@ -34,6 +56,7 @@ const initialValues = {
   orderType: BUY_SIDE,
   leverage: 10,
   amount: 0.01,
+  price: 0,
 };
 
 const OrderForm: React.FC = () => {
@@ -58,7 +81,7 @@ const OrderForm: React.FC = () => {
         throw new Error(`Collateral not found: ${values.collateral}`);
       if (!activeAccount) return;
 
-      const instrumentPrice = prices[instrument.token.address];
+      const instrumentPrice = values.price || prices[instrument.token.address];
 
       if (!instrumentPrice) throw new Error("No instrument price");
 
@@ -152,6 +175,11 @@ const OrderForm: React.FC = () => {
           <option value={BUY_SIDE}>BUY</option>
         </Field>
         <Field label="Amount" name="amount" />
+        <PriceField
+          label="Price"
+          name="price"
+          instrumentFieldName="instrument"
+        />
         <Field
           label="Leverage"
           name="leverage"
