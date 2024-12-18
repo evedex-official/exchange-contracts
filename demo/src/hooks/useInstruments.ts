@@ -77,8 +77,10 @@ export default useInstruments;
 export const useInstrumentsPrices = () => {
   const { instruments } = useInstruments();
   const prices = usePrices();
-  return instruments.map((i) => ({
-    index: i.index,
-    price: (prices[i.token.address] as bigint) || 0n,
-  }));
+  return instruments
+    .map((i) => ({
+      index: i.index,
+      price: (prices[i.token.address] as bigint) || 0n,
+    }))
+    .sort((a, b) => a.index - b.index);
 };

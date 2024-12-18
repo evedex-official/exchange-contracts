@@ -1,10 +1,10 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { toast } from "react-toastify";
 import * as yup from "yup";
 import { parseUnits, zeroAddress } from "viem";
 
 import Form, { Field } from "../../components/Form";
-import { Btc, Usdt } from "../../contracts";
+import { Usdt } from "../../contracts";
 import useSignOrder from "../../hooks/useSignOrder";
 import { BUY_SIDE, SELL_SIDE } from "../../constants";
 import Collapse from "../../components/Collapse";
@@ -17,28 +17,7 @@ import useInstruments, {
 import useCollaterals from "../../hooks/useCollaterals";
 import usePrices from "../../hooks/usePrices";
 import { Collateral } from "../../helpers/event-horizon-types";
-import { useField } from "formik";
-
-const PriceField: React.FC<{
-  name: string;
-  label: string;
-  instrumentFieldName: string;
-}> = ({ name, label, instrumentFieldName }) => {
-  const instrumentsPrices = useInstrumentsPrices();
-  const [instrumentField] = useField(instrumentFieldName);
-  const [_, meta, helpers] = useField(name);
-  const instrumentPrice = (
-    instrumentsPrices[instrumentField.value] || { price: 0n }
-  ).price.toString();
-
-  useEffect(() => {
-    if (!meta.touched) {
-      console.log("setValue", instrumentPrice);
-      helpers.setValue(instrumentPrice);
-    }
-  }, [meta.touched, instrumentPrice]);
-  return <Field name={name} label={label} />;
-};
+import { parsePrice } from "../../helpers";
 
 const validationSchema = yup.object({
   collateral: yup.string().required(),
@@ -69,11 +48,11 @@ const initialValues = {
 const OrderForm: React.FC = () => {
   const { addOrder } = useMatcherState();
   const { instruments } = useInstruments();
+  const instrumentsPrices = useInstrumentsPrices();
   const { collaterals } = useCollaterals();
   const { accounts, sessionWallets } = useConfig();
   const { alice, bob, matcher } = accounts;
   const { signOrder, signMultiOrder } = useSignOrder();
-  const prices = usePrices();
   const onSubmit = async (values: any) => {
     const activeAccount = [alice, bob].find((w) => w.key === values.account);
     const collateral = collaterals.find(
@@ -88,8 +67,11 @@ const OrderForm: React.FC = () => {
         throw new Error(`Collateral not found: ${values.collateral}`);
       if (!activeAccount) return;
 
-      const instrumentPrice: bigint =
-        BigInt(values.price) || prices[instrument.token.address];
+      const instrumentPrice: bigint = values.price
+        ? parsePrice(values.price, {
+            tokenDecimals: BigInt(instrument.token.decimals),
+          })
+        : instrumentsPrices[instrument.index].price;
 
       if (!instrumentPrice) throw new Error("No instrument price");
 
@@ -230,11 +212,7 @@ const OrderForm: React.FC = () => {
           <option value={BUY_SIDE}>BUY</option>
         </Field>
         <Field label="Amount" name="amount" />
-        <PriceField
-          label="Price"
-          name="price"
-          instrumentFieldName="instrument"
-        />
+        <Field label="Price" name="price" />
         <Field label="Take profit, %" name="takeProfit" min={1} max={300} />
         <Field label="Stop loss, %" name="stopLoss" min={1} max={99} />
         <Field
