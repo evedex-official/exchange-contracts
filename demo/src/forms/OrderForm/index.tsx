@@ -128,24 +128,35 @@ const OrderForm: React.FC = () => {
       if (values.stopLoss || values.takeProfit) {
         const arrayOfDataToSign = [dataToSign];
 
+        const isLong = values.orderType === BUY_SIDE;
+
         if (values.stopLoss) {
-          arrayOfDataToSign.push({
+          const stopDiffPrice =
+            (dataToSign.instrumentPrice * BigInt(values.stopLoss)) / 100n;
+
+          const stopLossOrder = {
             ...dataToSign,
-            side: values.orderType === BUY_SIDE ? SELL_SIDE : BUY_SIDE,
-            instrumentPrice:
-              dataToSign.instrumentPrice -
-              (dataToSign.instrumentPrice * BigInt(values.stopLoss)) / 100n,
-          });
+            side: isLong ? SELL_SIDE : BUY_SIDE,
+            instrumentPrice: isLong
+              ? dataToSign.instrumentPrice - stopDiffPrice
+              : dataToSign.instrumentPrice + stopDiffPrice,
+          };
+
+          arrayOfDataToSign.push(stopLossOrder);
         }
 
         if (values.takeProfit) {
-          arrayOfDataToSign.push({
+          const takeDiffPrice =
+            (dataToSign.instrumentPrice * BigInt(values.takeProfit)) / 100n;
+
+          const takeProfitOrder = {
             ...dataToSign,
-            side: values.orderType === BUY_SIDE ? SELL_SIDE : BUY_SIDE,
-            instrumentPrice:
-              dataToSign.instrumentPrice +
-              (dataToSign.instrumentPrice * BigInt(values.stopLoss)) / 100n,
-          });
+            side: isLong ? SELL_SIDE : BUY_SIDE,
+            instrumentPrice: isLong
+              ? dataToSign.instrumentPrice + takeDiffPrice
+              : dataToSign.instrumentPrice - takeDiffPrice,
+          };
+          arrayOfDataToSign.push(takeProfitOrder);
         }
 
         const signedOrders = await signMultiOrder(arrayOfDataToSign, account);
