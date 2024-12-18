@@ -6,10 +6,16 @@ import {
   encodeAbiParameters,
   keccak256,
 } from "viem";
+import { StandardMerkleTree } from "@openzeppelin/merkle-tree";
 
 import { DepositDEX, EveDEX } from "../contracts";
 
-import { domain, orderTypes, orderWithdrawalTypes } from "./eip721-types";
+import {
+  domain,
+  multiOrderTypes,
+  orderTypes,
+  orderWithdrawalTypes,
+} from "./eip721-types";
 import { OrderExtended, Order, WithdrawalRequest } from "./event-horizon-types";
 import { ORDER_TYPEHASH } from "../constants";
 
@@ -203,5 +209,51 @@ export const createMultiLiquidationOrder = ({
     liquidationTimestamp,
     expiration,
     signature: "0x",
+  };
+};
+
+export const getOrdersMerkleTree = (ordersExt: OrderExtended[]) => {
+  const leafEncoding = [
+    "bytes32",
+    "uint256",
+    "address",
+    "address",
+    "address",
+    "uint256",
+    "uint256",
+    "uint256",
+    "uint16",
+    "uint256",
+    "uint256",
+    "uint8",
+  ];
+  const values = ordersExt.map(({ order }) => [
+    ORDER_TYPEHASH,
+    order.orderId,
+    order.senderAddress,
+    order.matcherAddress,
+    order.collateral,
+    order.instrumentIndex,
+    order.amount,
+    order.price,
+    order.leverage,
+    order.matcherFee,
+    order.creationTime,
+    order.side,
+  ]);
+  const tree = StandardMerkleTree.of(values, leafEncoding);
+
+  return tree;
+};
+
+export const createMultiOrderDataToSign = (
+  merkleRoot: Hash,
+  chainId: number
+) => {
+  return {
+    message: { merkleRoot },
+    types: multiOrderTypes,
+    domain: domain(EveDEX.address, chainId),
+    primaryType: "MultiOrder" as any,
   };
 };

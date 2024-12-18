@@ -21,6 +21,7 @@ import useFillOrders from "../../hooks/useFillOrders";
 import Collapse from "../Collapse";
 import Button from "../Button";
 import useOrderInfo from "../../hooks/useOrderInfo";
+import classNames from "../../helpers/classnames";
 
 type OrderProps = {
   order: OrderExtended;
@@ -44,7 +45,7 @@ const Order: React.FC<OrderProps> = ({
   const filledPercent = Number((filledAmount * 100n) / BigInt(order.amount));
   const isFilled = filledPercent === 100;
   return (
-    <div>
+    <div className={classNames("order", { "order--filled": isFilled })}>
       <label>
         <input
           type="checkbox"

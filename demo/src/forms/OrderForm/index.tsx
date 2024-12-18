@@ -11,7 +11,9 @@ import Collapse from "../../components/Collapse";
 import { useConfig } from "../../providers/ConfigProvider";
 import SessionField from "../../components/SessionFIeld/SessionField";
 import { useMatcherState } from "../../providers/MatcherProvider";
-import useInstruments from "../../hooks/useInstruments";
+import useInstruments, {
+  useInstrumentsPrices,
+} from "../../hooks/useInstruments";
 import useCollaterals from "../../hooks/useCollaterals";
 import usePrices from "../../hooks/usePrices";
 import { Collateral } from "../../helpers/event-horizon-types";
@@ -22,15 +24,16 @@ const PriceField: React.FC<{
   label: string;
   instrumentFieldName: string;
 }> = ({ name, label, instrumentFieldName }) => {
-  const prices = usePrices();
-  const { instruments } = useInstruments();
+  const instrumentsPrices = useInstrumentsPrices();
   const [instrumentField] = useField(instrumentFieldName);
   const [_, meta, helpers] = useField(name);
-  const instrument = instruments.find((i) => i.index == instrumentField.value);
-  const instrumentPrice = instrument ? prices[instrument.token.address] : 0;
+  const instrumentPrice = (
+    instrumentsPrices[instrumentField.value] || { price: 0n }
+  ).price.toString();
 
   useEffect(() => {
     if (!meta.touched) {
+      console.log("setValue", instrumentPrice);
       helpers.setValue(instrumentPrice);
     }
   }, [meta.touched, instrumentPrice]);
@@ -46,12 +49,16 @@ const validationSchema = yup.object({
   amount: yup.number().required(),
   leverage: yup.number().required(),
   price: yup.number().required(),
+  takeProfit: yup.number(),
+  stopLoss: yup.number(),
 });
 
 const initialValues = {
   account: "",
   session: "",
   instrument: "",
+  takeProfit: "",
+  stopLoss: "",
   collateral: Usdt.address,
   orderType: BUY_SIDE,
   leverage: 10,
@@ -65,7 +72,7 @@ const OrderForm: React.FC = () => {
   const { collaterals } = useCollaterals();
   const { accounts, sessionWallets } = useConfig();
   const { alice, bob, matcher } = accounts;
-  const { signOrder } = useSignOrder();
+  const { signOrder, signMultiOrder } = useSignOrder();
   const prices = usePrices();
   const onSubmit = async (values: any) => {
     const activeAccount = [alice, bob].find((w) => w.key === values.account);
@@ -81,7 +88,8 @@ const OrderForm: React.FC = () => {
         throw new Error(`Collateral not found: ${values.collateral}`);
       if (!activeAccount) return;
 
-      const instrumentPrice = values.price || prices[instrument.token.address];
+      const instrumentPrice: bigint =
+        BigInt(values.price) || prices[instrument.token.address];
 
       if (!instrumentPrice) throw new Error("No instrument price");
 
@@ -90,26 +98,62 @@ const OrderForm: React.FC = () => {
       );
 
       const account = !!sessionAccount ? sessionAccount : activeAccount.wallet;
+      const userSessionWallet = sessionAccount
+        ? sessionAccount.address
+        : zeroAddress;
+
+      const amount = parseUnits(
+        values.amount.toString(),
+        instrument.token.decimals
+      );
+      const senderWallet = activeAccount.wallet.address;
+      const leverage = BigInt(values.leverage);
+      const instrumentIndex = values.instrument;
+      const matcherAddress = matcher.wallet.address;
+      const collateralIndex = collateral.index;
 
       const dataToSign = {
-        account,
-        senderWallet: activeAccount.wallet.address,
-        userSessionWallet: sessionAccount
-          ? sessionAccount.address
-          : zeroAddress,
-        amount: parseUnits(values.amount.toString(), instrument.token.decimals),
-        leverage: BigInt(values.leverage),
+        senderWallet,
+        userSessionWallet,
+        amount,
+        leverage,
         collateral: collateral.address,
-        collateralIndex: collateral.index,
+        collateralIndex,
         side: values.orderType,
-        instrumentIndex: values.instrument,
-        matcherAddress: matcher.wallet.address,
-        instrumentPrice: instrumentPrice,
+        instrumentIndex,
+        matcherAddress,
+        instrumentPrice,
       };
 
-      const signedOrder = await signOrder(dataToSign);
+      if (values.stopLoss || values.takeProfit) {
+        const arrayOfDataToSign = [dataToSign];
 
-      addOrder(signedOrder);
+        if (values.stopLoss) {
+          arrayOfDataToSign.push({
+            ...dataToSign,
+            side: values.orderType === BUY_SIDE ? SELL_SIDE : BUY_SIDE,
+            instrumentPrice:
+              dataToSign.instrumentPrice -
+              (dataToSign.instrumentPrice * BigInt(values.stopLoss)) / 100n,
+          });
+        }
+
+        if (values.takeProfit) {
+          arrayOfDataToSign.push({
+            ...dataToSign,
+            side: values.orderType === BUY_SIDE ? SELL_SIDE : BUY_SIDE,
+            instrumentPrice:
+              dataToSign.instrumentPrice +
+              (dataToSign.instrumentPrice * BigInt(values.stopLoss)) / 100n,
+          });
+        }
+
+        const signedOrders = await signMultiOrder(arrayOfDataToSign, account);
+        signedOrders.forEach((signedOrder) => addOrder(signedOrder));
+      } else {
+        const signedOrder = await signOrder(dataToSign, account);
+        addOrder(signedOrder);
+      }
 
       toast.success(`Order placed.`);
     } catch (e) {
@@ -180,6 +224,8 @@ const OrderForm: React.FC = () => {
           name="price"
           instrumentFieldName="instrument"
         />
+        <Field label="Take profit, %" name="takeProfit" min={1} max={300} />
+        <Field label="Stop loss, %" name="stopLoss" min={1} max={99} />
         <Field
           label="Leverage"
           name="leverage"

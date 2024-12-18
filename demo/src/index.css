@@ -100,3 +100,7 @@
 .config-prices {
   flex: 1;
 }
+
+.order--filled {
+  text-decoration: line-through;
+}
