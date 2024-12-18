@@ -57,7 +57,7 @@ const Order: React.FC<OrderProps> = ({
         {JSON.stringify(order, null, 2)}
       </pre> */}
         <span>
-          {order.side === BUY_SIDE ? "Buy" : "Sell"}{" "}
+          {order.side == BUY_SIDE ? "Buy" : "Sell"}{" "}
           {formatUnits(order.amount, instrument.token.decimals)}{" "}
           {instrument.token.symbol} x{order.leverage.toString()} / 1{" "}
           {instrument.token.symbol} {"="} {order.price.toString()}{" "}
