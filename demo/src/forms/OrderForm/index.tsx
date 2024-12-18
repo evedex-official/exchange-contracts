@@ -14,6 +14,7 @@ import { useMatcherState } from "../../providers/MatcherProvider";
 import useInstruments from "../../hooks/useInstruments";
 import useCollaterals from "../../hooks/useCollaterals";
 import usePrices from "../../hooks/usePrices";
+import { Collateral } from "../../helpers/event-horizon-types";
 
 const validationSchema = yup.object({
   collateral: yup.string().required(),
@@ -46,7 +47,7 @@ const OrderForm: React.FC = () => {
   const onSubmit = async (values: any) => {
     const activeAccount = [alice, bob].find((w) => w.key === values.account);
     const collateral = collaterals.find(
-      (collateral) => (collateral.address = values.collateral)
+      (c: Collateral) => (c.address = values.collateral)
     );
     const instrument = instruments.find((i) => i.index == values.instrument);
 
@@ -135,9 +136,9 @@ const OrderForm: React.FC = () => {
           fieldType="select"
           placeholder="Select"
         >
-          {collaterals.map((collateral) => (
-            <option key={collateral.address} value={collateral.address}>
-              {collateral.symbol}
+          {collaterals.map((c: Collateral) => (
+            <option key={c.address} value={c.address}>
+              {c.symbol}
             </option>
           ))}
         </Field>

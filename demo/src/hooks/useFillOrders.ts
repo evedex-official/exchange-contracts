@@ -43,6 +43,11 @@ const useFillOrders = () => {
       const historyTimestamp = Math.trunc(Date.now() / 1000);
       const historySearchHint = 0n; // element index in funding rate array. Hint from backend to reduce tx gas cost
 
+      const fillAmount =
+        buyOrder.order.amount < sellOrder.order.amount
+          ? buyOrder.order.amount
+          : sellOrder.order.amount;
+
       const tx = await writeContractAsync({
         abi: EveDEX.abi,
         address: EveDEX.address,
@@ -52,7 +57,7 @@ const useFillOrders = () => {
           buyOrder,
           sellOrder,
           prices[Btc.address],
-          buyOrder.order.amount,
+          fillAmount,
           fullPrices,
           historyTimestamp,
           historySearchHint,

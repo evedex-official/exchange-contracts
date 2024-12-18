@@ -4,7 +4,9 @@ import Collapse from "../Collapse";
 import { useReadContracts } from "wagmi";
 import { getContractCalls } from "../../helpers";
 import { EveDEX } from "../../contracts";
-import useInstruments from "../../hooks/useInstruments";
+import useInstruments, {
+  useInstrumentsPrices,
+} from "../../hooks/useInstruments";
 import { BUY_SIDE, SELL_SIDE } from "../../constants";
 import {
   Instrument,
@@ -14,6 +16,7 @@ import {
 import Button from "../Button";
 import useFillOrders from "../../hooks/useFillOrders";
 import { toast } from "react-toastify";
+import { formatUnits, parseUnits } from "viem";
 
 type OrderProps = {
   order: OrderExtended;
@@ -27,10 +30,24 @@ const Order: React.FC<OrderProps> = ({
   onSelect,
 }) => {
   const { order } = orderExtended;
+  const instrumentsPrices = useInstrumentsPrices();
+  const { instruments } = useInstruments();
+  const instrument = instruments.find((i) => i.index == order.instrumentIndex);
+  if (!instrument) return null;
   return (
     <div>
-      <input type="checkbox" checked={checked} onChange={onSelect} />{" "}
-      {order.amount.toString()}:{order.price.toString()}
+      <label>
+        <input type="checkbox" checked={checked} onChange={onSelect} />{" "}
+        {/* <pre>
+        {JSON.stringify(order, null, 2)}
+      </pre> */}
+        <span>
+          {order.side === BUY_SIDE ? "Buy" : "Sell"}{" "}
+          {formatUnits(order.amount, instrument.token.decimals)}{" "}
+          {instrument.token.symbol} x{order.leverage.toString()} / 1{" "}
+          {instrument.token.symbol} {"="} {order.price.toString()}
+        </span>
+      </label>
     </div>
   );
 };
