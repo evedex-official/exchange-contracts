@@ -173,3 +173,35 @@ export const getWithdrawalRequestHash = (
   );
   return keccak256(encodedData);
 };
+
+export const createMultiLiquidationOrder = ({
+  accountToLiquidate,
+  liquidator,
+  collateral,
+  liquidationPrices,
+  prices,
+  leverage,
+  liquidationTimestamp = Math.floor(Date.now() / 1000),
+  expiration = Math.floor(Date.now() / 1000) + 3600,
+}: {
+  accountToLiquidate: Address;
+  liquidator: Address;
+  collateral: Address;
+  liquidationPrices: { index: number; price: bigint }[];
+  prices: { index: number; price: bigint }[];
+  leverage: bigint;
+  liquidationTimestamp?: number;
+  expiration?: number;
+}) => {
+  return {
+    accountToLiquidate,
+    liquidator,
+    collateral,
+    liquidationPrices,
+    prices,
+    leverage,
+    liquidationTimestamp,
+    expiration,
+    signature: "0x",
+  };
+};

@@ -10,30 +10,10 @@ import useAccounts from "../../hooks/useAccounts";
 import useWithdraw from "../../hooks/useWithdraw";
 
 import Form, { Field } from "../../components/Form";
-import WalletBalances from "../../components/WalletBalances";
-import DexBalances from "../../components/DexBalances";
 import Collapse from "../../components/Collapse";
 import SessionField from "../../components/SessionFIeld/SessionField";
 import { useMatcherState } from "../../providers/MatcherProvider";
-import useSession from "../../hooks/useSessions";
 import { useConfig } from "../../providers/ConfigProvider";
-
-const AccountBalances = () => {
-  const { alice, bob } = useAccounts();
-  const [accountField] = useField("account");
-  const activeAccount = [alice, bob].find(
-    (w) => w.key === (accountField as any)?.value
-  );
-  if (!activeAccount) return null;
-
-  return (
-    <>
-      <WalletBalances account={activeAccount.wallet} />
-      <DexBalances account={activeAccount.wallet} />
-      <hr />
-    </>
-  );
-};
 
 const validationSchema = yup.object({
   account: yup.string().required(),
@@ -110,7 +90,6 @@ const WithdrawForm: React.FC = () => {
             </option>
           ))}
         </Field>
-        <AccountBalances />
         <SessionField
           label="Account session"
           name="session"

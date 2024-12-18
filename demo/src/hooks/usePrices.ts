@@ -15,8 +15,6 @@ const usePrices = () => {
     return acc;
   }, {} as { [x: Address]: bigint });
 
-  console.log("parsedPrices", parsedPrices, prices, collaterals);
-
   return parsedPrices;
 };
 

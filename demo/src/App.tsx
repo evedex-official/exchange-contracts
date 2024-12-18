@@ -6,6 +6,7 @@ import WithdrawForm from "./forms/WithdrawForm";
 import OrderForm from "./forms/OrderForm";
 import Tabs from "./components/Tabs";
 import Config from "./components/Config";
+import Accounts from "./components/Accounts";
 
 const Wallet = () => {
   return (
@@ -29,6 +30,11 @@ const Matcher = () => {
 
 function App() {
   const tabs = [
+    {
+      tabKey: "accounts",
+      title: "Accounts",
+      component: Accounts,
+    },
     {
       tabKey: "wallet",
       title: "Deposit/Wihdraw",

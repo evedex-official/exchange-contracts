@@ -3,6 +3,7 @@ import { useConfig } from "../../providers/ConfigProvider";
 import Accounts from "../Accounts";
 import { BaseField } from "../Form";
 import Collapse from "../Collapse";
+import useEveDex from "../../hooks/useEveDex";
 
 type PricesProps = {
   value: {
@@ -41,11 +42,14 @@ const Prices: React.FC<PricesProps> = ({ value, name, onChange }) => {
 };
 
 const Config = () => {
+  const { data: eveDexData } = useEveDex();
   const { prices, onChange } = useConfig();
   return (
     <div className="config">
       <div className="config-accounts">
-        <Accounts />
+        <Collapse title="EveDex">
+          <pre>{JSON.stringify(eveDexData, null, 2)}</pre>
+        </Collapse>
       </div>
       <div className="config-prices">
         <Collapse title="Prices">

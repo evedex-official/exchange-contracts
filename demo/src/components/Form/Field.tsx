@@ -16,11 +16,11 @@ export type FieldProps = React.HTMLAttributes<
   error?: string;
 };
 
-export type BaseFieldProps = {
+export type BaseFieldProps = FieldProps & {
   value: any;
 };
 
-export const BaseField: React.FC<FieldProps> = ({
+export const BaseField: React.FC<BaseFieldProps> = ({
   label,
   name,
   fieldType = "input",

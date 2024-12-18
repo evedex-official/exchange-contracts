@@ -1,42 +1,27 @@
 import React from "react";
 import { toast } from "react-toastify";
 import * as yup from "yup";
-import { useField, useFormikContext } from "formik";
+import { useFormikContext } from "formik";
 import { useWriteContract } from "wagmi";
 import { Address, parseUnits } from "viem";
 
-import { Btc, DepositDEX, Usdt } from "../../contracts";
+import { DepositDEX } from "../../contracts";
 
 import useApprove from "../../hooks/useApprove";
 import useAccounts from "../../hooks/useAccounts";
 
 import Button from "../../components/Button";
 import Form, { Field } from "../../components/Form";
-import WalletBalances from "../../components/WalletBalances";
-import DexBalances from "../../components/DexBalances";
 import Collapse from "../../components/Collapse";
-
-const AccountBalances = () => {
-  const { alice, bob } = useAccounts();
-  const [accountField] = useField("account");
-  const activeAccount = [alice, bob].find(
-    (w) => w.key === (accountField as any)?.value
-  );
-  if (!activeAccount) return null;
-
-  return (
-    <>
-      <WalletBalances account={activeAccount.wallet} />
-      <DexBalances account={activeAccount.wallet} />
-      <hr />
-    </>
-  );
-};
+import useCollaterals from "../../hooks/useCollaterals";
+import { Collateral } from "../../helpers/event-horizon-types";
 
 const AllowanceNote = () => {
   const { values } = useFormikContext<any>();
-  const { alice, bob } = useAccounts();
-  const activeAccount = [alice, bob].find((w) => w.key === values.account);
+  const { alice, bob, liquidator } = useAccounts();
+  const activeAccount = [alice, bob, liquidator].find(
+    (w) => w.key === values.account
+  );
   const { allowance, onMaxApprove, isApproving } = useApprove({
     account: activeAccount?.wallet,
     source: values.token as Address,
@@ -71,21 +56,16 @@ const initialValues = {
   amount: 10,
 };
 
-const tokens = {
-  [Usdt.address]: {
-    decimals: 6,
-  },
-  [Btc.address]: {
-    decimals: 18,
-  },
-};
-
 const DepositForm: React.FC = () => {
   const { writeContractAsync } = useWriteContract();
-  const { alice, bob } = useAccounts();
+  const { collaterals } = useCollaterals();
+  const { alice, bob, liquidator } = useAccounts();
+  const accs = [alice, bob, liquidator];
   const onSubmit = async (values: any) => {
-    const token = tokens[values.token];
-    const activeAccount = [alice, bob].find((w) => w.key === values.account);
+    const token = collaterals.find(
+      (c: Collateral) => (c.address = values.token)
+    );
+    const activeAccount = accs.find((w) => w.key === values.account);
 
     try {
       const args = {
@@ -120,21 +100,23 @@ const DepositForm: React.FC = () => {
           fieldType="select"
           placeholder="Select"
         >
-          {[alice, bob].map((account) => (
+          {accs.map((account) => (
             <option key={account.key} value={account.key}>
               {account.key} ({account.wallet.address})
             </option>
           ))}
         </Field>
-        <AccountBalances />
         <Field
           label="Token"
           name="token"
           fieldType="select"
           placeholder="Select"
         >
-          <option value={Usdt.address}>USDT</option>
-          <option value={Btc.address}>BTC</option>
+          {collaterals.map((c: Collateral) => (
+            <option key={c.address} value={c.address}>
+              {c.symbol}
+            </option>
+          ))}
         </Field>
         <Field label="Amount" name="amount" />
         <AllowanceNote />

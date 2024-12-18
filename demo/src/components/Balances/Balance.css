@@ -1,0 +1,10 @@
+.balance {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  font-size: 12px;
+}
+
+.balance-symbol {
+  font-weight: bold;
+}

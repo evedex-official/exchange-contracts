@@ -1,15 +1,10 @@
-import { useAccount, useReadContract } from "wagmi";
-import { EveDEX } from "../contracts";
 import { Address } from "viem";
 
-const useActiveInstrumentsPositions = () => {
-  const { address } = useAccount();
-  return useReadContract({
-    functionName: "getActiveInstrumentsPositions",
-    args: [address],
-    abi: EveDEX.abi,
-    address: EveDEX.address as Address,
-  });
+import useEveDexAccount from "./useEveDexAccount";
+
+const useActiveInstrumentsPositions = (address: Address) => {
+  const { data, isLoading } = useEveDexAccount(address);
+  return { data: data.activeInstrumentsPositions, isLoading };
 };
 
 export default useActiveInstrumentsPositions;

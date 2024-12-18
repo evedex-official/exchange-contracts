@@ -58,11 +58,14 @@ export type Token = {
   symbol: string;
   decimals: number;
   address: Address;
+  name: string;
 };
 
 export type InstrumentExtended = Instrument & {
   index: number;
-  token0: Token;
-  token1: Token;
-  priceToken: Address;
+  token: Token;
+};
+
+export type Collateral = Token & {
+  index: number;
 };

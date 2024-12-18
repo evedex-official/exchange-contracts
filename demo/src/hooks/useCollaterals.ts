@@ -1,66 +1,22 @@
-import { useBlockNumber, useReadContract, useReadContracts } from "wagmi";
-import { Btc, DepositDEX, Usdt } from "../contracts";
-import { Address } from "viem";
-import { useEffect } from "react";
-
-type Collateral = {
-  address: Address;
-  index: number;
-  symbol: string;
-  decimals: number;
-  name: string;
-};
-
-const collateralsConfig = {
-  [Usdt.address]: {
-    address: Usdt.address,
-    symbol: "USDT",
-    name: "Tether",
-    decimals: 6,
-  },
-  [Btc.address]: {
-    address: Btc.address,
-    symbol: "BTC",
-    name: "Bitcoin",
-    decimals: 18,
-  },
-};
-
-const contractConfig = {
-  abi: DepositDEX.abi,
-  address: DepositDEX.address,
-};
+import { Collateral } from "../helpers/event-horizon-types";
+import useDepositDex from "./useDepositDex";
+import usePrices from "./usePrices";
 
 const useCollaterals = () => {
-  const { data, isLoading, refetch } = useReadContract({
-    ...contractConfig,
-    functionName: "getCollaterals",
-  });
-
-  const { data: blockNumber } = useBlockNumber({ watch: true });
-
-  useEffect(() => {
-    refetch();
-  }, [blockNumber]);
-
-  const collaterals: Address[] = ((data as any) as Address[]) || [];
-
-  const mergedCollaterals: Collateral[] = [];
-
-  collaterals.forEach((collateral, index) => {
-    const config = collateralsConfig[collateral];
-    if (config) {
-      mergedCollaterals.push({
-        ...config,
-        index,
-      });
-    }
-  });
-
+  const { data, isLoading } = useDepositDex();
   return {
-    collaterals: mergedCollaterals,
+    collaterals: data.collaterals || [],
     isLoading: isLoading,
   };
 };
 
 export default useCollaterals;
+
+export const useCollateralsPrices = () => {
+  const { collaterals } = useCollaterals();
+  const prices = usePrices();
+  return collaterals.map((c: Collateral) => ({
+    collateral: c.address,
+    price: (prices[c.address] as bigint) || 0n,
+  }));
+};

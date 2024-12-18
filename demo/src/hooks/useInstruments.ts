@@ -1,13 +1,14 @@
-import { useReadContract, useReadContracts } from "wagmi";
-import { Address } from "viem";
+import { useReadContracts } from "wagmi";
 
-import { Btc, EveDEX, Usdt } from "../contracts";
+import { Btc, EveDEX } from "../contracts";
 import { convertCallsResult, getContractCalls } from "../helpers";
 import {
   Instrument,
   InstrumentExtended,
   Token,
 } from "../helpers/event-horizon-types";
+import useEveDex from "./useEveDex";
+import usePrices from "./usePrices";
 
 const contractConfig = {
   abi: EveDEX.abi,
@@ -15,33 +16,22 @@ const contractConfig = {
 };
 
 const instrumentsConfig: {
-  [x: string]: { token0: Token; token1: Token; priceToken: Address };
+  [x: string]: { token: Token };
 } = {
   "BTC/USD": {
-    token0: {
+    token: {
       address: Btc.address,
       symbol: "BTC",
       decimals: 18,
+      name: "Bitcoin",
     },
-    token1: {
-      address: Usdt.address,
-      symbol: "USDT",
-      decimals: 6,
-    },
-    priceToken: Btc.address,
   },
 };
 
 const useInstruments = () => {
-  const {
-    data: instrumentsLengthData,
-    isLoading: isLoadingInstrumentsLength,
-  } = useReadContract({
-    ...contractConfig,
-    functionName: "instrumentsLength",
-  });
+  const { data: eveDex, isLoading: isLoadingEveDex } = useEveDex();
 
-  const instrumentsLength: number = instrumentsLengthData || 0;
+  const { instrumentsLength } = eveDex;
 
   const calls = [];
 
@@ -78,8 +68,17 @@ const useInstruments = () => {
 
   return {
     instruments: instrumentsExtended,
-    isLoading: isLoading || isLoadingInstrumentsLength,
+    isLoading: isLoading || isLoadingEveDex,
   };
 };
 
 export default useInstruments;
+
+export const useInstrumentsPrices = () => {
+  const { instruments } = useInstruments();
+  const prices = usePrices();
+  return instruments.map((i) => ({
+    index: i.index,
+    price: (prices[i.token.address] as bigint) || 0n,
+  }));
+};

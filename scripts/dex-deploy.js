@@ -74,6 +74,16 @@ async function main() {
   );
 
   console.log(`BTC_USD_SYMBOL:${BTC_USD_SYMBOL} added as instrument`);
+
+  // await dex.addInstrument(
+  //   ETH_USD_SYMBOL,
+  //   100, //leverage
+  //   86400, //dailyFRLong
+  //   86400, //dailyFRShort
+  //   Math.floor(Date.now() / 1000), //timestamp
+  // );
+
+  // console.log(`ETH_USD_SYMBOL:${ETH_USD_SYMBOL} added as instrument`);
 }
 
 async function deployTokenMocks(wallets) {

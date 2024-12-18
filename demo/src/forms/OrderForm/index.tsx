@@ -57,14 +57,7 @@ const OrderForm: React.FC = () => {
         throw new Error(`Collateral not found: ${values.collateral}`);
       if (!activeAccount) return;
 
-      const instrumentPrice = prices[instrument.priceToken];
-
-      console.log(
-        "instrumentPrice",
-        instrumentPrice,
-        instrument.priceToken,
-        prices[instrument.priceToken]
-      );
+      const instrumentPrice = prices[instrument.token.address];
 
       if (!instrumentPrice) throw new Error("No instrument price");
 
@@ -80,10 +73,7 @@ const OrderForm: React.FC = () => {
         userSessionWallet: sessionAccount
           ? sessionAccount.address
           : zeroAddress,
-        amount: parseUnits(
-          values.amount.toString(),
-          instrument.token0.decimals
-        ),
+        amount: parseUnits(values.amount.toString(), instrument.token.decimals),
         leverage: BigInt(values.leverage),
         collateral: collateral.address,
         collateralIndex: collateral.index,

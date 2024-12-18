@@ -2,8 +2,9 @@ import React, { useContext, createContext } from "react";
 import { Address, Hash, Hex, PrivateKeyAccount } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 
-import { parsePrice } from "../../helpers";
 import { Btc, Usdt } from "../../contracts";
+import usePersistedState from "../../hooks/usePersistedState";
+import { LC_STORAGE_KEY } from "../../constants";
 
 const sessionWallets = [
   "0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba",
@@ -86,10 +87,13 @@ const ConfigProvider: React.FC<ConfigProviderProps> = ({ children }) => {
       wallet: privateKeyToAccount(roles[4]),
     },
   });
-  const [prices, setPrices] = React.useState<{ [x: string]: number }>({
-    [Btc.address]: 100_000,
-    [Usdt.address]: 0.9,
-  });
+  const [prices, setPrices] = usePersistedState<{ [x: string]: number }>(
+    {
+      [Btc.address]: 100_000,
+      [Usdt.address]: 0.9,
+    },
+    LC_STORAGE_KEY.PRICES
+  );
 
   const onChange = (name: string, value: any) => {
     if (name === "accounts") {
