@@ -161,18 +161,9 @@ abstract contract BaseDEX is
     emit InstrumentUpdate(index, ticker, leverage);
   }
 
-  //  Daily percent
   //  100% = 10^11
-  //	10000000
-  //
-  //  Min = 0.000000864 (86400)
-  function setFR(
-    uint256 index,
-    int72 dailyFRLong,
-    int72 dailyFRShort,
-    uint48 timestamp
-  ) external onlyRole(MATCHER_ROLE) {
-    _setFR(index, dailyFRLong, dailyFRShort, timestamp);
+  function setFR(uint256 index, int72 newFRLong, int72 newFRShort, uint48 timestamp) external onlyRole(MATCHER_ROLE) {
+    _setFR(index, newFRLong, newFRShort, timestamp);
   }
 
   function _setFR(uint256 index, int72 newFRLong, int72 newFRShort, uint48 timestamp) internal {
