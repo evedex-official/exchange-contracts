@@ -296,7 +296,7 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     // If it's the last instrument that user have liquidator pays for user's negative balance
     if (_activeInstruments[accountToLiquidate].length() == 1 && balance < 0) {
       _setBalance(accountToLiquidate, collateral, 0);
-      _setBalance(liquidator, collateral, balance + int112(liquidationFee));
+      _setBalance(liquidator, collateral, balanceOfLiquidator + balance + int112(liquidationFee));
     } else {
       _setBalance(accountToLiquidate, collateral, balance);
       _setBalance(liquidator, collateral, balanceOfLiquidator + int112(liquidationFee));
