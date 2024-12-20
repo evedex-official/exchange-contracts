@@ -1,12 +1,12 @@
 import React from "react";
 import { useReadContracts } from "wagmi";
 import { toast } from "react-toastify";
-import { formatUnits } from "viem";
+import { formatUnits, zeroAddress } from "viem";
 
 import { EveDEX } from "../../contracts";
 import { BUY_SIDE, SELL_SIDE } from "../../constants";
 
-import { getContractCalls } from "../../helpers";
+import { formatPrice, getContractCalls } from "../../helpers";
 import {
   InstrumentExtended,
   OrderExtended,
@@ -27,12 +27,14 @@ type OrderProps = {
   order: OrderExtended;
   checked?: boolean;
   onSelect: () => void;
+  onRemove: () => void;
 };
 
 const Order: React.FC<OrderProps> = ({
   order: orderExtended,
   checked,
   onSelect,
+  onRemove,
 }) => {
   const { order } = orderExtended;
   const instrumentsPrices = useInstrumentsPrices();
@@ -60,8 +62,23 @@ const Order: React.FC<OrderProps> = ({
           {order.side == BUY_SIDE ? "Buy" : "Sell"}{" "}
           {formatUnits(order.amount, instrument.token.decimals)}{" "}
           {instrument.token.symbol} x{order.leverage.toString()} / 1{" "}
-          {instrument.token.symbol} {"="} {order.price.toString()}{" "}
-          <span>({filledPercent}% filled)</span>
+          {instrument.token.symbol} {"="}{" "}
+          {formatPrice(order.price, {
+            tokenDecimals: instrument.token.decimals,
+          })}{" "}
+          <span>({filledPercent}% filled)</span>{" "}
+          <span>
+            (
+            {order.userSession !== zeroAddress
+              ? `Session: ${order.userSession}`
+              : order.senderAddress}
+            )
+          </span>
+          {!isFilled && (
+            <span onClick={onRemove} className="order-remove">
+              &times;
+            </span>
+          )}
         </span>
       </label>
     </div>
@@ -79,9 +96,13 @@ const InstrumentOrders: React.FC<InstrumentOrdersProps> = ({
   buyOrders,
   sellOrders,
 }) => {
+  const { removeOrder } = useMatcherState();
   const { fillOrders, isLoading } = useFillOrders();
   const [checkedBuyOrderId, setCheckedBuyOrderId] = React.useState<number>();
   const [checkedSellOrderId, setCheckedSellOrderId] = React.useState<number>();
+  const instrumentPrices = useInstrumentsPrices();
+  const instrumentPrice =
+    instrumentPrices.find((i) => i.index == instrument.index)?.price || 0n;
 
   const onCheckBuyOrder = (orderId: number) => () => {
     setCheckedBuyOrderId(orderId);
@@ -102,22 +123,33 @@ const InstrumentOrders: React.FC<InstrumentOrdersProps> = ({
 
       if (!buyOrder || !sellOrder) throw new Error("Orders not found");
 
-      const tx = await fillOrders(buyOrder, sellOrder);
+      const tx = await fillOrders(buyOrder, sellOrder, instrument.index);
       toast.success(`Matched: ${tx}`);
     } catch (e) {
       toast.error((e as any).message);
     }
   };
 
+  const onRemoveOrder = (order: OrderExtended) => () => {
+    removeOrder(order);
+  };
+
   return (
     <div>
-      <h4>{instrument.ticker}</h4>
+      <h4>
+        {instrument.ticker} (
+        {formatPrice(instrumentPrice, {
+          tokenDecimals: instrument.token.decimals,
+        })}
+        )
+      </h4>
       <h5>Buy</h5>
       {buyOrders.map((order) => (
         <Order
           key={order.order.orderId}
           checked={checkedBuyOrderId === order.order.orderId}
           onSelect={onCheckBuyOrder(order.order.orderId)}
+          onRemove={onRemoveOrder(order)}
           order={order}
         />
       ))}
@@ -127,6 +159,7 @@ const InstrumentOrders: React.FC<InstrumentOrdersProps> = ({
           key={order.order.orderId}
           checked={checkedSellOrderId === order.order.orderId}
           onSelect={onCheckSellOrder(order.order.orderId)}
+          onRemove={onRemoveOrder(order)}
           order={order}
         />
       ))}

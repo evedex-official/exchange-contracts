@@ -10,7 +10,7 @@ import {
   Order,
   OrderExtended,
 } from "../helpers/event-horizon-types";
-import useInstruments from "./useInstruments";
+import useInstruments, { useInstrumentsPrices } from "./useInstruments";
 import { Address } from "viem";
 import { useState } from "react";
 
@@ -23,12 +23,8 @@ const useLiquidator = () => {
 
   const prices = usePrices();
   const { collaterals } = useCollaterals();
-  const { instruments } = useInstruments();
 
-  const currentInstrumentPrices = instruments.map((i) => ({
-    index: i.index,
-    price: prices[i.token.address],
-  }));
+  const currentInstrumentPrices = useInstrumentsPrices();
 
   const currentCollateralPrices = collaterals.map((c: Collateral) => ({
     collateral: c.address,

@@ -2,7 +2,7 @@ const { ethers, network, run, upgrades } = require('hardhat');
 const { maxUint112 } = require('viem');
 
 const config = require('../config.js');
-const { BTC_USD_SYMBOL } = require('../test/helpers/constants.js');
+const { BTC_USD_SYMBOL, ETH_USD_SYMBOL } = require('../test/helpers/constants.js');
 
 async function main() {
   const [deployer, alice, bob, liquidator, matcher] = await ethers.getSigners();
@@ -75,15 +75,15 @@ async function main() {
 
   console.log(`BTC_USD_SYMBOL:${BTC_USD_SYMBOL} added as instrument`);
 
-  // await dex.addInstrument(
-  //   ETH_USD_SYMBOL,
-  //   100, //leverage
-  //   86400, //dailyFRLong
-  //   86400, //dailyFRShort
-  //   Math.floor(Date.now() / 1000), //timestamp
-  // );
+  await dex.addInstrument(
+    ETH_USD_SYMBOL,
+    100, //leverage
+    86400, //dailyFRLong
+    86400, //dailyFRShort
+    Math.floor(Date.now() / 1000), //timestamp
+  );
 
-  // console.log(`ETH_USD_SYMBOL:${ETH_USD_SYMBOL} added as instrument`);
+  console.log(`ETH_USD_SYMBOL:${ETH_USD_SYMBOL} added as instrument`);
 }
 
 async function deployTokenMocks(wallets) {

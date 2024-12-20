@@ -5,39 +5,28 @@ import { Btc, EveDEX, Usdt } from "../contracts";
 import { OrderExtended } from "../helpers/event-horizon-types";
 import { useState } from "react";
 import usePrices from "./usePrices";
-import { BTC_USD_INDEX } from "../constants";
+import { useInstrumentsPrices } from "./useInstruments";
+import { useCollateralsPrices } from "./useCollaterals";
 
 const useFillOrders = () => {
   const { matcher } = useAccounts();
+  const instrumentsPrices = useInstrumentsPrices();
+  const collateralPrices = useCollateralsPrices();
   const { writeContractAsync } = useWriteContract();
-  const prices = usePrices();
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
   const fillOrders = async (
     buyOrder: OrderExtended,
-    sellOrder: OrderExtended
+    sellOrder: OrderExtended,
+    instrumentIndex: number
   ) => {
     try {
       setIsLoading(true);
 
       const fullPrices = {
-        instrumentPrices: [
-          {
-            index: BTC_USD_INDEX,
-            price: prices[Btc.address],
-          },
-        ],
-        collateralPrices: [
-          {
-            collateral: Usdt.address,
-            price: prices[Usdt.address],
-          },
-          {
-            collateral: Btc.address,
-            price: prices[Btc.address],
-          },
-        ],
+        instrumentPrices: instrumentsPrices,
+        collateralPrices: collateralPrices,
       };
 
       const historyTimestamp = Math.trunc(Date.now() / 1000);
@@ -47,6 +36,12 @@ const useFillOrders = () => {
         buyOrder.order.amount < sellOrder.order.amount
           ? buyOrder.order.amount
           : sellOrder.order.amount;
+      const instrument = instrumentsPrices.find(
+        (i) => i.index == instrumentIndex
+      );
+      const instrumentPrice = instrument?.price;
+
+      if (!instrumentPrice) throw new Error("Instrument price not found");
 
       const tx = await writeContractAsync({
         abi: EveDEX.abi,
@@ -56,7 +51,7 @@ const useFillOrders = () => {
         args: [
           buyOrder,
           sellOrder,
-          prices[Btc.address],
+          instrumentPrice,
           fillAmount,
           fullPrices,
           historyTimestamp,

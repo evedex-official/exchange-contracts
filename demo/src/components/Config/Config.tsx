@@ -43,7 +43,7 @@ const Prices: React.FC<PricesProps> = ({ value, name, onChange }) => {
 
 const Config = () => {
   const { data: eveDexData } = useEveDex();
-  const { prices, onChange } = useConfig();
+  const { prices, instrumentsPrices, onChange } = useConfig();
   return (
     <div className="config">
       <div className="config-accounts">
@@ -52,7 +52,14 @@ const Config = () => {
         </Collapse>
       </div>
       <div className="config-prices">
-        <Collapse title="Prices">
+        <Collapse title="Instruments Prices">
+          <Prices
+            value={instrumentsPrices}
+            name="instrumentsPrices"
+            onChange={onChange}
+          />
+        </Collapse>
+        <Collapse title="Collateral Prices">
           <Prices value={prices} name="prices" onChange={onChange} />
         </Collapse>
       </div>

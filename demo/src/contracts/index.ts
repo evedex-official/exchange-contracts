@@ -1,4 +1,4 @@
-import { Address, AbiItem } from "viem";
+import { Address, AbiItem, erc20Abi } from "viem";
 
 // contract addresses initially deployed on clean node, replace if needed
 import OrderValidationLibJson from "../../../artifacts/contracts/lib/OrderValidationLib.sol/OrderValidationLib.json";
@@ -42,4 +42,9 @@ export const Usdt = {
 export const Btc = {
   address: "0x9A676e781A523b5d0C0e43731313A708CB607508" as Address,
   abi: BtcJson.abi as AbiItem[],
+};
+
+export const Eth = {
+  address: "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee" as Address,
+  abi: erc20Abi,
 };

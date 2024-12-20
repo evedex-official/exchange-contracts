@@ -15,9 +15,9 @@ import useInstruments, {
   useInstrumentsPrices,
 } from "../../hooks/useInstruments";
 import useCollaterals from "../../hooks/useCollaterals";
-import usePrices from "../../hooks/usePrices";
 import { Collateral } from "../../helpers/event-horizon-types";
-import { parsePrice } from "../../helpers";
+import { formatPrice, parsePrice } from "../../helpers";
+import { useField } from "formik";
 
 const validationSchema = yup.object({
   collateral: yup.string().required(),
@@ -43,6 +43,29 @@ const initialValues = {
   leverage: 10,
   amount: 0.01,
   price: 0,
+};
+
+const InstrumentPrice: React.FC<{ instrumentFieldName: string }> = ({
+  instrumentFieldName,
+}) => {
+  const { instruments } = useInstruments();
+  const instrumentsPrices = useInstrumentsPrices();
+  const [field] = useField(instrumentFieldName);
+  const instrumentPrice = field.value
+    ? instrumentsPrices.find((i) => i.index == field.value)?.price || 0n
+    : undefined;
+  const instrument = instruments.find((i) => i.index == field.value);
+
+  return (
+    <span>
+      Zero or empty price field is for market order. Market price:{" "}
+      {instrumentPrice
+        ? formatPrice(instrumentPrice, {
+            tokenDecimals: instrument?.token.decimals,
+          })
+        : "Select instrument first."}
+    </span>
+  );
 };
 
 const OrderForm: React.FC = () => {
@@ -213,6 +236,7 @@ const OrderForm: React.FC = () => {
         </Field>
         <Field label="Amount" name="amount" />
         <Field label="Price" name="price" />
+        <InstrumentPrice instrumentFieldName="instrument" />
         <Field label="Take profit, %" name="takeProfit" min={1} max={300} />
         <Field label="Stop loss, %" name="stopLoss" min={1} max={99} />
         <Field

@@ -36,6 +36,10 @@ type PricesConfig = {
   [address: Address]: number;
 };
 
+type InstrumentsPricesConfig = {
+  [ticker: string]: number;
+};
+
 type AccountsConfig = {
   [key: string]: {
     key: string;
@@ -47,6 +51,7 @@ export type ConfigType = {
   accounts: AccountsConfig;
   sessionWallets: PrivateKeyAccount[];
   prices: PricesConfig;
+  instrumentsPrices: InstrumentsPricesConfig;
   onChange: (name: string, value: any) => void;
 };
 
@@ -56,6 +61,10 @@ const ConfigContext = createContext<ConfigType>({
   prices: {
     [Btc.address]: 100_000,
     [Usdt.address]: 0.9,
+  },
+  instrumentsPrices: {
+    "BTC/USD": 100_000,
+    "ETH/USD": 4000,
   },
   onChange: (_name: string, _value: any) => {},
 });
@@ -95,16 +104,29 @@ const ConfigProvider: React.FC<ConfigProviderProps> = ({ children }) => {
     LC_STORAGE_KEY.PRICES
   );
 
+  const [instrumentsPrices, setInstrumentsPrices] = usePersistedState<{
+    [x: string]: number;
+  }>(
+    {
+      "BTC/USD": 100_000,
+      "ETH/USD": 4000,
+    },
+    LC_STORAGE_KEY.INSTRUMENT_PRICES
+  );
+
   const onChange = (name: string, value: any) => {
     if (name === "accounts") {
       setAcccounts(value);
     } else if (name === "prices") {
       setPrices(value);
+    } else if (name === "instrumentsPrices") {
+      setInstrumentsPrices(value);
     }
   };
   const value: ConfigType = {
     accounts,
     prices,
+    instrumentsPrices,
     sessionWallets,
     onChange,
   };

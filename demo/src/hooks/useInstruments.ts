@@ -1,14 +1,14 @@
 import { useReadContracts } from "wagmi";
 
-import { Btc, EveDEX } from "../contracts";
-import { convertCallsResult, getContractCalls } from "../helpers";
+import { Btc, Eth, EveDEX } from "../contracts";
+import { convertCallsResult, getContractCalls, parsePrice } from "../helpers";
 import {
   Instrument,
   InstrumentExtended,
   Token,
 } from "../helpers/event-horizon-types";
 import useEveDex from "./useEveDex";
-import usePrices from "./usePrices";
+import { useConfig } from "../providers/ConfigProvider";
 
 const contractConfig = {
   abi: EveDEX.abi,
@@ -16,14 +16,24 @@ const contractConfig = {
 };
 
 const instrumentsConfig: {
-  [x: string]: { token: Token };
+  [ticker: string]: { ticker: string; token: Token };
 } = {
   "BTC/USD": {
+    ticker: "BTC/USD",
     token: {
       address: Btc.address,
       symbol: "BTC",
       decimals: 18,
       name: "Bitcoin",
+    },
+  },
+  "ETH/USD": {
+    ticker: "ETH/USD",
+    token: {
+      address: Eth.address,
+      symbol: "ETH",
+      decimals: 18,
+      name: "Ethereum",
     },
   },
 };
@@ -76,11 +86,14 @@ export default useInstruments;
 
 export const useInstrumentsPrices = () => {
   const { instruments } = useInstruments();
-  const prices = usePrices();
+  const { instrumentsPrices } = useConfig();
+  console.log("instrumentsPrices", instrumentsPrices, instruments);
   return instruments
     .map((i) => ({
       index: i.index,
-      price: (prices[i.token.address] as bigint) || 0n,
+      price: parsePrice(instrumentsPrices[i.ticker] || 0, {
+        tokenDecimals: BigInt(i.token.decimals),
+      }),
     }))
     .sort((a, b) => a.index - b.index);
 };

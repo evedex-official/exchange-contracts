@@ -1,4 +1,4 @@
-import { useReadContracts } from "wagmi";
+import { useBlockNumber, useReadContracts } from "wagmi";
 
 import { convertCallsResult, getContractCalls } from "../helpers";
 import { Order } from "../helpers/event-horizon-types";
@@ -6,6 +6,7 @@ import { getOrderDigest } from "../helpers/contract-data-helpers";
 
 import { EveDEX } from "../contracts";
 import { CallConfig } from "../interfaces";
+import { useEffect } from "react";
 
 const useOrderInfo = (order: Order) => {
   const orderHash = getOrderDigest(order);
@@ -21,10 +22,16 @@ const useOrderInfo = (order: Order) => {
     address: EveDEX.address,
     abi: EveDEX.abi,
   });
-  const { data, isLoading } = useReadContracts({
+  const { data, isLoading, refetch } = useReadContracts({
     contracts: contractCalls,
   });
   const convertedData = convertCallsResult(calls, data);
+
+  const { data: blockNumber } = useBlockNumber({ watch: true });
+
+  useEffect(() => {
+    refetch();
+  }, [blockNumber]);
 
   return { data: convertedData, isLoading };
 };

@@ -25,14 +25,9 @@ type AccountProps = {
 const Account: React.FC<AccountProps> = ({ accountKey, account }) => {
   const { data: eveDex } = useEveDex();
   const { liquidate, isLiquidating } = useLiquidator();
-  const { instruments } = useInstruments();
   const { collaterals } = useCollaterals();
   const prices = usePrices();
 
-  const instrumentPrices = instruments.map((instrument) => ({
-    index: instrument.index,
-    price: prices[instrument.token.address],
-  }));
   const mappedCollaterals: { [x: Address]: any } = {};
   const collateralAddresses: Address[] = [];
   const collateralsPrices: any[] = [];

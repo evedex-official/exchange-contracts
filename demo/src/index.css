@@ -104,3 +104,14 @@
 .order--filled {
   text-decoration: line-through;
 }
+
+.order-remove {
+  margin-left: 5px;
+  padding: 5px;
+  color: #f00;
+  font-size: 18px;
+}
+
+.order-remove:hover {
+  cursor: pointer;
+}

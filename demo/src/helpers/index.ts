@@ -1,3 +1,4 @@
+import { formatUnits, parseUnits } from "viem";
 import { CallConfig, ContractConfig } from "../interfaces";
 
 export const getContractCalls = (
@@ -46,14 +47,14 @@ export const convertCallsResult = (
 };
 
 export const parsePrice = (
-  priceFloat: number,
-  { precisionDecimals = 8n, tokenDecimals = 0n } = {}
+  price: number,
+  { tokenDecimals = 0n } = {}
 ): bigint => {
-  const shift = Number(10n ** precisionDecimals);
-  const priceShifted = BigInt(Math.round(priceFloat * shift));
-  return tokenDecimals > precisionDecimals
-    ? priceShifted / 10n ** (tokenDecimals - precisionDecimals)
-    : priceShifted * 10n ** (precisionDecimals - tokenDecimals);
+  return parseUnits(price.toString(), Number(tokenDecimals));
+};
+
+export const formatPrice = (price: bigint, { tokenDecimals = 0 } = {}) => {
+  return formatUnits(price, tokenDecimals);
 };
 
 export const getRandom = (min: number, max: number) => {

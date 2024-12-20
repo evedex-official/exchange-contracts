@@ -18,7 +18,8 @@ type MatcherStateType = {
   addWithdrawRequest: (request: WithdrawalRequest, address: Address) => void;
   completeWithdrawRequest: () => void;
   cancelWithdrawRequest: () => void;
-  addOrder: (order: any) => void;
+  addOrder: (order: OrderExtended) => void;
+  removeOrder: (order: OrderExtended) => void;
   matchOrders: () => void;
 };
 
@@ -29,6 +30,7 @@ const MatcherStateContext = createContext<MatcherStateType>({
   completeWithdrawRequest: () => {},
   cancelWithdrawRequest: () => {},
   addOrder: () => {},
+  removeOrder: () => {},
   matchOrders: () => {},
 });
 
@@ -42,15 +44,29 @@ const MatcherStateProvider: React.FC<MatcherStateProviderProps> = ({
   const [orders, setOrders] = usePersistedState<any>({}, LC_STORAGE_KEY.ORDERS);
 
   const addOrder = (orderExtended: OrderExtended) => {
-    const { collateralIndex, order } = orderExtended;
+    const { order } = orderExtended;
     setOrders((prevState: any) => ({
       ...prevState,
       [order.instrumentIndex]: {
         ...(prevState[order.instrumentIndex] || {}),
         [order.side]: [
           ...((prevState[order.instrumentIndex] || {})[order.side] || []),
-          { collateralIndex, order },
+          orderExtended,
         ],
+      },
+    }));
+  };
+
+  const removeOrder = (orderExtended: OrderExtended) => {
+    const { order } = orderExtended;
+
+    setOrders((prevState: any) => ({
+      ...prevState,
+      [order.instrumentIndex]: {
+        ...(prevState[order.instrumentIndex] || {}),
+        [order.side]: (
+          (prevState[order.instrumentIndex] || {})[order.side] || []
+        ).filter((o: OrderExtended) => o.order.orderId !== order.orderId),
       },
     }));
   };
@@ -76,6 +92,7 @@ const MatcherStateProvider: React.FC<MatcherStateProviderProps> = ({
     cancelWithdrawRequest,
     orders: orders,
     addOrder,
+    removeOrder,
     matchOrders: () => {},
   };
   return (
