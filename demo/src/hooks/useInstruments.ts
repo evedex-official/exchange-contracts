@@ -23,7 +23,7 @@ const instrumentsConfig: {
     token: {
       address: Btc.address,
       symbol: "BTC",
-      decimals: 18,
+      decimals: 8,
       name: "Bitcoin",
     },
   },
@@ -32,7 +32,7 @@ const instrumentsConfig: {
     token: {
       address: Eth.address,
       symbol: "ETH",
-      decimals: 18,
+      decimals: 8,
       name: "Ethereum",
     },
   },
@@ -87,12 +87,11 @@ export default useInstruments;
 export const useInstrumentsPrices = () => {
   const { instruments } = useInstruments();
   const { instrumentsPrices } = useConfig();
-  console.log("instrumentsPrices", instrumentsPrices, instruments);
   return instruments
     .map((i) => ({
       index: i.index,
       price: parsePrice(instrumentsPrices[i.ticker] || 0, {
-        tokenDecimals: BigInt(i.token.decimals),
+        tokenDecimals: 8n, //BigInt(i.token.decimals),
       }),
     }))
     .sort((a, b) => a.index - b.index);

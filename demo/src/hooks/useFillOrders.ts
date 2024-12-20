@@ -43,7 +43,7 @@ const useFillOrders = () => {
 
       if (!instrumentPrice) throw new Error("Instrument price not found");
 
-      const tx = await writeContractAsync({
+      const args = {
         abi: EveDEX.abi,
         address: EveDEX.address,
         functionName: "fillOrders",
@@ -57,7 +57,11 @@ const useFillOrders = () => {
           historyTimestamp,
           historySearchHint,
         ],
-      });
+      };
+
+      console.log("args", args);
+
+      const tx = await writeContractAsync(args);
 
       setIsLoading(false);
 

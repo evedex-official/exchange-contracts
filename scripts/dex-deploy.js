@@ -88,7 +88,7 @@ async function main() {
 
 async function deployTokenMocks(wallets) {
   const usdtToken = await deployAndVerify('ERC20MockDecimals', ['USDT', 6n]);
-  const btcToken = await deployAndVerify('ERC20MockDecimals', ['BTC', 18n]);
+  const btcToken = await deployAndVerify('ERC20MockDecimals', ['BTC', 8n]);
 
   await Promise.all(wallets.map((user) => usdtToken.mint(user.address, maxUint112)));
   await Promise.all(wallets.map((wallet) => btcToken.mint(wallet.address, maxUint112)));

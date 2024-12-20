@@ -48,13 +48,21 @@ export const convertCallsResult = (
 
 export const parsePrice = (
   price: number,
-  { tokenDecimals = 0n } = {}
+  { precisionDecimals = 8n, tokenDecimals = 0n } = {}
 ): bigint => {
-  return parseUnits(price.toString(), Number(tokenDecimals));
+  const priceShifted = BigInt(
+    Math.round(price * Number(10n ** precisionDecimals))
+  );
+  return (priceShifted * 10n ** precisionDecimals) / 10n ** tokenDecimals;
 };
 
-export const formatPrice = (price: bigint, { tokenDecimals = 0 } = {}) => {
-  return formatUnits(price, tokenDecimals);
+export const formatPrice = (
+  price: bigint,
+  { precisionDecimals = 8n, tokenDecimals = 0n } = {}
+) => {
+  const priceShifted =
+    (price * 10n ** tokenDecimals) / 10n ** precisionDecimals;
+  return (priceShifted / 10n ** precisionDecimals).toString();
 };
 
 export const getRandom = (min: number, max: number) => {

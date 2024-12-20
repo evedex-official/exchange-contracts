@@ -63,8 +63,8 @@ const Order: React.FC<OrderProps> = ({
           {formatUnits(order.amount, instrument.token.decimals)}{" "}
           {instrument.token.symbol} x{order.leverage.toString()} / 1{" "}
           {instrument.token.symbol} {"="}{" "}
-          {formatPrice(order.price, {
-            tokenDecimals: instrument.token.decimals,
+          {formatPrice(BigInt(order.price), {
+            tokenDecimals: BigInt(instrument.token.decimals),
           })}{" "}
           <span>({filledPercent}% filled)</span>{" "}
           <span>
@@ -139,7 +139,7 @@ const InstrumentOrders: React.FC<InstrumentOrdersProps> = ({
       <h4>
         {instrument.ticker} (
         {formatPrice(instrumentPrice, {
-          tokenDecimals: instrument.token.decimals,
+          tokenDecimals: BigInt(instrument.token.decimals),
         })}
         )
       </h4>

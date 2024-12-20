@@ -19,7 +19,7 @@ const collateralsConfig = {
     address: Btc.address,
     symbol: "BTC",
     name: "Bitcoin",
-    decimals: 18,
+    decimals: 8,
   },
 };
 

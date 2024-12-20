@@ -59,9 +59,9 @@ const InstrumentPrice: React.FC<{ instrumentFieldName: string }> = ({
   return (
     <span>
       Zero or empty price field is for market order. Market price:{" "}
-      {instrumentPrice
+      {instrumentPrice && instrument
         ? formatPrice(instrumentPrice, {
-            tokenDecimals: instrument?.token.decimals,
+            tokenDecimals: BigInt(instrument.token.decimals),
           })
         : "Select instrument first."}
     </span>
