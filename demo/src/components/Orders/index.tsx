@@ -22,6 +22,7 @@ import Collapse from "../Collapse";
 import Button from "../Button";
 import useOrderInfo from "../../hooks/useOrderInfo";
 import classNames from "../../helpers/classnames";
+import { BaseField } from "../Form";
 
 type OrderProps = {
   order: OrderExtended;
@@ -98,6 +99,9 @@ const InstrumentOrders: React.FC<InstrumentOrdersProps> = ({
 }) => {
   const { removeOrder } = useMatcherState();
   const { fillOrders, isLoading } = useFillOrders();
+  const [historyTimestamp, setHistoryTimestamp] = React.useState<number>(
+    Math.trunc(Date.now() / 1000)
+  );
   const [checkedBuyOrderId, setCheckedBuyOrderId] = React.useState<number>();
   const [checkedSellOrderId, setCheckedSellOrderId] = React.useState<number>();
   const instrumentPrices = useInstrumentsPrices();
@@ -123,7 +127,12 @@ const InstrumentOrders: React.FC<InstrumentOrdersProps> = ({
 
       if (!buyOrder || !sellOrder) throw new Error("Orders not found");
 
-      const tx = await fillOrders(buyOrder, sellOrder, instrument.index);
+      const tx = await fillOrders(
+        buyOrder,
+        sellOrder,
+        instrument.index,
+        historyTimestamp
+      );
       toast.success(`Matched: ${tx}`);
     } catch (e) {
       toast.error((e as any).message);
@@ -134,15 +143,18 @@ const InstrumentOrders: React.FC<InstrumentOrdersProps> = ({
     removeOrder(order);
   };
 
+  const onChangeTimestamp = (e: any) => {
+    setHistoryTimestamp(e.target.value);
+  };
+
+  const price = formatPrice(instrumentPrice, {
+    tokenDecimals: BigInt(instrument.token.decimals),
+  });
+
+  const title = `${instrument.ticker} (${price})`;
+
   return (
-    <div>
-      <h4>
-        {instrument.ticker} (
-        {formatPrice(instrumentPrice, {
-          tokenDecimals: BigInt(instrument.token.decimals),
-        })}
-        )
-      </h4>
+    <Collapse title={title}>
       <h5>Buy</h5>
       {buyOrders.map((order) => (
         <Order
@@ -164,6 +176,16 @@ const InstrumentOrders: React.FC<InstrumentOrdersProps> = ({
         />
       ))}
 
+      <div>
+        <BaseField
+          label="History Timestamp"
+          name="historyTimestamp"
+          value={historyTimestamp}
+          onChange={onChangeTimestamp}
+          type="number"
+        />
+      </div>
+
       <Button
         disabled={!checkedBuyOrderId || !checkedSellOrderId}
         onClick={onFillOrders}
@@ -171,7 +193,7 @@ const InstrumentOrders: React.FC<InstrumentOrdersProps> = ({
       >
         Fill orders
       </Button>
-    </div>
+    </Collapse>
   );
 };
 
@@ -196,21 +218,24 @@ const AllOrders: React.FC = () => {
   const { instruments, isLoading: isLoadingInstruments } = useInstruments();
 
   return (
-    <Collapse title="Orders">
-      {instruments.map((instrument) => {
-        const instrumentOrders = orders[instrument.index] || {};
-        const buyOrders = instrumentOrders[BUY_SIDE] || [];
-        const sellOrders = instrumentOrders[SELL_SIDE] || [];
-        return (
-          <InstrumentOrders
-            key={instrument.index}
-            instrument={instrument}
-            buyOrders={buyOrders}
-            sellOrders={sellOrders}
-          />
-        );
-      })}
-    </Collapse>
+    <div>
+      <h3>Orders</h3>
+      <div>
+        {instruments.map((instrument) => {
+          const instrumentOrders = orders[instrument.index] || {};
+          const buyOrders = instrumentOrders[BUY_SIDE] || [];
+          const sellOrders = instrumentOrders[SELL_SIDE] || [];
+          return (
+            <InstrumentOrders
+              key={instrument.index}
+              instrument={instrument}
+              buyOrders={buyOrders}
+              sellOrders={sellOrders}
+            />
+          );
+        })}
+      </div>
+    </div>
   );
 };
 

@@ -19,7 +19,8 @@ const useFillOrders = () => {
   const fillOrders = async (
     buyOrder: OrderExtended,
     sellOrder: OrderExtended,
-    instrumentIndex: number
+    instrumentIndex: number,
+    historyTimestamp: number
   ) => {
     try {
       setIsLoading(true);
@@ -58,8 +59,6 @@ const useFillOrders = () => {
           historySearchHint,
         ],
       };
-
-      console.log("args", args);
 
       const tx = await writeContractAsync(args);
 
