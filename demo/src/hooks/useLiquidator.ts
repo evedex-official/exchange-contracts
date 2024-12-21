@@ -35,7 +35,6 @@ const useLiquidator = () => {
     const liquidationPrices = currentInstrumentPrices.filter((price) =>
       activeInstrumentsIndexes.includes(BigInt(price.index))
     );
-    debugger;
     const multiLiquidationOrder = createMultiLiquidationOrder({
       accountToLiquidate,
       liquidator: liquidator.wallet.address,
