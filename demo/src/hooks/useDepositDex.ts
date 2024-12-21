@@ -1,12 +1,12 @@
 import { useBlockNumber, useReadContracts } from "wagmi";
 import { Address } from "viem";
+import { useEffect } from "react";
 
 import { convertCallsResult, getContractCalls } from "../helpers";
 import { Btc, DepositDEX, Usdt } from "../contracts";
 import { CallConfig } from "../interfaces";
 
 import { Collateral } from "../helpers/event-horizon-types";
-import { useEffect } from "react";
 
 const collateralsConfig = {
   [Usdt.address]: {

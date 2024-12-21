@@ -63,7 +63,11 @@ const Account: React.FC<AccountProps> = ({ accountKey, account }) => {
       const collateral = collaterals.find(
         (c: Collateral) => c.symbol === "USDT"
       );
-      const tx = await liquidate(account.address, collateral);
+      const tx = await liquidate(
+        account.address,
+        eveDexAccount.activeInstrumentsIndexes,
+        collateral
+      );
       toast.success(`Liquidated: ${tx}`);
     } catch (e) {
       toast.error((e as any).message);

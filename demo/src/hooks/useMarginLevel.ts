@@ -16,6 +16,7 @@ const useMarginLevel = (
     Math.floor(Date.now() / 1000), // Historical timestamp
     0n, // History search hint (optimization for gas)
   ];
+
   const { data, isLoading } = useReadContract({
     functionName: "calculateMarginLevel",
     address: EveDEX.address as Address,
@@ -33,8 +34,8 @@ const useMarginLevel = (
       marginLevel: bigint;
       equity: bigint;
       margin: bigint;
-      pnls: any;
-      frs: any;
+      pnls: bigint[];
+      frs: bigint[];
     };
     isLoading: boolean;
   };

@@ -50,7 +50,22 @@ const useEveDexAccount = (address: Address) => {
     refetch();
   }, [blockNumber]);
 
-  const accountData = convertCallsResult(calls, data);
+  const accountData = convertCallsResult(calls, data) as {
+    settledOrders: bigint;
+    activeInstrumentsIndexes: bigint[];
+    activeInstrumentsPositions: [
+      bigint[],
+      {
+        position: bigint;
+        frAccumulated: bigint;
+        positionLastUpdate: bigint;
+        positionAvgPrice: bigint;
+        positionLongFRStored: bigint;
+        positionShortFRStored: bigint;
+        leverage: bigint;
+      }[]
+    ];
+  };
 
   return {
     data: { ...accountData, ...marginData },

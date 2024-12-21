@@ -63,25 +63,23 @@ const DepositForm: React.FC = () => {
   const accs = [alice, bob, liquidator];
   const onSubmit = async (values: any) => {
     const token = collaterals.find(
-      (c: Collateral) => (c.address = values.token)
+      (c: Collateral) => c.address == values.token
     );
     const activeAccount = accs.find((w) => w.key === values.account);
 
     try {
+      const amountWei = parseUnits(values.amount.toString(), token.decimals);
       const args = {
         abi: DepositDEX.abi,
         address: DepositDEX.address as Address,
         functionName: "depositCollateral",
-        args: [
-          values.token,
-          parseUnits(values.amount.toString(), token.decimals),
-        ],
+        args: [values.token, amountWei],
         account: activeAccount?.wallet,
       };
 
       const tx = await writeContractAsync(args);
 
-      toast.success(`Deposited.`);
+      toast.success(`Deposited. ${tx}`);
     } catch (e) {
       console.error(e);
       toast.error(`Error: ${(e as any).message}`);

@@ -5,12 +5,8 @@ import { domain, multiOrderLiquidationTypes } from "../helpers/eip721-types";
 import usePrices from "./usePrices";
 import useCollaterals from "./useCollaterals";
 import { createMultiLiquidationOrder } from "../helpers/contract-data-helpers";
-import {
-  Collateral,
-  Order,
-  OrderExtended,
-} from "../helpers/event-horizon-types";
-import useInstruments, { useInstrumentsPrices } from "./useInstruments";
+import { Collateral } from "../helpers/event-horizon-types";
+import { useInstrumentsPrices } from "./useInstruments";
 import { Address } from "viem";
 import { useState } from "react";
 
@@ -33,13 +29,18 @@ const useLiquidator = () => {
 
   const signMultiLiquidationOrder = async (
     accountToLiquidate: Address,
+    activeInstrumentsIndexes: bigint[],
     collateral: Collateral
   ) => {
+    const liquidationPrices = currentInstrumentPrices.filter((price) =>
+      activeInstrumentsIndexes.includes(BigInt(price.index))
+    );
+    debugger;
     const multiLiquidationOrder = createMultiLiquidationOrder({
       accountToLiquidate,
       liquidator: liquidator.wallet.address,
       collateral: collateral.address,
-      liquidationPrices: currentInstrumentPrices,
+      liquidationPrices,
       prices: currentInstrumentPrices,
       leverage: 1n,
     });
@@ -59,12 +60,14 @@ const useLiquidator = () => {
 
   const liquidate = async (
     accountToLiquidate: Address,
+    activeInstrumentsIndexes: bigint[],
     collateral: Collateral
   ) => {
     try {
       setIsLiquidating(true);
       const signedMultiliquidationOrder = await signMultiLiquidationOrder(
         accountToLiquidate,
+        activeInstrumentsIndexes,
         collateral
       );
 
