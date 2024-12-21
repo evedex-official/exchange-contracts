@@ -61,9 +61,16 @@ export type Token = {
   name: string;
 };
 
+export type InstrumentFR = {
+  longFRStored: bigint;
+  shortFRStored: bigint;
+  lastFRUpdateTime: number;
+};
+
 export type InstrumentExtended = Instrument & {
   index: number;
   token: Token;
+  fr: InstrumentFR[];
 };
 
 export type Collateral = Token & {

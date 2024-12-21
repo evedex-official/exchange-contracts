@@ -1,14 +1,16 @@
-import { useReadContracts } from "wagmi";
+import { useBlockNumber, useReadContracts } from "wagmi";
 
 import { Btc, Eth, EveDEX } from "../contracts";
 import { convertCallsResult, getContractCalls, parsePrice } from "../helpers";
 import {
   Instrument,
   InstrumentExtended,
+  InstrumentFR,
   Token,
 } from "../helpers/event-horizon-types";
 import useEveDex from "./useEveDex";
 import { useConfig } from "../providers/ConfigProvider";
+import { useEffect } from "react";
 
 const contractConfig = {
   abi: EveDEX.abi,
@@ -51,30 +53,46 @@ const useInstruments = () => {
       functionName: "getInstrumentData",
       args: [i],
     });
+
+    calls.push({
+      key: `fr-${i.toString()}`,
+      functionName: "getFundingRateData",
+      args: [i, 0n, 100000000n],
+    });
   }
 
   const contractCalls = getContractCalls(calls, contractConfig);
 
-  const { data, isLoading } = useReadContracts({
+  const { data, isLoading, refetch } = useReadContracts({
     contracts: contractCalls,
     query: {
       enabled: instrumentsLength > 0,
     },
   });
 
-  const instruments = convertCallsResult(calls, data) as {
-    [x: number]: Instrument;
+  const { data: blockNumber } = useBlockNumber({ watch: true });
+
+  useEffect(() => {
+    refetch();
+  }, [blockNumber]);
+
+  const convertedCalls = convertCallsResult(calls, data) as {
+    [x: string]: Instrument | InstrumentFR[];
   };
 
   const instrumentsExtended: InstrumentExtended[] = [];
 
-  Object.entries(instruments).forEach(([key, value]) => {
-    instrumentsExtended.push({
-      index: parseInt(key),
-      ...value,
-      ...instrumentsConfig[value.ticker],
+  Object.keys(convertedCalls)
+    .filter((k) => !k.includes("fr-"))
+    .forEach((key) => {
+      const value = convertedCalls[key] as Instrument;
+      instrumentsExtended.push({
+        index: parseInt(key),
+        ...value,
+        ...instrumentsConfig[value.ticker],
+        fr: (convertedCalls[`fr-${key}`] || []) as InstrumentFR[],
+      });
     });
-  });
 
   return {
     instruments: instrumentsExtended,

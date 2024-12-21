@@ -99,11 +99,12 @@ const Account: React.FC<AccountProps> = ({ accountKey, account }) => {
 };
 
 const Accounts = () => {
-  const { alice, bob, liquidator } = useAccounts();
+  const { owner, alice, bob, liquidator } = useAccounts();
   const accs = [alice, bob, liquidator];
   return (
     <div>
       <h2>Accounts</h2>
+      <div>Owner: {owner.wallet.address}</div>
       <div className="accounts-list">
         {accs.map((acc, index) => (
           <React.Fragment key={acc.key}>

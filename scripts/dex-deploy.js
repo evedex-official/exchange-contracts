@@ -34,8 +34,10 @@ async function main() {
   await deposit.initialize(await dex.getAddress(), await vault.getAddress());
   console.log('DepositDEX is initialized');
 
-  await dex.grantRole(ethers.ZeroHash, config.defaultAdmin);
-  console.log(`EVEDEX: default admin added: ${config.defaultAdmin}`);
+  await dex.grantRole(ethers.ZeroHash, deployer.address);
+  console.log(`EVEDEX: admin added: ${deployer.address}`);
+  // await dex.grantRole(ethers.ZeroHash, config.defaultAdmin);
+  // console.log(`EVEDEX: default admin added: ${config.defaultAdmin}`);
   const matcherRole = await dex.MATCHER_ROLE();
   // await dex.grantRole(matcherRole, config.defaultMatcher);
   // console.log(`EVEDEX: default matcher added: ${config.defaultMatcher}`);

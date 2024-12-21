@@ -1,6 +1,5 @@
 import React from "react";
 import { useConfig } from "../../providers/ConfigProvider";
-import Accounts from "../Accounts";
 import { BaseField } from "../Form";
 import Collapse from "../Collapse";
 import useEveDex from "../../hooks/useEveDex";

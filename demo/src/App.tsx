@@ -7,6 +7,7 @@ import OrderForm from "./forms/OrderForm";
 import Tabs from "./components/Tabs";
 import Config from "./components/Config";
 import Accounts from "./components/Accounts";
+import Instruments from "./components/Instruments";
 
 const Wallet = () => {
   return (
@@ -54,6 +55,11 @@ function App() {
       tabKey: "matcher",
       title: "Matcher",
       component: Matcher,
+    },
+    {
+      tabKey: "instruments",
+      title: "Instruments",
+      component: Instruments,
     },
   ];
   return (
