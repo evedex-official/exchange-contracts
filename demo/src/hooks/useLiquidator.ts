@@ -60,14 +60,15 @@ const useLiquidator = () => {
   const liquidate = async (
     accountToLiquidate: Address,
     activeInstrumentsIndexes: bigint[],
-    collateral: Collateral
+    liquidatorCollater: Collateral,
+    indicesToLiquidate: bigint[]
   ) => {
     try {
       setIsLiquidating(true);
       const signedMultiliquidationOrder = await signMultiLiquidationOrder(
         accountToLiquidate,
         activeInstrumentsIndexes,
-        collateral
+        liquidatorCollater
       );
 
       const tx = await writeContractAsync({
@@ -80,7 +81,10 @@ const useLiquidator = () => {
             collateralPrices: currentCollateralPrices,
             instrumentPrices: currentInstrumentPrices,
           },
-          collateral.index,
+          {
+            liquidatorIndex: liquidatorCollater.index,
+            indicesToLiquidate,
+          },
           Math.trunc(Date.now() / 1000), // history timestamp
           0n, // history search hint
         ],
