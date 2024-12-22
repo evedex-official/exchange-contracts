@@ -35,6 +35,11 @@ struct OrderExtended {
   Order order;
 }
 
+struct LiquidationCollaterals {
+  uint256 liquidatorIndex;
+  uint256[] indicesToLiquidate;
+}
+
 interface IEVEDEX {
   event PositionUpdate(
     uint256 indexed index,
@@ -125,7 +130,7 @@ interface IEVEDEX {
   function liquidatePositions(
     MultiOrderLiquidation memory liquidationOrder,
     FullPrices calldata fullPrices,
-    uint256 collateralIndex,
+    LiquidationCollaterals calldata collateralIndices,
     uint256 historyTimestamp,
     uint256 historySearchHint
   ) external;
@@ -133,7 +138,7 @@ interface IEVEDEX {
   function liquidatePosition(
     OrderLiquidation memory liquidationOrder,
     FullPrices calldata fullPrices,
-    uint256 collateralIndex,
+    LiquidationCollaterals calldata collateralIndices,
     uint256 historyTimestamp,
     uint256 historySearchHint
   ) external;

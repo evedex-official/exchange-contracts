@@ -213,7 +213,6 @@ contract EVEDEX is BaseDEX, IEVEDEX {
   function _calculateLiquidationFee(PositionInfo memory position) internal view returns (uint112) {
     uint112 absPosition = position.position < 0 ? uint112(-position.position) : uint112(position.position);
     // TODO make fixed with constant precision
-    // uint112 margin = (absPosition * position.positionAvgPrice) / _UINT_PRECISION / _getInstrumentLeverage(index);
     uint112 margin = (absPosition * position.positionAvgPrice) / _UINT_PRECISION / position.leverage;
     uint112 liquidationFee = (margin * uint112(liquidationFeePercent)) / _UINT_PRECISION;
 
@@ -226,7 +225,7 @@ contract EVEDEX is BaseDEX, IEVEDEX {
   function liquidatePositions(
     MultiOrderLiquidation memory liquidationOrder,
     FullPrices calldata fullPrices,
-    uint256 collateralIndex,
+    LiquidationCollaterals calldata collateralIndices,
     uint256 historyTimestamp,
     uint256 historySearchHint
   ) external onlyRole(MATCHER_ROLE) {
@@ -254,8 +253,8 @@ contract EVEDEX is BaseDEX, IEVEDEX {
         liquidationOrder.liquidator,
         int112(liquidationPrice),
         fullPrices,
+        collateralIndices,
         liquidationOrder.leverage,
-        collateralIndex,
         historyTimestamp,
         historySearchHint
       );
@@ -268,8 +267,8 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     address liquidator,
     int112 liquidationPrice,
     FullPrices calldata fullPrices,
+    LiquidationCollaterals calldata collateralIndices,
     uint16 liquidatorLeverage,
-    uint256 collateralIndex,
     uint256 historyTimestamp,
     uint256 historySearchHint
   ) internal returns (int112 pnl, int112 fr, uint112 liquidationFee) {
@@ -281,32 +280,15 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     fr =
       (getAccountFR(accountToLiquidate, index, historyTimestamp, historySearchHint) * liquidationPrice) /
       _INT_PRECISION;
+    liquidationFee = _calculateLiquidationFee(accountToLiquidatePosition);
 
-    address collateral = fullPrices.collateralPrices[collateralIndex].collateral;
-    int112 collateralPrice = int112(fullPrices.collateralPrices[collateralIndex].price);
-    int112 balance = _getBalance(accountToLiquidate, collateral);
-    balance += ((pnl + fr) * _INT_PRECISION) / collateralPrice;
-    liquidationFee =
-      (_calculateLiquidationFee(accountToLiquidatePosition) * _UINT_PRECISION) /
-      uint112(collateralPrice);
-
-    balance -= int112(liquidationFee);
-    int112 balanceOfLiquidator = _getBalance(liquidator, collateral);
-
-    // If it's the last instrument that user have liquidator pays for user's negative balance
-    if (_activeInstruments[accountToLiquidate].length() == 1 && balance < 0) {
-      _setBalance(accountToLiquidate, collateral, 0);
-      _setBalance(liquidator, collateral, balanceOfLiquidator + balance + int112(liquidationFee));
-    } else {
-      _setBalance(accountToLiquidate, collateral, balance);
-      _setBalance(liquidator, collateral, balanceOfLiquidator + int112(liquidationFee));
-    }
+    _adjustBalances(accountToLiquidate, liquidator, fullPrices, collateralIndices, pnl + fr, int112(liquidationFee));
 
     _changePosition(
       index,
       liquidator,
       liquidatorPosition,
-      collateralIndex,
+      collateralIndices.liquidatorIndex,
       accountToLiquidatePosition.position,
       liquidationPrice,
       int112(100),
@@ -323,17 +305,59 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     emit PositionLiquidated(
       accountToLiquidate,
       index,
-      uint112(liquidationFee),
-      _getBalance(accountToLiquidate, collateral),
+      liquidationFee,
+      IDepositDEX(depositDex).getTotalBalance(accountToLiquidate, fullPrices.collateralPrices),
       pnl,
       fr
     );
   }
 
+  function _adjustBalances(
+    address accountToLiquidate,
+    address liquidator,
+    FullPrices calldata fullPrices,
+    LiquidationCollaterals calldata collateralIndices,
+    int112 sumPnlFr,
+    int112 liquidationFee
+  ) internal {
+    uint256 len = collateralIndices.indicesToLiquidate.length;
+    uint256 last = len - 1;
+    for (uint256 i; i < len && sumPnlFr < 0; i++) {
+      uint256 index = collateralIndices.indicesToLiquidate[i];
+      address collateral = fullPrices.collateralPrices[index].collateral;
+      int112 collateralPrice = int112(fullPrices.collateralPrices[index].price);
+      int112 balance = _getBalance(accountToLiquidate, collateral);
+      int112 balanceOfLiquidator = _getBalance(liquidator, collateral);
+      if (balance > 0) {
+        int112 newBalance = balance + ((sumPnlFr - liquidationFee) * _INT_PRECISION) / collateralPrice;
+        if (newBalance > 0) {
+          _setBalance(accountToLiquidate, collateral, newBalance);
+          _setBalance(
+            liquidator,
+            collateral,
+            balanceOfLiquidator + (liquidationFee * _INT_PRECISION) / collateralPrice
+          );
+          sumPnlFr = 0;
+        } else {
+          _setBalance(accountToLiquidate, collateral, 0);
+          _setBalance(liquidator, collateral, balanceOfLiquidator + balance);
+          sumPnlFr = sumPnlFr + (balance * collateralPrice) / _INT_PRECISION;
+        }
+      } else if (i == last) {
+        _setBalance(accountToLiquidate, collateral, 0);
+        _setBalance(
+          liquidator,
+          collateral,
+          balanceOfLiquidator + balance + (sumPnlFr * _INT_PRECISION) / collateralPrice
+        );
+      }
+    }
+  }
+
   function liquidatePosition(
     OrderLiquidation memory liquidationOrder,
     FullPrices calldata fullPrices,
-    uint256 collateralIndex,
+    LiquidationCollaterals calldata collateralIndices,
     uint256 historyTimestamp,
     uint256 historySearchHint
   ) external onlyRole(MATCHER_ROLE) {
@@ -357,8 +381,8 @@ contract EVEDEX is BaseDEX, IEVEDEX {
       liquidationOrder.liquidator,
       int112(uint112(liquidationOrder.prices[0].price)),
       fullPrices,
+      collateralIndices,
       liquidationOrder.leverage,
-      collateralIndex,
       historyTimestamp,
       historySearchHint
     );
