@@ -14,6 +14,8 @@ import Collapse from "../../components/Collapse";
 import SessionField from "../../components/SessionFIeld/SessionField";
 import { useMatcherState } from "../../providers/MatcherProvider";
 import { useConfig } from "../../providers/ConfigProvider";
+import useCollaterals from "../../hooks/useCollaterals";
+import { Collateral } from "../../helpers/event-horizon-types";
 
 const validationSchema = yup.object({
   account: yup.string().required(),
@@ -29,26 +31,21 @@ const initialValues = {
   amount: 10,
 };
 
-const tokens = {
-  [Usdt.address]: {
-    decimals: 6,
-  },
-  [Btc.address]: {
-    decimals: 18,
-  },
-};
-
 const WithdrawForm: React.FC = () => {
   const { addWithdrawRequest } = useMatcherState();
   const { withdrawRequest } = useWithdraw();
+  const { collaterals } = useCollaterals();
   const { alice, bob } = useAccounts();
   const { sessionWallets } = useConfig();
   const onSubmit = async (values: any) => {
-    const token = tokens[values.token];
+    const token = collaterals.find(
+      (c: Collateral) => c.address === values.token
+    );
     const activeAccount = [alice, bob].find((w) => w.key === values.account);
 
     try {
-      if (!activeAccount) return;
+      if (!activeAccount) throw new Error("Account not found");
+      if (!token) throw new Error("Collateral not found");
 
       const userSession = values.session;
       const userSessionAccount = values.session
