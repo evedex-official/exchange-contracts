@@ -552,7 +552,7 @@ describe('EVEDEX contract', function () {
       0, // historySearchHint
     );
 
-    const liquidationPrice = 301000000000;
+    const liquidationPrice = 302000000000;
 
     const liquidationPrices = [
       {
@@ -560,6 +560,11 @@ describe('EVEDEX contract', function () {
         price: liquidationPrice,
       },
     ];
+    const collateralIndices = {
+      liquidatorIndex: 0,
+      indicesToLiquidate: [0],
+    };
+
     const multiLiquidationOrder = {
       accountToLiquidate: bob.address,
       liquidator: liquidator.address,
@@ -578,12 +583,163 @@ describe('EVEDEX contract', function () {
     );
     const liquidationOrder = { ...multiLiquidationOrder, signature: liquidatorSignature };
 
+    const bal0Before = await depositDex.getBalance(bob.address, tokenAddress);
+    console.log(`Bob's collaterals before liquidation: ${bal0Before}`);
+
     await eveDex.connect(matcher).liquidatePositions(
       liquidationOrder,
       { collateralPrices, instrumentPrices }, // fullPrices
-      0, // collateralIndex
+      collateralIndices, // collateralIndices
       time.latest(), // historyTimestamp
       0, // historySearchHint
     );
+    console.log('Liquidating Bob with single collateral');
+
+    const bal0After = await depositDex.getBalance(bob.address, tokenAddress);
+    console.log(`Bob's collaterals after liquidation: ${bal0After}`);
+  });
+
+  it('should liquidate multiple collaterals', async function () {
+    const MockToken = await ethers.getContractFactory('ERC20Mock');
+    const token2 = await MockToken.deploy();
+    const token2Address = await token2.getAddress();
+    await depositDex.setCollateralConfigs([token2Address], [true]);
+
+    const amount = await ethers.parseEther('100');
+    const halfAmount = await ethers.parseEther('50');
+    await token.mint(alice.address, amount);
+    await token.mint(bob.address, halfAmount);
+    await token2.mint(bob.address, halfAmount);
+
+    await token.connect(alice).approve(await depositDex.getAddress(), amount);
+    await token.connect(bob).approve(await depositDex.getAddress(), halfAmount);
+    await token2.connect(bob).approve(await depositDex.getAddress(), halfAmount);
+    await depositDex.connect(alice).depositCollateral(tokenAddress, amount);
+    await depositDex.connect(bob).depositCollateral(tokenAddress, halfAmount);
+    await depositDex.connect(bob).depositCollateral(token2Address, halfAmount);
+
+    await token.mint(liquidator.address, ethers.parseEther('100000'));
+    await token.connect(liquidator).approve(await depositDex.getAddress(), ethers.parseEther('100000'));
+    await depositDex.connect(liquidator).depositCollateral(tokenAddress, ethers.parseEther('10000'));
+
+    const creationTime = Math.floor(Date.now() / 1000);
+    const expiration = Math.floor(Date.now() / 1000) + 3600;
+    const orderAmount = await ethers.parseEther('3.75'); // 3.75 * 3000 (price) / 100 (leverage) * 0.8 (soLevel) = 90
+    const orderPrice = 300000000000;
+
+    const aliceOrder = {
+      orderId: 42,
+      senderAddress: alice.address,
+      matcherAddress: matcher.address,
+      collateral: tokenAddress,
+      instrumentIndex: 0,
+      amount: orderAmount,
+      price: orderPrice,
+      leverage: 100,
+      matcherFee: 0,
+      creationTime: creationTime,
+      side: 1,
+      userSession: ethers.ZeroAddress,
+      merkleRoot: ethers.ZeroHash,
+      merkleProof: [],
+    };
+    const bobOrder = {
+      orderId: 142,
+      senderAddress: bob.address,
+      matcherAddress: matcher.address,
+      collateral: tokenAddress,
+      instrumentIndex: 0,
+      amount: orderAmount,
+      price: orderPrice,
+      leverage: 100,
+      matcherFee: 0,
+      creationTime: creationTime,
+      side: 0,
+      userSession: ethers.ZeroAddress,
+      merkleRoot: ethers.ZeroHash,
+      merkleProof: [],
+    };
+    const domainBase = await domain(await eveDex.getAddress());
+    const aliceSignature = await alice.signTypedData(domainBase, orderTypes, aliceOrder);
+    const bobSignature = await bob.signTypedData(domainBase, orderTypes, bobOrder);
+    const buyOrder = { ...aliceOrder, signature: aliceSignature };
+    const sellOrder = { ...bobOrder, signature: bobSignature };
+    const buyOrderExt = { collateralIndex: 0, order: buyOrder };
+    const sellOrderExt = { collateralIndex: 0, order: sellOrder };
+
+    const instrumentPrices = [
+      {
+        index: 0,
+        price: orderPrice,
+      },
+    ];
+    const collateralPrices = [
+      {
+        collateral: tokenAddress,
+        price: 100000000,
+      },
+      {
+        collateral: token2Address,
+        price: 100000000,
+      },
+    ];
+
+    await eveDex.connect(matcher).fillOrders(
+      buyOrderExt,
+      sellOrderExt,
+      orderPrice,
+      orderAmount,
+      { collateralPrices, instrumentPrices }, // fullPrices
+      time.latest(), // historyTimestamp
+      0, // historySearchHint
+    );
+
+    const liquidationPrice = 302000000000;
+
+    const liquidationPrices = [
+      {
+        index: 0,
+        price: liquidationPrice,
+      },
+    ];
+    const collateralIndices = {
+      liquidatorIndex: 0,
+      indicesToLiquidate: [0, 1],
+    };
+
+    const multiLiquidationOrder = {
+      accountToLiquidate: bob.address,
+      liquidator: liquidator.address,
+      collateral: tokenAddress,
+      liquidationPrices: liquidationPrices,
+      prices: liquidationPrices,
+      leverage: 100,
+      liquidationTimestamp: Math.floor(Date.now() / 1000),
+      expiration: expiration,
+    };
+
+    const liquidatorSignature = await liquidator.signTypedData(
+      domainBase,
+      multiOrderLiquidationTypes,
+      multiLiquidationOrder,
+    );
+    const liquidationOrder = { ...multiLiquidationOrder, signature: liquidatorSignature };
+
+    const bal0Before = await depositDex.getBalance(bob.address, tokenAddress);
+    const bal1Before = await depositDex.getBalance(bob.address, token2Address);
+    console.log(`Bob's collaterals before liquidation: (${bal0Before}, ${bal1Before})`);
+
+    await eveDex.connect(matcher).liquidatePositions(
+      liquidationOrder,
+      { collateralPrices, instrumentPrices }, // fullPrices
+      collateralIndices, // collateralIndices
+      time.latest(), // historyTimestamp
+      0, // historySearchHint
+    );
+    console.log('Liquidating Bob with 2 collaterals');
+
+    const bal0After = await depositDex.getBalance(bob.address, tokenAddress);
+    const bal1After = await depositDex.getBalance(bob.address, token2Address);
+    console.log(`Bob's collaterals after liquidation: (${bal0After}, ${bal1After})`);
   });
 });
