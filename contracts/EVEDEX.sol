@@ -344,12 +344,11 @@ contract EVEDEX is BaseDEX, IEVEDEX {
           sumPnlFr = sumPnlFr + (balance * collateralPrice) / _INT_PRECISION;
         }
       } else if (i == last) {
-        int112 newBalance = balance + (sumPnlFr * _INT_PRECISION) / collateralPrice;
         _setBalance(accountToLiquidate, collateral, 0);
         _setBalance(
           liquidator,
           collateral,
-          balanceOfLiquidator + newBalance + (sumPnlFr * _INT_PRECISION) / collateralPrice
+          balanceOfLiquidator + balance + (sumPnlFr * _INT_PRECISION) / collateralPrice
         );
       }
     }
