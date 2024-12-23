@@ -1,10 +1,11 @@
-import { useReadContracts } from "wagmi";
+import { useBlockNumber, useReadContracts } from "wagmi";
 
 import { CallConfig } from "../interfaces";
 
 import { convertCallsResult, getContractCalls } from "../helpers";
 import { EveDEX } from "../contracts";
 import { zeroAddress } from "viem";
+import { useEffect } from "react";
 
 const useEveDex = () => {
   const calls: CallConfig[] = [
@@ -60,9 +61,15 @@ const useEveDex = () => {
     address: EveDEX.address,
     abi: EveDEX.abi,
   });
-  const { data, isLoading } = useReadContracts({
+  const { data, isLoading, refetch } = useReadContracts({
     contracts: contractCalls,
   });
+
+  const { data: blockNumber } = useBlockNumber({ watch: true });
+
+  useEffect(() => {
+    refetch();
+  }, [blockNumber]);
 
   const eveDexData = convertCallsResult(calls, data);
 

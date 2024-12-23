@@ -3,6 +3,7 @@ import { useConfig } from "../../providers/ConfigProvider";
 import { BaseField } from "../Form";
 import Collapse from "../Collapse";
 import useEveDex from "../../hooks/useEveDex";
+import BasicParamsForm from "../../forms/BasicParamsForm";
 
 type PricesProps = {
   value: {
@@ -46,6 +47,9 @@ const Config = () => {
   return (
     <div className="config">
       <div className="config-accounts">
+        <Collapse title="Basic Params">
+          <BasicParamsForm />
+        </Collapse>
         <Collapse title="EveDex">
           <pre>{JSON.stringify(eveDexData, null, 2)}</pre>
         </Collapse>
