@@ -321,36 +321,38 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     int112 liquidationFee
   ) internal {
     uint256 len = collateralIndices.indicesToLiquidate.length;
-    uint256 last = len - 1;
+    address collateral;
+    int112 collateralPrice;
+    int112 balance;
+    int112 balanceOfLiquidator;
     for (uint256 i; i < len && sumPnlFr < 0; i++) {
       uint256 index = collateralIndices.indicesToLiquidate[i];
-      address collateral = fullPrices.collateralPrices[index].collateral;
-      int112 collateralPrice = int112(fullPrices.collateralPrices[index].price);
-      int112 balance = _getBalance(accountToLiquidate, collateral);
-      int112 balanceOfLiquidator = _getBalance(liquidator, collateral);
-      if (balance > 0) {
-        int112 newBalance = balance + ((sumPnlFr - liquidationFee) * _INT_PRECISION) / collateralPrice;
-        if (newBalance > 0) {
-          _setBalance(accountToLiquidate, collateral, newBalance);
-          _setBalance(
-            liquidator,
-            collateral,
-            balanceOfLiquidator + (liquidationFee * _INT_PRECISION) / collateralPrice
-          );
-          sumPnlFr = 0;
-        } else {
-          _setBalance(accountToLiquidate, collateral, 0);
-          _setBalance(liquidator, collateral, balanceOfLiquidator + balance);
-          sumPnlFr = sumPnlFr + (balance * collateralPrice) / _INT_PRECISION;
-        }
-      } else if (i == last) {
-        _setBalance(accountToLiquidate, collateral, 0);
+      collateral = fullPrices.collateralPrices[index].collateral;
+      collateralPrice = int112(fullPrices.collateralPrices[index].price);
+      balance = _getBalance(accountToLiquidate, collateral);
+      balanceOfLiquidator = _getBalance(liquidator, collateral);
+  
+      int112 newBalance = balance + ((sumPnlFr - liquidationFee) * _INT_PRECISION) / collateralPrice;
+      if (newBalance > 0) {
+        _setBalance(accountToLiquidate, collateral, newBalance);
         _setBalance(
           liquidator,
           collateral,
-          balanceOfLiquidator + balance + (sumPnlFr * _INT_PRECISION) / collateralPrice
+          balanceOfLiquidator + (liquidationFee * _INT_PRECISION) / collateralPrice
         );
+        sumPnlFr = 0;
+      } else {
+        _setBalance(accountToLiquidate, collateral, 0);
+        sumPnlFr = sumPnlFr + (balance * collateralPrice) / _INT_PRECISION;
       }
+    }
+
+    if (sumPnlFr < 0) {
+      _setBalance(
+        liquidator,
+        collateral,
+        balanceOfLiquidator + balance + (sumPnlFr * _INT_PRECISION) / collateralPrice
+      );
     }
   }
 
