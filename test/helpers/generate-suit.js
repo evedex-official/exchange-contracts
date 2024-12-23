@@ -44,7 +44,15 @@ const prepareTokens = async (wallets) => {
   return { usdtToken, btcToken };
 };
 
-const prepareContracts = async ({ owner, matcher, usdtToken, btcToken, fundingRateAccount, eveDexConfig, initInstrumentConfig }) => {
+const prepareContracts = async ({
+  owner,
+  matcher,
+  usdtToken,
+  btcToken,
+  fundingRateAccount,
+  eveDexConfig,
+  initInstrumentConfig,
+}) => {
   const [orderLib, sessions, vault] = await Promise.all([
     viemDeployWithLibraries('OrderValidationLib', []),
     viemDeployWithLibraries('SessionManager', [owner.account.address]),
@@ -92,12 +100,7 @@ const prepareContracts = async ({ owner, matcher, usdtToken, btcToken, fundingRa
   // positions of collaterals and instruments selected according to test/helpers/constants.js
   await depositDex.write.setCollateralConfigs([[usdtToken.address], [true]]);
   await depositDex.write.setCollateralConfigs([[btcToken.address], [true]]);
-  const {
-    symbol,
-    leverage,
-    dailyFRLong,
-    dailyFRShort,
-  } = initInstrumentConfig;
+  const { symbol, leverage, dailyFRLong, dailyFRShort } = initInstrumentConfig;
   await eveDex.write.addInstrument([
     symbol,
     leverage, //leverage
