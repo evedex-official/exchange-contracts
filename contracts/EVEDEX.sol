@@ -331,15 +331,11 @@ contract EVEDEX is BaseDEX, IEVEDEX {
       collateralPrice = int112(fullPrices.collateralPrices[index].price);
       balance = _getBalance(accountToLiquidate, collateral);
       balanceOfLiquidator = _getBalance(liquidator, collateral);
-  
+
       int112 newBalance = balance + ((sumPnlFr - liquidationFee) * _INT_PRECISION) / collateralPrice;
       if (newBalance > 0) {
         _setBalance(accountToLiquidate, collateral, newBalance);
-        _setBalance(
-          liquidator,
-          collateral,
-          balanceOfLiquidator + (liquidationFee * _INT_PRECISION) / collateralPrice
-        );
+        _setBalance(liquidator, collateral, balanceOfLiquidator + (liquidationFee * _INT_PRECISION) / collateralPrice);
         sumPnlFr = 0;
       } else {
         _setBalance(accountToLiquidate, collateral, 0);
