@@ -56,7 +56,7 @@ describe('EVEDEX contract', function () {
         128,
         80,
         100,
-        0,
+        10000000,
       ],
       libraries,
       true,
@@ -727,7 +727,8 @@ describe('EVEDEX contract', function () {
 
     const bal0Before = await depositDex.getBalance(bob.address, tokenAddress);
     const bal1Before = await depositDex.getBalance(bob.address, token2Address);
-    console.log(`Bob's collaterals before liquidation: (${bal0Before}, ${bal1Before})`);
+    const lbal0Before = await depositDex.getBalance(liquidator.address, tokenAddress);
+    const lbal1Before = await depositDex.getBalance(liquidator.address, token2Address);
 
     await eveDex.connect(matcher).liquidatePositions(
       liquidationOrder,
@@ -740,6 +741,9 @@ describe('EVEDEX contract', function () {
 
     const bal0After = await depositDex.getBalance(bob.address, tokenAddress);
     const bal1After = await depositDex.getBalance(bob.address, token2Address);
-    console.log(`Bob's collaterals after liquidation: (${bal0After}, ${bal1After})`);
+    console.log(`Bob's collaterals gain: (${bal0After - bal0Before}, ${bal1After - bal1Before})`);
+    const lbal0After = await depositDex.getBalance(liquidator.address, tokenAddress);
+    const lbal1After = await depositDex.getBalance(liquidator.address, token2Address);
+    console.log(`Liquidator's collaterals gain: (${lbal0After - lbal0Before}, ${lbal1After - lbal1Before})`);
   });
 });

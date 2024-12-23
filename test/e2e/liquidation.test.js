@@ -293,6 +293,10 @@ describe(flow, () => {
         order: multiLiquidationOrder,
         contractAddress: eveDex.address,
       });
+      const collateralIndices = {
+        liquidatorIndex: USDT_COLLATERAL_INDEX, // index of collateral that was used in extended order
+        indicesToLiquidate: [USDT_COLLATERAL_INDEX], // indices of user's collaterals that will be used for liquidation
+      };
       await writeContract(matcher, {
         functionName: 'liquidatePositions',
         address: eveDex.address,
@@ -300,7 +304,7 @@ describe(flow, () => {
         args: [
           multiLiquidationOrder,
           { collateralPrices: currentCollateralPrices, instrumentPrices: currentInstrumentPrices },
-          USDT_COLLATERAL_INDEX,
+          collateralIndices,
           Math.trunc(Date.now() / 1000), // history timestamp
           0n, // history search hint
         ],
