@@ -17,6 +17,7 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     address initialOwner_,
     address depositDex_,
     address sessionManager_,
+    address marginCalculator_,
     address fundingRateAccount_,
     uint256 maxOpenPositions_,
     int112 soLevel_,
@@ -27,6 +28,7 @@ contract EVEDEX is BaseDEX, IEVEDEX {
       initialOwner_,
       depositDex_,
       sessionManager_,
+      marginCalculator_,
       fundingRateAccount_,
       maxOpenPositions_,
       soLevel_,
@@ -140,16 +142,18 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     pnls = new int112[](len);
     frs = new int112[](len);
     uint256 pricesChecked = 0;
+    IMarginCalc calc = IMarginCalc(marginCalculator);
     for (uint256 i = 0; i < len; ++i) {
       uint256 index = prices[i].index;
       if (!_activeInstruments[account].contains(index)) continue;
 
       {
         PositionInfo memory positionInfo_ = _positionInfo[index][account];
-        int256 leverage = int256(uint256(positionInfo_.leverage));
-        leverage = leverage == 0 ? int256(1) : leverage;
+        uint256 leverage = uint256(positionInfo_.leverage);
+        leverage = leverage == 0 ? 1 : leverage;
         int256 absPosition = positionInfo_.position < 0 ? -positionInfo_.position : positionInfo_.position;
-        margin += int112((absPosition * int256(uint256(positionInfo_.positionAvgPrice))) / _INT_PRECISION / leverage);
+        uint256 positionVolume = (uint256(absPosition) * positionInfo_.positionAvgPrice) / _UINT_PRECISION / leverage;
+        margin += int112(int256(calc.getMargin(index, positionVolume)));
       }
 
       pnls[i] = getPNL(account, index, int112(uint112(prices[i].price)));
@@ -161,7 +165,13 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     }
     if (checkPrices && _activeInstruments[account].length() != pricesChecked) revert IncorrectInstrumentIndexes();
 
-    return (margin != 0 ? (equity * 100 - 1) / margin : int112(0), equity, margin, pnls, frs);
+    return (
+      margin != 0 ? (equity * int112(int256(calc.PRECISION())) - 1) / margin : int112(0),
+      equity,
+      margin,
+      pnls,
+      frs
+    );
   }
 
   function checkMarginWithPrices(
@@ -425,6 +435,8 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     }
     // Paying execution fee to matcher
     {
+      address buyOrderCollateral = fullPrices.collateralPrices[buyOrder.collateralIndex].collateral;
+      address sellOrderCollateral = fullPrices.collateralPrices[sellOrder.collateralIndex].collateral;
       buyOrder.order.matcherFee = uint64((uint256(buyOrder.order.matcherFee) * filledAmount) / buyOrder.order.amount);
       sellOrder.order.matcherFee = uint64(
         (uint256(sellOrder.order.matcherFee) * filledAmount) / sellOrder.order.amount
@@ -435,27 +447,27 @@ contract EVEDEX is BaseDEX, IEVEDEX {
       );
       int112 sellOrderMatcherFee = int112(
         (uint112(sellOrder.order.matcherFee) * _UINT_PRECISION) /
-          uint112(fullPrices.collateralPrices[buyOrder.collateralIndex].price)
+          uint112(fullPrices.collateralPrices[sellOrder.collateralIndex].price)
       );
       _setBalance(
         buyOrder.order.senderAddress,
-        buyOrder.order.collateral,
-        _getBalance(buyOrder.order.senderAddress, buyOrder.order.collateral) - buyOrderMatcherFee
+        buyOrderCollateral,
+        _getBalance(buyOrder.order.senderAddress, buyOrderCollateral) - buyOrderMatcherFee
       );
       _setBalance(
         sellOrder.order.senderAddress,
-        sellOrder.order.collateral,
-        _getBalance(sellOrder.order.senderAddress, sellOrder.order.collateral) - sellOrderMatcherFee
+        sellOrderCollateral,
+        _getBalance(sellOrder.order.senderAddress, sellOrderCollateral) - sellOrderMatcherFee
       );
       _setBalance(
         buyOrder.order.matcherAddress,
-        buyOrder.order.collateral,
-        _getBalance(buyOrder.order.matcherAddress, buyOrder.order.collateral) + buyOrderMatcherFee
+        buyOrderCollateral,
+        _getBalance(buyOrder.order.matcherAddress, buyOrderCollateral) + buyOrderMatcherFee
       );
       _setBalance(
         sellOrder.order.matcherAddress,
-        sellOrder.order.collateral,
-        _getBalance(sellOrder.order.matcherAddress, sellOrder.order.collateral) + sellOrderMatcherFee
+        sellOrderCollateral,
+        _getBalance(sellOrder.order.matcherAddress, sellOrderCollateral) + sellOrderMatcherFee
       );
     }
 

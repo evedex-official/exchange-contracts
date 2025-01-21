@@ -2,6 +2,7 @@
 pragma solidity ^0.8.21;
 
 import {IDepositDEX} from "./IDepositDEX.sol";
+import {IMarginCalc} from "./IMarginCalc.sol";
 
 struct FundingRateInfo {
   int72 longFRStored; // Accumulator for frLong
@@ -26,6 +27,7 @@ interface IBaseDEX {
   event BasicParamsUpdate(
     address depositDex,
     address sessionManager,
+    address marginCalculator,
     address fundingRateAccount,
     int112 soLevel,
     int112 withdrawMarginLevel,
@@ -50,6 +52,7 @@ interface IBaseDEX {
   function setBasicParams(
     address depositDex_,
     address sessionManager_,
+    address marginCalculator_,
     address fundingRateAccount_,
     int112 soLevel_,
     int112 withdrawMarginLevel_,

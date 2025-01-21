@@ -2,8 +2,9 @@
 pragma solidity ^0.8.21;
 
 import "../lib/OrderValidationLib.sol";
-import {ISessionManager} from "./ISessionManager.sol";
 import {IDepositDEX} from "./IDepositDEX.sol";
+import {IMarginCalc} from "./IMarginCalc.sol";
+import {ISessionManager} from "./ISessionManager.sol";
 
 struct PositionInfo {
   int112 position; // Signed position size (10^8 = 1 collateral token). position < 0 - short, position > 0 long

@@ -25,6 +25,7 @@ abstract contract BaseDEX is
     address initialOwner_,
     address depositDex_,
     address sessionManager_,
+    address marginCalculator_,
     address fundingRateAccount_,
     uint256 maxOpenPositions_,
     int112 soLevel_,
@@ -34,6 +35,7 @@ abstract contract BaseDEX is
     _setBasicParams(
       depositDex_,
       sessionManager_,
+      marginCalculator_,
       fundingRateAccount_,
       soLevel_,
       withdrawMarginLevel_,
@@ -73,6 +75,7 @@ abstract contract BaseDEX is
   function setBasicParams(
     address depositDex_,
     address sessionManager_,
+    address marginCalculator_,
     address fundingRateAccount_,
     int112 soLevel_,
     int112 withdrawMarginLevel_,
@@ -82,6 +85,7 @@ abstract contract BaseDEX is
     _setBasicParams(
       depositDex_,
       sessionManager_,
+      marginCalculator_,
       fundingRateAccount_,
       soLevel_,
       withdrawMarginLevel_,
@@ -93,6 +97,7 @@ abstract contract BaseDEX is
   function _setBasicParams(
     address depositDex_,
     address sessionManager_,
+    address marginCalculator_,
     address fundingRateAccount_,
     int112 soLevel_,
     int112 withdrawMarginLevel_,
@@ -101,6 +106,7 @@ abstract contract BaseDEX is
   ) internal {
     depositDex = depositDex_;
     sessionManager = sessionManager_;
+    marginCalculator = marginCalculator_;
     fundingRateAccount = fundingRateAccount_;
     withdrawMarginLevel = withdrawMarginLevel_;
     soLevel = soLevel_;
@@ -109,6 +115,7 @@ abstract contract BaseDEX is
     emit BasicParamsUpdate(
       depositDex_,
       sessionManager_,
+      marginCalculator_,
       fundingRateAccount_,
       soLevel_,
       withdrawMarginLevel_,

@@ -8,7 +8,6 @@ struct Order {
   uint256 orderId;
   address senderAddress;
   address matcherAddress;
-  address collateral;
   uint256 instrumentIndex;
   uint256 amount;
   uint256 price;
@@ -30,7 +29,6 @@ struct PriceData {
 struct MultiOrderLiquidation {
   address accountToLiquidate;
   address liquidator;
-  address collateral;
   PriceData[] liquidationPrices;
   PriceData[] prices;
   uint16 leverage;
@@ -42,7 +40,6 @@ struct MultiOrderLiquidation {
 struct OrderLiquidation {
   address accountToLiquidate;
   address liquidator;
-  address collateral;
   uint256 index;
   PriceData[] prices;
   uint16 leverage;
@@ -86,7 +83,7 @@ library OrderValidationLib {
   bytes32 public constant ORDER_TYPEHASH =
     keccak256(
       abi.encodePacked(
-        "Order(uint256 orderId,address senderAddress,address matcherAddress,address collateral,uint256 instrumentIndex,uint256 amount,uint256 price,uint16 leverage,uint256 matcherFee,uint256 creationTime,uint8 side)"
+        "Order(uint256 orderId,address senderAddress,address matcherAddress,uint256 instrumentIndex,uint256 amount,uint256 price,uint16 leverage,uint256 matcherFee,uint256 creationTime,uint8 side)"
       )
     );
 
@@ -123,7 +120,6 @@ library OrderValidationLib {
           _order.orderId,
           _order.senderAddress,
           _order.matcherAddress,
-          _order.collateral,
           _order.instrumentIndex,
           _order.amount,
           _order.price,
