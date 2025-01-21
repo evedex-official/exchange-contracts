@@ -196,7 +196,7 @@ contract DepositDEX is IDepositDEX, UUPSUpgradeable {
     int112 amountFrom = int112(int256(amount));
     int112 amountTo = (amountFrom * int112(priceFrom.price)) / int112(priceTo.price);
     _balances[account][collateralFrom] -= amountFrom;
-    _balances[account][collateralTo] -= int112(int256(amountTo));
+    _balances[account][collateralTo] += int112(int256(amountTo));
 
     emit ForcedSwap(account, collateralFrom, collateralTo, amount, priceFrom.price, priceTo.price);
   }

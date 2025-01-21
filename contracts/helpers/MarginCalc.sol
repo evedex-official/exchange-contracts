@@ -64,14 +64,15 @@ contract MarginCalc is OwnableUpgradeable, UUPSUpgradeable, IMarginCalc {
     for (uint256 i; i < len; i++) {
       uint128 currentLowerBound = levels[i].positionVolumeLowerBound;
       if (currentLowerBound <= pos) revert UnsortedLevels();
-      previousLevel = levels[i - 1];
-      if (
-        i > 0 &&
-        previousLevel.accumulatedMarginLowerLevels +
-          previousLevel.marginCoefficient *
-          (currentLowerBound - previousLevel.positionVolumeLowerBound) !=
-        levels[i].accumulatedMarginLowerLevels
-      ) revert NonSmoothMargin();
+      if (i > 0) {
+        previousLevel = levels[i - 1];
+        if (
+          previousLevel.accumulatedMarginLowerLevels +
+            previousLevel.marginCoefficient *
+            (currentLowerBound - previousLevel.positionVolumeLowerBound) !=
+          levels[i].accumulatedMarginLowerLevels
+        ) revert NonSmoothMargin();
+      }
       pos = currentLowerBound;
     }
     MarginLimit memory lim = MARGIN_LIMIT;
