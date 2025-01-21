@@ -1,10 +1,12 @@
 const { ethers, upgrades } = require('hardhat');
 const { expect } = require('chai');
-const { deployProxyWithLibraries, deployWithLibraries } = require('./helpers/deploy-utils');
+const { deployProxyWithLibraries, deployWithLibraries, deployProxy } = require('./helpers/deploy-utils');
 const { orderWithdrawalTypes, domain } = require('./helpers/eip712-types');
+const { maxUint128, maxUint256 } = require('viem');
+const { PYTH_IDS, ALLOWED_SLIPPAGE_EVEDEX } = require('./helpers/constants');
 
 describe('DepositDex contract', function () {
-  let depositDex, vault, eveDex, sessions, usdt, btcToken, tokenAddress, orderLib;
+  let depositDex, vault, eveDex, sessions, usdt, btcToken, tokenAddress, orderLib, marginCalculator, oracle, pythMock;
 
   let owner, alice, bob, liquidator, fundingRateAccount, matcher;
 
@@ -33,10 +35,28 @@ describe('DepositDex contract', function () {
     orderLib = await deployWithLibraries('OrderValidationLib', []);
     sessions = await deployWithLibraries('SessionManager', [owner.address]);
 
+    MockToken = await ethers.getContractFactory('ERC20Mock');
+    usdt = await MockToken.deploy();
+    tokenAddress = await usdt.getAddress();
+    btcToken = await MockToken.deploy();
+
     const libraries = { libraries: { OrderValidationLib: await orderLib.getAddress() } };
 
     vault = await deployWithLibraries('EveVault', [owner.address]);
     depositDex = await deployProxyWithLibraries('DepositDEX', [], libraries, false, owner.address);
+    marginCalculator = await deployProxy('MarginCalc', [
+      owner.address,
+      maxUint128, // max margin
+      0, // min margin
+    ]);
+    pythMock = await deployWithLibraries('PythMock', []);
+    oracle = await deployWithLibraries('PriceOraclePyth', [
+      await pythMock.getAddress(),
+      tokenAddress,
+      PYTH_IDS.USDT_PYTH_ID, // pyth id of the base token,
+      maxUint256, // max time window of the price confidence,
+      owner.address,
+    ]);
 
     eveDex = await deployProxyWithLibraries(
       'EVEDEX',
@@ -44,6 +64,7 @@ describe('DepositDex contract', function () {
         owner.address,
         await depositDex.getAddress(),
         await sessions.getAddress(),
+        await marginCalculator.getAddress(),
         fundingRateAccount.address,
         128,
         80,
@@ -55,7 +76,12 @@ describe('DepositDex contract', function () {
       owner.address,
     );
 
-    await depositDex.initialize(await eveDex.getAddress(), await vault.getAddress());
+    await depositDex.initialize(
+      await eveDex.getAddress(),
+      await vault.getAddress(),
+      await oracle.getAddress(),
+      ALLOWED_SLIPPAGE_EVEDEX,
+    );
 
     await eveDex.grantRole(ethers.ZeroHash, owner.address);
     const matcherRole = await eveDex.MATCHER_ROLE();
@@ -63,12 +89,6 @@ describe('DepositDex contract', function () {
 
     const validatorRole = await sessions.VALIDATOR_ROLE();
     await sessions.grantRole(validatorRole, await depositDex.getAddress());
-
-    MockToken = await ethers.getContractFactory('ERC20Mock');
-    usdt = await MockToken.deploy();
-    tokenAddress = await usdt.getAddress();
-
-    btcToken = await MockToken.deploy();
 
     await depositDex.setCollateralConfigs([tokenAddress], [true]);
 
