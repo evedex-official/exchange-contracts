@@ -24,7 +24,6 @@ const orderTypes = {
     { name: 'orderId', type: 'uint256' },
     { name: 'senderAddress', type: 'address' },
     { name: 'matcherAddress', type: 'address' },
-    { name: 'collateral', type: 'address' },
     { name: 'instrumentIndex', type: 'uint256' },
     { name: 'amount', type: 'uint256' },
     { name: 'price', type: 'uint256' },
@@ -59,7 +58,6 @@ const orderLiquidationTypes = {
   OrderLiquidation: [
     { name: 'accountToLiquidate', type: 'address' },
     { name: 'liquidator', type: 'address' },
-    { name: 'collateral', type: 'address' },
     { name: 'index', type: 'uint256' },
     { name: 'prices', type: 'PriceData[]' },
     { name: 'leverage', type: 'uint16' },

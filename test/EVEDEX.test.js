@@ -2,7 +2,7 @@ const { ethers } = require('hardhat');
 const { time } = require('@nomicfoundation/hardhat-network-helpers');
 const { expect } = require('chai');
 const { StandardMerkleTree } = require('@openzeppelin/merkle-tree');
-const { deployProxyWithLibraries, deployWithLibraries } = require('./helpers/deploy-utils');
+const { deployProxyWithLibraries, deployWithLibraries, deployProxy } = require('./helpers/deploy-utils');
 const {
   multiOrderLiquidationTypes,
   orderTypes,
@@ -10,6 +10,8 @@ const {
   orderWithdrawalTypes,
   domain,
 } = require('./helpers/eip712-types');
+const { ALLOWED_SLIPPAGE_EVEDEX, PYTH_IDS } = require('./helpers/constants');
+const { maxUint128, maxUint256 } = require('viem');
 
 describe('EVEDEX contract', function () {
   let depositDex, vault, eveDex, sessions, token, tokenAddress, orderLib;
@@ -41,10 +43,27 @@ describe('EVEDEX contract', function () {
     orderLib = await deployWithLibraries('OrderValidationLib', []);
     sessions = await deployWithLibraries('SessionManager', [owner.address]);
 
+    MockToken = await ethers.getContractFactory('ERC20Mock');
+    token = await MockToken.deploy();
+    tokenAddress = await token.getAddress();
+
     const libraries = { libraries: { OrderValidationLib: await orderLib.getAddress() } };
 
     vault = await deployWithLibraries('EveVault', [owner.address]);
     depositDex = await deployProxyWithLibraries('DepositDEX', [], libraries, false, owner.address);
+    marginCalculator = await deployProxy('MarginCalc', [
+      owner.address,
+      maxUint128, // max margin
+      0, // min margin
+    ]);
+    pythMock = await deployWithLibraries('PythMock', []);
+    oracle = await deployWithLibraries('PriceOraclePyth', [
+      await pythMock.getAddress(),
+      tokenAddress,
+      PYTH_IDS.USDT_PYTH_ID, // pyth id of the base token,
+      maxUint256, // max time window of the price confidence,
+      owner.address,
+    ]);
 
     eveDex = await deployProxyWithLibraries(
       'EVEDEX',
@@ -52,6 +71,7 @@ describe('EVEDEX contract', function () {
         owner.address,
         await depositDex.getAddress(),
         await sessions.getAddress(),
+        await marginCalculator.getAddress(),
         fundingRateAccount.address,
         128,
         80,
@@ -63,7 +83,12 @@ describe('EVEDEX contract', function () {
       owner.address,
     );
 
-    await depositDex.initialize(await eveDex.getAddress(), await vault.getAddress());
+    await depositDex.initialize(
+      await eveDex.getAddress(),
+      await vault.getAddress(),
+      await oracle.getAddress(),
+      ALLOWED_SLIPPAGE_EVEDEX,
+    );
 
     await eveDex.grantRole(ethers.ZeroHash, owner.address);
     const matcherRole = await eveDex.MATCHER_ROLE();
@@ -71,10 +96,6 @@ describe('EVEDEX contract', function () {
 
     const validatorRole = await sessions.VALIDATOR_ROLE();
     await sessions.grantRole(validatorRole, await eveDex.getAddress());
-
-    MockToken = await ethers.getContractFactory('ERC20Mock');
-    token = await MockToken.deploy();
-    tokenAddress = await token.getAddress();
 
     await depositDex.setCollateralConfigs([tokenAddress], [true]);
 
@@ -114,7 +135,6 @@ describe('EVEDEX contract', function () {
       orderId: 42,
       senderAddress: alice.address,
       matcherAddress: matcher.address,
-      collateral: tokenAddress,
       instrumentIndex: 0,
       amount: orderAmount,
       price: orderPrice,
@@ -130,7 +150,6 @@ describe('EVEDEX contract', function () {
       orderId: 142,
       senderAddress: bob.address,
       matcherAddress: matcher.address,
-      collateral: tokenAddress,
       instrumentIndex: 0,
       amount: orderAmount,
       price: orderPrice,
@@ -198,7 +217,6 @@ describe('EVEDEX contract', function () {
       orderId: 42,
       senderAddress: alice.address,
       matcherAddress: matcher.address,
-      collateral: tokenAddress,
       instrumentIndex: 0,
       amount: orderAmount1,
       price: orderPrice,
@@ -214,7 +232,6 @@ describe('EVEDEX contract', function () {
       orderId: 43,
       senderAddress: alice.address,
       matcherAddress: matcher.address,
-      collateral: tokenAddress,
       instrumentIndex: 0,
       amount: orderAmount2,
       price: orderPrice,
@@ -230,7 +247,6 @@ describe('EVEDEX contract', function () {
       orderId: 143,
       senderAddress: bob.address,
       matcherAddress: matcher.address,
-      collateral: tokenAddress,
       instrumentIndex: 0,
       amount: orderAmount1 + orderAmount2,
       price: orderPrice,
@@ -248,7 +264,6 @@ describe('EVEDEX contract', function () {
       'uint256',
       'address',
       'address',
-      'address',
       'uint256',
       'uint256',
       'uint256',
@@ -264,7 +279,6 @@ describe('EVEDEX contract', function () {
         aliceOrder1.orderId,
         aliceOrder1.senderAddress,
         aliceOrder1.matcherAddress,
-        aliceOrder1.collateral,
         aliceOrder1.instrumentIndex,
         aliceOrder1.amount,
         aliceOrder1.price,
@@ -278,7 +292,6 @@ describe('EVEDEX contract', function () {
         aliceOrder2.orderId,
         aliceOrder2.senderAddress,
         aliceOrder2.matcherAddress,
-        aliceOrder2.collateral,
         aliceOrder2.instrumentIndex,
         aliceOrder2.amount,
         aliceOrder2.price,
@@ -373,7 +386,6 @@ describe('EVEDEX contract', function () {
       orderId: 42,
       senderAddress: alice.address,
       matcherAddress: matcher.address,
-      collateral: tokenAddress,
       instrumentIndex: 0,
       amount: orderAmount,
       price: orderPrice,
@@ -389,7 +401,6 @@ describe('EVEDEX contract', function () {
       orderId: 142,
       senderAddress: bob.address,
       matcherAddress: matcher.address,
-      collateral: tokenAddress,
       instrumentIndex: 0,
       amount: orderAmount,
       price: orderPrice,
@@ -493,7 +504,6 @@ describe('EVEDEX contract', function () {
       orderId: 42,
       senderAddress: alice.address,
       matcherAddress: matcher.address,
-      collateral: tokenAddress,
       instrumentIndex: 0,
       amount: orderAmount,
       price: orderPrice,
@@ -509,7 +519,6 @@ describe('EVEDEX contract', function () {
       orderId: 142,
       senderAddress: bob.address,
       matcherAddress: matcher.address,
-      collateral: tokenAddress,
       instrumentIndex: 0,
       amount: orderAmount,
       price: orderPrice,
@@ -568,7 +577,6 @@ describe('EVEDEX contract', function () {
     const multiLiquidationOrder = {
       accountToLiquidate: bob.address,
       liquidator: liquidator.address,
-      collateral: tokenAddress,
       liquidationPrices: liquidationPrices,
       prices: liquidationPrices,
       leverage: 100,
@@ -631,7 +639,6 @@ describe('EVEDEX contract', function () {
       orderId: 42,
       senderAddress: alice.address,
       matcherAddress: matcher.address,
-      collateral: tokenAddress,
       instrumentIndex: 0,
       amount: orderAmount,
       price: orderPrice,
@@ -647,7 +654,6 @@ describe('EVEDEX contract', function () {
       orderId: 142,
       senderAddress: bob.address,
       matcherAddress: matcher.address,
-      collateral: tokenAddress,
       instrumentIndex: 0,
       amount: orderAmount,
       price: orderPrice,
@@ -710,7 +716,6 @@ describe('EVEDEX contract', function () {
     const multiLiquidationOrder = {
       accountToLiquidate: bob.address,
       liquidator: liquidator.address,
-      collateral: tokenAddress,
       liquidationPrices: liquidationPrices,
       prices: liquidationPrices,
       leverage: 100,
