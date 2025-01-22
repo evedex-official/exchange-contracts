@@ -3,7 +3,7 @@ const { expect } = require('chai');
 const { deployProxyWithLibraries, deployWithLibraries, deployProxy } = require('./helpers/deploy-utils');
 const { orderWithdrawalTypes, domain } = require('./helpers/eip712-types');
 const { maxUint128, maxUint256 } = require('viem');
-const { PYTH_IDS, ALLOWED_SLIPPAGE_EVEDEX } = require('./helpers/constants');
+const { PYTH_IDS, ALLOWED_SLIPPAGE_DEPOSIT_DEX } = require('./helpers/constants');
 
 describe('DepositDex contract', function () {
   let depositDex, vault, eveDex, sessions, usdt, btcToken, tokenAddress, orderLib, marginCalculator, oracle, pythMock;
@@ -80,7 +80,7 @@ describe('DepositDex contract', function () {
       await eveDex.getAddress(),
       await vault.getAddress(),
       await oracle.getAddress(),
-      ALLOWED_SLIPPAGE_EVEDEX,
+      ALLOWED_SLIPPAGE_DEPOSIT_DEX,
     );
 
     await eveDex.grantRole(ethers.ZeroHash, owner.address);
