@@ -10,7 +10,12 @@ const {
   orderWithdrawalTypes,
   domain,
 } = require('./helpers/eip712-types');
-const { PYTH_IDS, ALLOWED_SLIPPAGE_DEPOSIT_DEX } = require('./helpers/constants');
+const {
+  PYTH_IDS,
+  ALLOWED_SLIPPAGE_DEPOSIT_DEX,
+  EVEDEX_MARGIN_PRECISION,
+  MARGIN_CALC_MARGIN_PRECISION,
+} = require('./helpers/constants');
 const { maxUint128, maxUint256 } = require('viem');
 
 describe('EVEDEX contract', function () {
@@ -65,8 +70,6 @@ describe('EVEDEX contract', function () {
       owner.address,
     ]);
 
-    const precision = Number(await marginCalculator.PRECISION());
-
     eveDex = await deployProxyWithLibraries(
       'EVEDEX',
       [
@@ -76,8 +79,8 @@ describe('EVEDEX contract', function () {
         await marginCalculator.getAddress(),
         fundingRateAccount.address,
         128,
-        0.8 * precision,
-        1 * precision,
+        0.8 * EVEDEX_MARGIN_PRECISION,
+        1 * EVEDEX_MARGIN_PRECISION,
         10000000,
       ],
       libraries,
@@ -115,7 +118,7 @@ describe('EVEDEX contract', function () {
       {
         accumulatedMarginLowerLevels: 0, // accumulated value of margin function at lower levels
         positionVolumeLowerBound: 0, // f(positionVolumeLowerBound) === f_level_min - boundary where current level starts
-        marginCoefficient: 1 * precision, // f(v) = k*v; k - marginCoefficient on current level
+        marginCoefficient: 1 * MARGIN_CALC_MARGIN_PRECISION, // f(v) = k*v; k - marginCoefficient on current level
       },
     ]);
   });

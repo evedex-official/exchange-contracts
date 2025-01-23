@@ -70,8 +70,8 @@ contract MarginCalc is OwnableUpgradeable, UUPSUpgradeable, IMarginCalc {
       previousLevel = levels[i - 1];
       if (
         previousLevel.accumulatedMarginLowerLevels +
-          previousLevel.marginCoefficient *
-          (currentLowerBound - previousLevel.positionVolumeLowerBound) / PRECISION !=
+          (previousLevel.marginCoefficient * (currentLowerBound - previousLevel.positionVolumeLowerBound)) /
+          PRECISION !=
         levels[i].accumulatedMarginLowerLevels
       ) revert NonSmoothMargin();
       pos = currentLowerBound;

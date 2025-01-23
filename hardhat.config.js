@@ -54,6 +54,7 @@ module.exports = {
     hardhat: {
       initialBaseFeePerGas: 0,
       blockGasLimit: 10000000,
+      allowUnlimitedContractSize: true,
     },
     // mainnet: {
     //   url: process.env.MAINNET,

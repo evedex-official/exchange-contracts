@@ -165,13 +165,7 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     }
     if (checkPrices && _activeInstruments[account].length() != pricesChecked) revert IncorrectInstrumentIndexes();
 
-    return (
-      margin != 0 ? (equity * int112(int256(calc.PRECISION())) - 1) / margin : int112(0),
-      equity,
-      margin,
-      pnls,
-      frs
-    );
+    return (margin != 0 ? (equity * _MARGIN_LEVEL_PRECISION - 1) / margin : int112(0), equity, margin, pnls, frs);
   }
 
   function checkMarginWithPrices(

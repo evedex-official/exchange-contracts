@@ -11,6 +11,7 @@ abstract contract StorageDEX is IStorageDEX {
   int256 internal constant _INT_1DAY = 1e8;
   int112 internal constant _INT_PRECISION = 1e8;
   uint112 internal constant _UINT_PRECISION = 1e8;
+  int112 internal constant _MARGIN_LEVEL_PRECISION = 1e2;
   uint256 internal constant _WITHDRAW_DELAY = 7 days;
 
   bytes32 public constant MATCHER_ROLE = keccak256("MATCHER_ROLE");
@@ -49,7 +50,7 @@ abstract contract StorageDEX is IStorageDEX {
  *  int72 positionShortFRStored; // shortFRStored at positionLastUpdate
  *  uint16 leverage;
  *  }
- *  
+ *
  *  struct FundingRateInfo {
  *    int40 frLong; // Funding rate for long position - percentage of position per second. frLong = 10**11 => 100% per second
  *    int40 frShort; // Funding rate for short position - percentage of position per second. frShort = 10**11 => 100% per second
@@ -62,12 +63,12 @@ abstract contract StorageDEX is IStorageDEX {
  *    InstrumentData instrumentData;
  *    FundingRateInfo[] fundingRateData;
  *  }
- *  
+ *
  *  struct InstrumentData {
  *    uint8 leverage; // Max available leverage
  *    string[12] ticker; // Ticker of underlying asset
  *  }
- *  
+ *
  *  struct WithdrawRequest {
  *    uint64 timestamp;
  *    RequestStatus status;

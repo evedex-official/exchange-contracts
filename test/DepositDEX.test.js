@@ -3,7 +3,7 @@ const { expect } = require('chai');
 const { deployProxyWithLibraries, deployWithLibraries, deployProxy } = require('./helpers/deploy-utils');
 const { orderWithdrawalTypes, domain } = require('./helpers/eip712-types');
 const { maxUint128, maxUint256 } = require('viem');
-const { PYTH_IDS, ALLOWED_SLIPPAGE_DEPOSIT_DEX } = require('./helpers/constants');
+const { PYTH_IDS, ALLOWED_SLIPPAGE_DEPOSIT_DEX, EVEDEX_MARGIN_PRECISION } = require('./helpers/constants');
 
 describe('DepositDex contract', function () {
   let depositDex, vault, eveDex, sessions, usdt, btcToken, tokenAddress, orderLib, marginCalculator, oracle, pythMock;
@@ -58,8 +58,6 @@ describe('DepositDex contract', function () {
       owner.address,
     ]);
 
-    const precision = Number(await marginCalculator.PRECISION());
-
     eveDex = await deployProxyWithLibraries(
       'EVEDEX',
       [
@@ -69,8 +67,8 @@ describe('DepositDex contract', function () {
         await marginCalculator.getAddress(),
         fundingRateAccount.address,
         128,
-        0.8 * precision,
-        1 * precision,
+        0.8 * EVEDEX_MARGIN_PRECISION,
+        1 * EVEDEX_MARGIN_PRECISION,
         0,
       ],
       libraries,

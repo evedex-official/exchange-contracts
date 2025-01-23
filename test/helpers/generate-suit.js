@@ -9,7 +9,7 @@ const {
   BTC_DECIMALS,
   PYTH_IDS,
   ALLOWED_SLIPPAGE_DEPOSIT_DEX,
-  MARGIN_PRECISION,
+  EVEDEX_MARGIN_PRECISION,
 } = require('./constants');
 
 const suits = {};
@@ -140,8 +140,8 @@ const generateSuit = async (
   {
     eveDexConfig: {
       maxOpenPositions = 128,
-      soLevel = 0.8 * MARGIN_PRECISION,
-      withdrawMarginLevel = 1 * MARGIN_PRECISION,
+      soLevel = 0.8 * EVEDEX_MARGIN_PRECISION,
+      withdrawMarginLevel = 1 * EVEDEX_MARGIN_PRECISION,
       liquidationFeePercent = 0,
     } = {},
     initInstrumentConfig: { symbol = BTC_USD_SYMBOL, leverage = 100, dailyFRLong = 0, dailyFRShort = 0 } = {},
