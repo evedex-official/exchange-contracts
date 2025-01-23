@@ -1,9 +1,16 @@
 'use strict';
 
-const { viemDeployWithLibraries, viemDeployProxyWithLibraries } = require('./viemify');
+const { viemDeployWithLibraries, viemDeployProxyWithLibraries, viemDeployProxy } = require('./viemify');
 const { viem } = require('hardhat');
-const { zeroHash, maxUint112 } = require('viem');
-const { BTC_USD_SYMBOL, USDT_DECIMALS, BTC_DECIMALS } = require('./constants');
+const { zeroHash, maxUint112, maxUint256 } = require('viem');
+const {
+  BTC_USD_SYMBOL,
+  USDT_DECIMALS,
+  BTC_DECIMALS,
+  PYTH_IDS,
+  ALLOWED_SLIPPAGE_DEPOSIT_DEX,
+  MARGIN_PRECISION,
+} = require('./constants');
 
 const suits = {};
 
@@ -52,13 +59,28 @@ const prepareContracts = async ({
   fundingRateAccount,
   eveDexConfig,
   initInstrumentConfig,
+  marginCalcConfig,
+  oracleConfig,
 }) => {
-  const [orderLib, sessions, vault] = await Promise.all([
+  const [orderLib, sessions, vault, marginCalculator, pythMock] = await Promise.all([
     viemDeployWithLibraries('OrderValidationLib', []),
     viemDeployWithLibraries('SessionManager', [owner.account.address]),
     viemDeployWithLibraries('EveVault', [owner.account.address]),
+    viemDeployProxy('MarginCalc', [
+      owner.account.address,
+      marginCalcConfig.maxMargin, // max margin
+      marginCalcConfig.minMargin, // min margin
+    ]),
+    viemDeployWithLibraries('PythMock', []),
   ]);
-  const depositDexLibraries = { libraries: { OrderValidationLib: await orderLib.address } };
+  const oracle = await viemDeployWithLibraries('PriceOraclePyth', [
+    pythMock.address,
+    usdtToken.address,
+    PYTH_IDS.USDT_PYTH_ID, // pyth id of the base token,
+    oracleConfig.window, // max time window of the price confidence,
+    owner.account.address,
+  ]);
+  const depositDexLibraries = { libraries: { OrderValidationLib: orderLib.address } };
   const depositDex = await viemDeployProxyWithLibraries(
     'DepositDEX',
     [],
@@ -72,6 +94,7 @@ const prepareContracts = async ({
       owner.account.address,
       depositDex.address,
       sessions.address,
+      marginCalculator.address,
       fundingRateAccount.account.address,
       eveDexConfig.maxOpenPositions,
       eveDexConfig.soLevel,
@@ -82,7 +105,7 @@ const prepareContracts = async ({
     true,
     owner.account.address,
   );
-  await depositDex.write.initialize([eveDex.address, vault.address]);
+  await depositDex.write.initialize([eveDex.address, vault.address, oracle.address, ALLOWED_SLIPPAGE_DEPOSIT_DEX]);
 
   const [matcherRole, validatorRole, withdrawRole] = await Promise.all([
     eveDex.read.MATCHER_ROLE(),
@@ -109,14 +132,21 @@ const prepareContracts = async ({
     Math.floor(Date.now() / 1000) - 100, //timestamp
   ]);
 
-  return { orderLib, sessions, vault, depositDex, eveDex };
+  return { orderLib, sessions, vault, depositDex, eveDex, marginCalculator, oracle, pythMock };
 };
 
 const generateSuit = async (
   id,
   {
-    eveDexConfig: { maxOpenPositions = 128, soLevel = 80, withdrawMarginLevel = 100, liquidationFeePercent = 0 } = {},
+    eveDexConfig: {
+      maxOpenPositions = 128,
+      soLevel = 0.8 * MARGIN_PRECISION,
+      withdrawMarginLevel = 1 * MARGIN_PRECISION,
+      liquidationFeePercent = 0,
+    } = {},
     initInstrumentConfig: { symbol = BTC_USD_SYMBOL, leverage = 100, dailyFRLong = 0, dailyFRShort = 0 } = {},
+    marginCalcConfig: { maxMargin = maxUint112, minMargin = 0 } = {},
+    oracleConfig: { window = maxUint256 } = {},
   } = {},
 ) => {
   if (!id) throw new Error('Suit id is required');
@@ -142,12 +172,14 @@ const generateSuit = async (
     matcher,
     carolSessionWallet,
   ]);
-  const { orderLib, sessions, vault, depositDex, eveDex } = await prepareContracts({
+  const { orderLib, sessions, vault, depositDex, eveDex, marginCalculator, pythMock, oracle } = await prepareContracts({
     owner,
     matcher,
     usdtToken,
     btcToken,
     fundingRateAccount,
+    marginCalcConfig: { maxMargin, minMargin },
+    oracleConfig: { window },
     eveDexConfig: {
       maxOpenPositions,
       soLevel,
@@ -179,6 +211,9 @@ const generateSuit = async (
     aliceSessionWallet,
     bobSessionWallet,
     carolSessionWallet,
+    marginCalculator,
+    oracle,
+    pythMock,
   };
 
   return suits[id];

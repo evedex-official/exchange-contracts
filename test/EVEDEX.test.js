@@ -10,7 +10,7 @@ const {
   orderWithdrawalTypes,
   domain,
 } = require('./helpers/eip712-types');
-const { ALLOWED_SLIPPAGE_EVEDEX, PYTH_IDS } = require('./helpers/constants');
+const { PYTH_IDS, ALLOWED_SLIPPAGE_DEPOSIT_DEX } = require('./helpers/constants');
 const { maxUint128, maxUint256 } = require('viem');
 
 describe('EVEDEX contract', function () {
@@ -65,6 +65,8 @@ describe('EVEDEX contract', function () {
       owner.address,
     ]);
 
+    const precision = Number(await marginCalculator.PRECISION());
+
     eveDex = await deployProxyWithLibraries(
       'EVEDEX',
       [
@@ -74,8 +76,8 @@ describe('EVEDEX contract', function () {
         await marginCalculator.getAddress(),
         fundingRateAccount.address,
         128,
-        80,
-        100,
+        0.8 * precision,
+        1 * precision,
         10000000,
       ],
       libraries,
@@ -87,7 +89,7 @@ describe('EVEDEX contract', function () {
       await eveDex.getAddress(),
       await vault.getAddress(),
       await oracle.getAddress(),
-      ALLOWED_SLIPPAGE_EVEDEX,
+      ALLOWED_SLIPPAGE_DEPOSIT_DEX,
     );
 
     await eveDex.grantRole(ethers.ZeroHash, owner.address);
@@ -107,6 +109,15 @@ describe('EVEDEX contract', function () {
     const frLong = 86400;
     const frShort = 86400;
     await eveDex.addInstrument(ticker, leverage, frLong, frShort, Math.floor(Date.now() / 1000));
+
+    // set margin levels
+    await marginCalculator.setLevels(0, [
+      {
+        accumulatedMarginLowerLevels: 0, // accumulated value of margin function at lower levels
+        positionVolumeLowerBound: 0, // f(positionVolumeLowerBound) === f_level_min - boundary where current level starts
+        marginCoefficient: 1 * precision, // f(v) = k*v; k - marginCoefficient on current level
+      },
+    ]);
   });
 
   it('contracts are correctly initialized', async function () {
@@ -181,7 +192,6 @@ describe('EVEDEX contract', function () {
         price: 100000000,
       },
     ];
-
     await eveDex.connect(matcher).fillOrders(
       buyOrderExt,
       sellOrderExt,
@@ -273,51 +283,51 @@ describe('EVEDEX contract', function () {
       'uint8',
     ];
     const typehash = await orderLib.ORDER_TYPEHASH();
-    const values = [
-      [
-        typehash,
-        aliceOrder1.orderId,
-        aliceOrder1.senderAddress,
-        aliceOrder1.matcherAddress,
-        aliceOrder1.instrumentIndex,
-        aliceOrder1.amount,
-        aliceOrder1.price,
-        aliceOrder1.leverage,
-        aliceOrder1.matcherFee,
-        aliceOrder1.creationTime,
-        aliceOrder1.side,
-      ],
-      [
-        typehash,
-        aliceOrder2.orderId,
-        aliceOrder2.senderAddress,
-        aliceOrder2.matcherAddress,
-        aliceOrder2.instrumentIndex,
-        aliceOrder2.amount,
-        aliceOrder2.price,
-        aliceOrder2.leverage,
-        aliceOrder2.matcherFee,
-        aliceOrder2.creationTime,
-        aliceOrder2.side,
-      ],
+    const leaf1 = [
+      typehash,
+      aliceOrder1.orderId,
+      aliceOrder1.senderAddress,
+      aliceOrder1.matcherAddress,
+      aliceOrder1.instrumentIndex,
+      aliceOrder1.amount,
+      aliceOrder1.price,
+      aliceOrder1.leverage,
+      aliceOrder1.matcherFee,
+      aliceOrder1.creationTime,
+      aliceOrder1.side,
     ];
+    const leaf2 = [
+      typehash,
+      aliceOrder2.orderId,
+      aliceOrder2.senderAddress,
+      aliceOrder2.matcherAddress,
+      aliceOrder2.instrumentIndex,
+      aliceOrder2.amount,
+      aliceOrder2.price,
+      aliceOrder2.leverage,
+      aliceOrder2.matcherFee,
+      aliceOrder2.creationTime,
+      aliceOrder2.side,
+    ];
+    const values = [leaf1, leaf2];
     const tree = StandardMerkleTree.of(values, leafEncoding);
     const aliceMultiOrder = { merkleRoot: tree.root };
 
     const domainBase = await domain(await eveDex.getAddress());
     const aliceSignature = await alice.signTypedData(domainBase, multiOrderTypes, aliceMultiOrder);
     const bobSignature = await bob.signTypedData(domainBase, orderTypes, bobOrder);
-    const buyOrder1 = { ...aliceOrder1, signature: aliceSignature };
-    const buyOrder2 = { ...aliceOrder2, signature: aliceSignature };
-    for (const [i, v] of tree.entries()) {
-      if (v[6] === orderAmount1) {
-        buyOrder1.merkleRoot = tree.root;
-        buyOrder1.merkleProof = tree.getProof(i);
-      } else if (v[6] === orderAmount2) {
-        buyOrder2.merkleRoot = tree.root;
-        buyOrder2.merkleProof = tree.getProof(i);
-      }
-    }
+    const buyOrder1 = {
+      ...aliceOrder1,
+      signature: aliceSignature,
+      merkleRoot: tree.root,
+      merkleProof: tree.getProof(tree.leafLookup(leaf1)),
+    };
+    const buyOrder2 = {
+      ...aliceOrder2,
+      signature: aliceSignature,
+      merkleRoot: tree.root,
+      merkleProof: tree.getProof(tree.leafLookup(leaf2)),
+    };
     const sellOrder = { ...bobOrder, signature: bobSignature };
     const buyOrderExt1 = { collateralIndex: 0, order: buyOrder1 };
     const buyOrderExt2 = { collateralIndex: 0, order: buyOrder2 };

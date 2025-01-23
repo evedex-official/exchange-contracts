@@ -58,6 +58,8 @@ describe('DepositDex contract', function () {
       owner.address,
     ]);
 
+    const precision = Number(await marginCalculator.PRECISION());
+
     eveDex = await deployProxyWithLibraries(
       'EVEDEX',
       [
@@ -67,8 +69,8 @@ describe('DepositDex contract', function () {
         await marginCalculator.getAddress(),
         fundingRateAccount.address,
         128,
-        80,
-        100,
+        0.8 * precision,
+        1 * precision,
         0,
       ],
       libraries,

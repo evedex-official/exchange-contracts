@@ -53,26 +53,27 @@ contract MarginCalc is OwnableUpgradeable, UUPSUpgradeable, IMarginCalc {
 
     if (low == 0) return 0;
     MarginLevel memory lev = marginLevels[instrumentIndex][low - 1];
-    return lev.accumulatedMarginLowerLevels + lev.marginCoefficient * (positionVolume - lev.positionVolumeLowerBound);
+    return
+      lev.accumulatedMarginLowerLevels +
+      (lev.marginCoefficient * (positionVolume - lev.positionVolumeLowerBound)) /
+      PRECISION;
   }
 
   function setLevels(uint256 instrumentIndex, MarginLevel[] calldata levels) external onlyOwner {
     uint256 len = levels.length;
 
-    uint256 pos;
     MarginLevel memory previousLevel;
-    for (uint256 i; i < len; i++) {
+    uint256 pos = levels[0].positionVolumeLowerBound;
+    for (uint256 i = 1; i < len; i++) {
       uint128 currentLowerBound = levels[i].positionVolumeLowerBound;
       if (currentLowerBound <= pos) revert UnsortedLevels();
-      if (i > 0) {
-        previousLevel = levels[i - 1];
-        if (
-          previousLevel.accumulatedMarginLowerLevels +
-            previousLevel.marginCoefficient *
-            (currentLowerBound - previousLevel.positionVolumeLowerBound) !=
-          levels[i].accumulatedMarginLowerLevels
-        ) revert NonSmoothMargin();
-      }
+      previousLevel = levels[i - 1];
+      if (
+        previousLevel.accumulatedMarginLowerLevels +
+          previousLevel.marginCoefficient *
+          (currentLowerBound - previousLevel.positionVolumeLowerBound) / PRECISION !=
+        levels[i].accumulatedMarginLowerLevels
+      ) revert NonSmoothMargin();
       pos = currentLowerBound;
     }
     MarginLimit memory lim = MARGIN_LIMIT;

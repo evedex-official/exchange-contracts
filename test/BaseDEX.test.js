@@ -1,7 +1,7 @@
 const { ethers } = require('hardhat');
 const { expect } = require('chai');
 const { deployProxyWithLibraries, deployWithLibraries, deployProxy } = require('./helpers/deploy-utils');
-const { ALLOWED_SLIPPAGE_EVEDEX, PYTH_IDS } = require('./helpers/constants');
+const { PYTH_IDS, ALLOWED_SLIPPAGE_DEPOSIT_DEX } = require('./helpers/constants');
 const { maxUint128, maxUint256 } = require('viem');
 
 describe('EVEDEX contract', function () {
@@ -41,6 +41,8 @@ describe('EVEDEX contract', function () {
       owner.address,
     ]);
 
+    const precision = Number(await marginCalculator.PRECISION());
+
     eveDex = await deployProxyWithLibraries(
       'EVEDEX',
       [
@@ -50,8 +52,8 @@ describe('EVEDEX contract', function () {
         await marginCalculator.getAddress(),
         fundingRateAccount.address,
         128,
-        80,
-        100,
+        0.8 * precision,
+        1 * precision,
         0,
       ],
       libraries,
@@ -63,7 +65,7 @@ describe('EVEDEX contract', function () {
       await eveDex.getAddress(),
       await vault.getAddress(),
       await oracle.getAddress(),
-      ALLOWED_SLIPPAGE_EVEDEX,
+      ALLOWED_SLIPPAGE_DEPOSIT_DEX,
     );
 
     await eveDex.grantRole(ethers.ZeroHash, owner.address);
