@@ -48,6 +48,16 @@ struct OrderLiquidation {
   bytes signature;
 }
 
+struct AdlOrderLiquidation {
+  address accountToLiquidate;
+  address liquidator;
+  uint256 index;
+  PriceData[] prices;
+  uint16 leverage;
+  uint256 liquidationTimestamp;
+  uint256 expiration;
+}
+
 struct OrderWithdrawal {
   address collateral;
   address account;

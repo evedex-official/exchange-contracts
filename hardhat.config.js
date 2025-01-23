@@ -2,6 +2,7 @@ require('@nomicfoundation/hardhat-ethers');
 require('@nomicfoundation/hardhat-toolbox-viem');
 require('@openzeppelin/hardhat-upgrades');
 require('@nomicfoundation/hardhat-chai-matchers');
+require('hardhat-contract-sizer');
 require('dotenv').config();
 const path = require('path');
 

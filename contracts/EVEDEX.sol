@@ -356,6 +356,104 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     }
   }
 
+  /**
+   * @notice Executes an ADL (Auto-Deleveraging) liquidation for a specific account.
+   */
+  function adlLiquidation(
+    AdlOrderLiquidation memory liquidationOrder,
+    FullPrices calldata fullPrices,
+    LiquidationCollaterals calldata collateralIndices,
+    uint256 historyTimestamp,
+    uint256 historySearchHint
+  ) external onlyRole(MATCHER_ROLE) {
+    if (liquidationOrder.prices[0].index != liquidationOrder.index) revert PriceOfLiquidatedInstrumentNotFirst();
+
+    (bool validMargin, ) = _checkMargin(
+      liquidationOrder.accountToLiquidate,
+      soLevel,
+      liquidationOrder.prices,
+      fullPrices.collateralPrices,
+      true,
+      historyTimestamp,
+      historySearchHint
+    );
+    if (validMargin) revert SufficientMargin();
+    uint80 liquidatorPositionAvgPrice = _positionInfo[liquidationOrder.index][liquidationOrder.accountToLiquidate]
+      .positionAvgPrice;
+    uint80 liquidationPrice = uint80(liquidationOrder.prices[0].price);
+    if (liquidationPrice < liquidatorPositionAvgPrice) revert PriceBelowLiquidatorPositionAvgPrice();
+
+    _liquidatePosition(
+      liquidationOrder.index,
+      liquidationOrder.accountToLiquidate,
+      liquidationOrder.liquidator,
+      int112(uint112(liquidationOrder.prices[0].price)),
+      fullPrices,
+      collateralIndices,
+      liquidationOrder.leverage,
+      historyTimestamp,
+      historySearchHint
+    );
+  }
+
+  /**
+   * @notice Executes an ADL (Auto-Deleveraging) liquidation for a specific account.
+   * todo: remove after test
+   */
+  function adlLiquidationWithBalanceCheck(
+    AdlOrderLiquidation memory liquidationOrder,
+    FullPrices calldata fullPrices,
+    LiquidationCollaterals calldata collateralIndices,
+    uint256 historyTimestamp,
+    uint256 historySearchHint
+  ) external onlyRole(MATCHER_ROLE) {
+    if (liquidationOrder.prices[0].index != liquidationOrder.index) revert PriceOfLiquidatedInstrumentNotFirst();
+
+    (bool validMargin, ) = _checkMargin(
+      liquidationOrder.accountToLiquidate,
+      soLevel,
+      liquidationOrder.prices,
+      fullPrices.collateralPrices,
+      true,
+      historyTimestamp,
+      historySearchHint
+    );
+    if (validMargin) revert SufficientMargin();
+
+    uint256 len = collateralIndices.indicesToLiquidate.length;
+    address collateral;
+    address liquidator = liquidationOrder.liquidator;
+    int112 balance;
+    int112 balanceOfLiquidator;
+    int112[] memory collaterals = new int112[](len);
+
+    for (uint256 i; i < len; i++) {
+      uint256 index = collateralIndices.indicesToLiquidate[i];
+      collateral = fullPrices.collateralPrices[index].collateral;
+      balanceOfLiquidator = _getBalance(liquidator, collateral);
+      collaterals[i] = balanceOfLiquidator;
+    }
+
+    _liquidatePosition(
+      liquidationOrder.index,
+      liquidationOrder.accountToLiquidate,
+      liquidationOrder.liquidator,
+      int112(uint112(liquidationOrder.prices[0].price)),
+      fullPrices,
+      collateralIndices,
+      liquidationOrder.leverage,
+      historyTimestamp,
+      historySearchHint
+    );
+
+    for (uint256 i; i < len; i++) {
+      uint256 index = collateralIndices.indicesToLiquidate[i];
+      collateral = fullPrices.collateralPrices[index].collateral;
+      balanceOfLiquidator = _getBalance(liquidator, collateral);
+      if (balanceOfLiquidator < collaterals[i]) revert PriceBelowLiquidatorPositionAvgPrice();
+    }
+  }
+
   function liquidatePosition(
     OrderLiquidation memory liquidationOrder,
     FullPrices calldata fullPrices,

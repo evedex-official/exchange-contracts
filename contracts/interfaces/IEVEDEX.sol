@@ -77,6 +77,7 @@ interface IEVEDEX {
   error PriceOfLiquidatedInstrumentNotFirst();
   error OrderIsAlreadyFilled();
   error PriceArrayLengthError();
+  error PriceBelowLiquidatorPositionAvgPrice();
 
   function getActiveInstrumentsIndexes(address account) external view returns (uint256[] memory);
 
