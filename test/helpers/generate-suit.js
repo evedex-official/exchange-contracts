@@ -10,6 +10,7 @@ const {
   PYTH_IDS,
   ALLOWED_SLIPPAGE_DEPOSIT_DEX,
   EVEDEX_MARGIN_PRECISION,
+  MARGIN_CALC_MARGIN_PRECISION,
 } = require('./constants');
 
 const suits = {};
@@ -58,8 +59,8 @@ const prepareContracts = async ({
   btcToken,
   fundingRateAccount,
   eveDexConfig,
-  initInstrumentConfig,
-  marginCalcConfig,
+  initInstrumentConfigs,
+  initMarginCalcConfig,
   oracleConfig,
 }) => {
   const [orderLib, sessions, vault, marginCalculator, pythMock] = await Promise.all([
@@ -68,8 +69,8 @@ const prepareContracts = async ({
     viemDeployWithLibraries('EveVault', [owner.account.address]),
     viemDeployProxy('MarginCalc', [
       owner.account.address,
-      marginCalcConfig.maxMargin, // max margin
-      marginCalcConfig.minMargin, // min margin
+      initMarginCalcConfig.maxMargin, // max margin
+      initMarginCalcConfig.minMargin, // min margin
     ]),
     viemDeployWithLibraries('PythMock', []),
   ]);
@@ -123,33 +124,68 @@ const prepareContracts = async ({
   // positions of collaterals and instruments selected according to test/helpers/constants.js
   await depositDex.write.setCollateralConfigs([[usdtToken.address], [true]]);
   await depositDex.write.setCollateralConfigs([[btcToken.address], [true]]);
-  const { symbol, leverage, dailyFRLong, dailyFRShort } = initInstrumentConfig;
-  await eveDex.write.addInstrument([
-    symbol,
-    leverage, //leverage
-    dailyFRLong, //dailyFRLong
-    dailyFRShort, //dailyFRShort
-    Math.floor(Date.now() / 1000) - 100, //timestamp
-  ]);
+
+  for (let i = 0; i < initInstrumentConfigs.length; i++) {
+    const { symbol, leverage, dailyFRLong, dailyFRShort } = initInstrumentConfigs[i];
+    await Promise.all([
+      eveDex.write.addInstrument([
+        symbol,
+        leverage, //leverage
+        dailyFRLong, //dailyFRLong
+        dailyFRShort, //dailyFRShort
+        Math.floor(Date.now() / 1000) - 100, //timestamp
+      ]),
+      marginCalculator.write.setLevels([i, initMarginCalcConfig.initLevels[i]]),
+    ]);
+  }
 
   return { orderLib, sessions, vault, depositDex, eveDex, marginCalculator, oracle, pythMock };
 };
 
-const generateSuit = async (
-  id,
-  {
-    eveDexConfig: {
-      maxOpenPositions = 128,
-      soLevel = 0.8 * EVEDEX_MARGIN_PRECISION,
-      withdrawMarginLevel = 1 * EVEDEX_MARGIN_PRECISION,
-      liquidationFeePercent = 0,
-    } = {},
-    initInstrumentConfig: { symbol = BTC_USD_SYMBOL, leverage = 100, dailyFRLong = 0, dailyFRShort = 0 } = {},
-    marginCalcConfig: { maxMargin = maxUint112, minMargin = 0 } = {},
-    oracleConfig: { window = maxUint256 } = {},
-  } = {},
-) => {
+const populateDefaults = (config) => {
+  if (!config.eveDexConfig) {
+    config.eveDexConfig = {
+      maxOpenPositions: 128,
+      soLevel: 0.8 * EVEDEX_MARGIN_PRECISION,
+      withdrawMarginLevel: 1 * EVEDEX_MARGIN_PRECISION,
+      liquidationFeePercent: 0,
+    };
+  }
+  if (!config.initInstrumentConfigs) {
+    config.initInstrumentConfigs = [
+      {
+        symbol: BTC_USD_SYMBOL,
+        leverage: 100,
+        dailyFRLong: 0,
+        dailyFRShort: 0,
+      },
+    ];
+  }
+  if (!config.initMarginCalcConfig) {
+    config.initMarginCalcConfig = {
+      maxMargin: maxUint112,
+      minMargin: 0,
+      initLevels: [
+        // levels for initial instruments (index in accordance with initInstrumentConfigs array)
+        [
+          {
+            accumulatedMarginLowerLevels: 0n,
+            positionVolumeLowerBound: 0n,
+            marginCoefficient: BigInt(1 * MARGIN_CALC_MARGIN_PRECISION),
+          },
+        ],
+      ],
+    };
+  }
+  if (!config.oracleConfig) {
+    config.oracleConfig = { window: maxUint256 };
+  }
+  return config;
+};
+
+const generateSuit = async (id, config = {}) => {
   if (!id) throw new Error('Suit id is required');
+  populateDefaults(config);
   const {
     owner,
     alice,
@@ -178,20 +214,10 @@ const generateSuit = async (
     usdtToken,
     btcToken,
     fundingRateAccount,
-    marginCalcConfig: { maxMargin, minMargin },
-    oracleConfig: { window },
-    eveDexConfig: {
-      maxOpenPositions,
-      soLevel,
-      withdrawMarginLevel,
-      liquidationFeePercent,
-    },
-    initInstrumentConfig: {
-      symbol,
-      leverage,
-      dailyFRLong,
-      dailyFRShort,
-    },
+    oracleConfig: config.oracleConfig,
+    eveDexConfig: config.eveDexConfig,
+    initInstrumentConfigs: config.initInstrumentConfigs,
+    initMarginCalcConfig: config.initMarginCalcConfig,
   });
   suits[id] = {
     owner,

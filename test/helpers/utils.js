@@ -7,7 +7,7 @@ const {
 } = require('./eip712-types');
 const { signTypedData, readContract, writeContract } = require('viem/actions');
 const { maxUint32, maxUint128, maxUint64, zeroHash, encodeAbiParameters, keccak256 } = require('viem');
-const { INT_PRECISION_EVEDEX, ORDER_TYPEHASH } = require('./constants');
+const { INT_PRECISION_EVEDEX, ORDER_TYPEHASH, EVEDEX_MARGIN_PRECISION } = require('./constants');
 const { StandardMerkleTree } = require('@openzeppelin/merkle-tree');
 
 const signWithdrawOrder = async ({ wallet, order, contractAddress }) => {
@@ -38,7 +38,6 @@ const createWithdrawOrder = ({ accountAddress, collateralAddress, amount, sessio
  * @param {number} params.collateralIndex - The index of the collateral.
  * @param {string} params.senderAddress - The address of the sender creating the order.
  * @param {string} params.matcherAddress - The address of the matcher handling the order.
- * @param {string} params.collateral - The address of the collateral token.
  * @param {number} params.instrumentIndex - The index of the instrument being traded.
  * @param {bigint} params.amount - The amount of the instrument being ordered.
  * @param {bigint} params.price - The price of the instrument with precision.
@@ -46,7 +45,6 @@ const createWithdrawOrder = ({ accountAddress, collateralAddress, amount, sessio
  * @param {string} params.userSession - The session address associated with the user.
  * @param {bigint} [params.leverage=1n] - The leverage used in the order (default: 1).
  * @param {bigint} [params.matcherFee=0n] - The fee paid to the matcher (default: 0).
- * @param {number} [params.expiration=Math.floor(Date.now() / 1000) + 3600] - The expiration time of the order in seconds since the epoch (default: maximum value).
  * @param {string} [params.merkleRoot=zeroHash] - The root of the Merkle tree for multi-order verification (default: zero hash).
  * @param {Array<string>} [params.merkleProof=[]] - The Merkle proof for verifying the order (default: empty array).
  */
@@ -55,7 +53,6 @@ const createOrderExtended = ({
   collateralIndex,
   senderAddress,
   matcherAddress,
-  collateral,
   instrumentIndex,
   amount,
   price,
@@ -73,7 +70,6 @@ const createOrderExtended = ({
       orderId,
       senderAddress,
       matcherAddress,
-      collateral,
       instrumentIndex,
       amount,
       price,
@@ -135,7 +131,6 @@ const toMultiOrders = async ({ wallet, contractAddress, ordersExt }) => {
     'uint256',
     'address',
     'address',
-    'address',
     'uint256',
     'uint256',
     'uint256',
@@ -149,7 +144,6 @@ const toMultiOrders = async ({ wallet, contractAddress, ordersExt }) => {
     order.orderId,
     order.senderAddress,
     order.matcherAddress,
-    order.collateral,
     order.instrumentIndex,
     order.amount,
     order.price,
@@ -271,7 +265,8 @@ const calculateBoundaryOrderAmount = async ({
 
   // formula used in contracts
   const positionSize =
-    (leverage * (equity * 100n - margin * soLevel - 1n) * INT_PRECISION_EVEDEX) / (soLevel * instrumentPrice);
+    (leverage * (equity * BigInt(EVEDEX_MARGIN_PRECISION) - margin * soLevel - 1n) * INT_PRECISION_EVEDEX) /
+    (soLevel * instrumentPrice);
   return positionSize;
 };
 

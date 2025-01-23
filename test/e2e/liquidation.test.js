@@ -248,6 +248,7 @@ describe(flow, () => {
         collateralPrices: currentCollateralPrices,
         addressToCheck: extOrder.order.senderAddress,
       });
+
       if (marginLevel < contractSoLevel) {
         matcherState.positionsToLiquidate.push(extOrder);
       }

@@ -73,12 +73,11 @@ describe(flow, () => {
   });
 
   it('Alice creates tp and sl multi order', async () => {
-    const { eveDex, usdtToken, alice, matcher, aliceSessionWallet } = await restoreSuit(flow);
+    const { eveDex, alice, matcher, aliceSessionWallet } = await restoreSuit(flow);
     const marketOrderExt = createOrderExtended({
       collateralIndex: USDT_COLLATERAL_INDEX,
       senderAddress: alice.account.address,
       matcherAddress: matcher.account.address,
-      collateral: usdtToken.address,
       instrumentIndex: BTC_USD_INDEX,
       side: BUY_SIDE,
       amount: MARKET_ORDER_AMOUNT,
@@ -90,7 +89,6 @@ describe(flow, () => {
       collateralIndex: USDT_COLLATERAL_INDEX,
       senderAddress: alice.account.address,
       matcherAddress: matcher.account.address,
-      collateral: usdtToken.address,
       instrumentIndex: BTC_USD_INDEX,
       side: SELL_SIDE,
       amount: TP_ORDER_AMOUNT,
@@ -102,7 +100,6 @@ describe(flow, () => {
       collateralIndex: USDT_COLLATERAL_INDEX,
       senderAddress: alice.account.address,
       matcherAddress: matcher.account.address,
-      collateral: usdtToken.address,
       instrumentIndex: BTC_USD_INDEX,
       side: SELL_SIDE,
       amount: SL_ORDER_AMOUNT,
@@ -121,12 +118,11 @@ describe(flow, () => {
   });
 
   it('Bob create market order', async () => {
-    const { eveDex, usdtToken, bob, matcher, bobSessionWallet } = await restoreSuit(flow);
+    const { eveDex, bob, matcher, bobSessionWallet } = await restoreSuit(flow);
     const orderExt = createOrderExtended({
       collateralIndex: USDT_COLLATERAL_INDEX,
       senderAddress: bob.account.address,
       matcherAddress: matcher.account.address,
-      collateral: usdtToken.address,
       instrumentIndex: BTC_USD_INDEX,
       side: SELL_SIDE,
       amount: MARKET_ORDER_AMOUNT,
@@ -187,7 +183,7 @@ describe(flow, () => {
    * Depending on TRIGGER_PRICE, TP or SL order will be triggered
    */
   it('Bob create market order after price changes', async () => {
-    const { eveDex, usdtToken, bob, matcher, bobSessionWallet } = await restoreSuit(flow);
+    const { eveDex, bob, matcher, bobSessionWallet } = await restoreSuit(flow);
 
     const isUp = TRIGGER_BTC_PRICE > INITIAL_BTC_PRICE;
     const amount = isUp ? TP_ORDER_AMOUNT : SL_ORDER_AMOUNT;
@@ -197,7 +193,6 @@ describe(flow, () => {
       collateralIndex: USDT_COLLATERAL_INDEX,
       senderAddress: bob.account.address,
       matcherAddress: matcher.account.address,
-      collateral: usdtToken.address,
       instrumentIndex: BTC_USD_INDEX,
       side: BUY_SIDE,
       amount,
