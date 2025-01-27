@@ -2,7 +2,7 @@
 pragma solidity ^0.8.26;
 
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import {InstrumentInfo} from "../interfaces/IBaseDEX.sol";
+import {InstrumentInfo, StaticFundingRateInfo} from "../interfaces/IBaseDEX.sol";
 import {PositionInfo} from "../interfaces/IEVEDEX.sol";
 import "../interfaces/IStorageDEX.sol";
 
@@ -18,6 +18,7 @@ abstract contract StorageDEX is IStorageDEX {
   bytes32 public constant WITHDRAW_GUARDIAN_ROLE = keccak256("WITHDRAW_GUARDIAN_ROLE");
 
   address public fundingRateAccount;
+  address public staticFundingRateAccount;
   address public sessionManager;
   address public depositDex;
   address public marginCalculator;
@@ -36,6 +37,8 @@ abstract contract StorageDEX is IStorageDEX {
   EnumerableSet.AddressSet internal _accountsWithOpenPositions;
   mapping(uint256 instrumentIndex => mapping(address account => PositionInfo position)) internal _positionInfo;
   mapping(bytes32 orderHash => uint96 orderAmount) public filledAmounts;
+
+  StaticFundingRateInfo[] internal _staticFundingRateData;
 
   uint256[50] private __gap;
 }

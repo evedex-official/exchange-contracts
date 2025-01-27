@@ -47,8 +47,7 @@ interface IEVEDEX {
     address indexed account,
     int112 balance,
     PositionInfo position,
-    int112 realizedPNL,
-    int112 realizedFR
+    int112 realizedPNL
   );
 
   event PositionLiquidated(
@@ -56,8 +55,7 @@ interface IEVEDEX {
     uint256 liquidatedInstrument,
     uint112 liquidationFee,
     int112 balance,
-    int112 realizedPNL,
-    int112 realizedFR
+    int112 realizedPNL
   );
 
   event NewTrade(
@@ -67,6 +65,8 @@ interface IEVEDEX {
     uint80 filledPrice,
     uint192 filledAmount
   );
+
+  event FrCollected(uint256 indexed index, address indexed account, uint256 collateralIndex, int112 accountNewBalance);
 
   error InvalidSession();
   error ZeroPositionLiquidation();

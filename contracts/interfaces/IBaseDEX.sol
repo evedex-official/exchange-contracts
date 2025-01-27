@@ -15,6 +15,12 @@ struct InstrumentInfo {
   FundingRateInfo[] fundingRateData;
 }
 
+// Static funding rate for all instruments in percents of original funding rate. 10**11 = 100%
+struct StaticFundingRateInfo {
+  uint72 staticFr; // Accumulator for staticFR.
+  uint48 lastFRUpdateTime; // Last funding rate update time
+}
+
 struct InstrumentData {
   uint8 leverage; // Max available leverage
   string ticker; // Ticker of underlying asset
@@ -23,12 +29,14 @@ struct InstrumentData {
 interface IBaseDEX {
   event InstrumentUpdate(uint256 indexed index, string ticker, uint8 leverage);
   event NewFundingRate(uint256 indexed index, int72 longFRStored, int72 shortFRStored, uint256 position);
+  event NewStaticFundingRate(uint72 staticFr);
   event InstrumentDeleted(uint256 indexed index);
   event BasicParamsUpdate(
     address depositDex,
     address sessionManager,
     address marginCalculator,
     address fundingRateAccount,
+    address staticFundingRateAccount,
     int112 soLevel,
     int112 withdrawMarginLevel,
     uint256 maxOpenPositions,
@@ -54,6 +62,7 @@ interface IBaseDEX {
     address sessionManager_,
     address marginCalculator_,
     address fundingRateAccount_,
+    address staticFundingRateAccount_,
     int112 soLevel_,
     int112 withdrawMarginLevel_,
     uint256 maxOpenPositions_,

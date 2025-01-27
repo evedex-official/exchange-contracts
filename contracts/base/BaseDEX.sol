@@ -27,6 +27,7 @@ abstract contract BaseDEX is
     address sessionManager_,
     address marginCalculator_,
     address fundingRateAccount_,
+    address staticFundingRateAccount_,
     uint256 maxOpenPositions_,
     int112 soLevel_,
     int112 withdrawMarginLevel_,
@@ -37,6 +38,7 @@ abstract contract BaseDEX is
       sessionManager_,
       marginCalculator_,
       fundingRateAccount_,
+      staticFundingRateAccount_,
       soLevel_,
       withdrawMarginLevel_,
       maxOpenPositions_,
@@ -77,6 +79,7 @@ abstract contract BaseDEX is
     address sessionManager_,
     address marginCalculator_,
     address fundingRateAccount_,
+    address staticFundingRateAccount_,
     int112 soLevel_,
     int112 withdrawMarginLevel_,
     uint256 maxOpenPositions_,
@@ -87,6 +90,7 @@ abstract contract BaseDEX is
       sessionManager_,
       marginCalculator_,
       fundingRateAccount_,
+      staticFundingRateAccount_,
       soLevel_,
       withdrawMarginLevel_,
       maxOpenPositions_,
@@ -99,6 +103,7 @@ abstract contract BaseDEX is
     address sessionManager_,
     address marginCalculator_,
     address fundingRateAccount_,
+    address staticFundingRateAccount_,
     int112 soLevel_,
     int112 withdrawMarginLevel_,
     uint256 maxOpenPositions_,
@@ -108,6 +113,7 @@ abstract contract BaseDEX is
     sessionManager = sessionManager_;
     marginCalculator = marginCalculator_;
     fundingRateAccount = fundingRateAccount_;
+    staticFundingRateAccount = staticFundingRateAccount_;
     withdrawMarginLevel = withdrawMarginLevel_;
     soLevel = soLevel_;
     maxOpenPositions = maxOpenPositions_;
@@ -117,6 +123,7 @@ abstract contract BaseDEX is
       sessionManager_,
       marginCalculator_,
       fundingRateAccount_,
+      staticFundingRateAccount_,
       soLevel_,
       withdrawMarginLevel_,
       maxOpenPositions_,
@@ -168,7 +175,7 @@ abstract contract BaseDEX is
     emit InstrumentUpdate(index, ticker, leverage);
   }
 
-  //  100% = 10^11
+  //  100% = 10^8
   function setFR(uint256 index, int72 newFRLong, int72 newFRShort, uint48 timestamp) external onlyRole(MATCHER_ROLE) {
     _setFR(index, newFRLong, newFRShort, timestamp);
   }
@@ -184,6 +191,23 @@ abstract contract BaseDEX is
     newFundingRateInfo.shortFRStored = newFRShort;
     _instrumentInfo[index].fundingRateData.push(newFundingRateInfo);
     emit NewFundingRate(index, newFRLong, newFRShort, len);
+  }
+
+  //  100% = 10^8
+  function setStaticFR(uint72 newStaticFr, uint48 timestamp) external onlyRole(MATCHER_ROLE) {
+    _setStaticFR(newStaticFr, timestamp);
+  }
+
+  function _setStaticFR(uint72 newStaticFr, uint48 timestamp) internal {
+    uint256 len = _staticFundingRateData.length;
+    if (len > 0) {
+      if (timestamp <= _staticFundingRateData[len - 1].lastFRUpdateTime) revert InvalidFRTimestamp();
+    }
+    StaticFundingRateInfo memory newFundingRateInfo;
+    newFundingRateInfo.staticFr = newStaticFr;
+    newFundingRateInfo.lastFRUpdateTime = timestamp;
+    _staticFundingRateData.push(newFundingRateInfo);
+    emit NewStaticFundingRate(newStaticFr);
   }
 
   function _getFundingRateInfo(
@@ -209,6 +233,29 @@ abstract contract BaseDEX is
       }
     }
     return _instrumentInfo[index].fundingRateData[--low];
+  }
+
+  function _getStaticFundingRateInfo(
+    uint256 timestamp,
+    uint256 searchHint
+  ) internal view returns (StaticFundingRateInfo memory) {
+    uint256 len = _staticFundingRateData.length;
+    if (len == 0) revert EmptyArrayToSearch();
+    if (_staticFundingRateData[searchHint].lastFRUpdateTime > timestamp) revert SearchWithHintFailed(searchHint);
+
+    uint256 low = searchHint;
+    uint256 high = len;
+    while (low < high) {
+      uint256 mid = Math.average(low, high);
+      if (_staticFundingRateData[mid].lastFRUpdateTime > timestamp) {
+        high = mid;
+      } else {
+        unchecked {
+          low = mid + 1;
+        }
+      }
+    }
+    return _staticFundingRateData[--low];
   }
 
   function _getBalance(address account_, address collateral_) internal view returns (int112 balance) {
