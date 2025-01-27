@@ -722,14 +722,12 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     uint256 historySearchHint
   ) internal {
     int112 newPosition = amount + posData.position;
-
-    bool changePositionSide = (posData.position > 0 && newPosition <= 0) || (posData.position < 0 && newPosition >= 0);
-    bool increase_position = (newPosition > 0 && amount > 0) || (newPosition < 0 && amount < 0);
     int112 realizedFRCollateral;
     int112 realizedPNL;
     address collateral = fullPrices.collateralPrices[collateralIndex].collateral;
     int112 collateralPrice = int112(fullPrices.collateralPrices[collateralIndex].price);
-    if (changePositionSide) {
+    if ((posData.position > 0 && newPosition <= 0) || (posData.position < 0 && newPosition >= 0)) {
+      // change position side
       realizedFRCollateral =
         (getAccountFR(positionOwner, index, historyTimestamp, historySearchHint) *
           int112(uint112(posData.positionAvgPrice))) /
@@ -749,7 +747,8 @@ contract EVEDEX is BaseDEX, IEVEDEX {
       );
       posData.frAccumulated = 0;
       posData.positionAvgPrice = uint80(uint112(price));
-    } else if (increase_position) {
+    } else if ((newPosition > 0 && amount > 0) || (newPosition < 0 && amount < 0)) {
+      // increase position
       posData.positionAvgPrice = uint80(
         uint112((amount * price + posData.position * int112(uint112(posData.positionAvgPrice))) / newPosition)
       );
