@@ -18,7 +18,6 @@ abstract contract StorageDEX is IStorageDEX {
   bytes32 public constant WITHDRAW_GUARDIAN_ROLE = keccak256("WITHDRAW_GUARDIAN_ROLE");
 
   address public fundingRateAccount;
-  address public staticFundingRateAccount;
   address public sessionManager;
   address public depositDex;
   address public marginCalculator;
