@@ -721,13 +721,14 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     uint256 historyTimestamp,
     uint256 historySearchHint
   ) internal {
-    int112 newPosition = amount + posData.position;
+    int112 oldPosition = posData.position;
+    int112 newPosition = amount + oldPosition;
     int112 realizedFRCollateral;
     int112 realizedPNL;
     address collateral = fullPrices.collateralPrices[collateralIndex].collateral;
     int112 collateralPrice = int112(fullPrices.collateralPrices[collateralIndex].price);
-    if ((posData.position > 0 && newPosition <= 0) || (posData.position < 0 && newPosition >= 0)) {
-      // change position side
+    // change position side
+    if ((oldPosition > 0 && newPosition <= 0) || (oldPosition < 0 && newPosition >= 0)) {
       realizedFRCollateral =
         (getAccountFR(positionOwner, index, historyTimestamp, historySearchHint) *
           int112(uint112(posData.positionAvgPrice))) /
@@ -747,22 +748,22 @@ contract EVEDEX is BaseDEX, IEVEDEX {
       );
       posData.frAccumulated = 0;
       posData.positionAvgPrice = uint80(uint112(price));
-    } else if ((newPosition > 0 && amount > 0) || (newPosition < 0 && amount < 0)) {
       // increase position
+    } else if ((newPosition > 0 && amount > 0) || (newPosition < 0 && amount < 0)) {
       posData.positionAvgPrice = uint80(
-        uint112((amount * price + posData.position * int112(uint112(posData.positionAvgPrice))) / newPosition)
+        uint112((amount * price + oldPosition * int112(uint112(posData.positionAvgPrice))) / newPosition)
       );
       posData.frAccumulated = getAccountFR(positionOwner, index, historyTimestamp, historySearchHint);
-    } else {
       //  Partially close.
+    } else {
       int112 frCurrent = getAccountFR(positionOwner, index, historyTimestamp, historySearchHint);
 
-      //  In this case, amount and posData.position would have different signs
+      //  In this case, amount and oldPosition would have different signs
       realizedFRCollateral =
         (frCurrent * int112(uint112(posData.positionAvgPrice)) * -1 * amount) /
-        posData.position /
+        oldPosition /
         _INT_PRECISION;
-      realizedPNL = (getPNL(positionOwner, index, price) * amount * -1) / posData.position;
+      realizedPNL = (getPNL(positionOwner, index, price) * amount * -1) / oldPosition;
 
       _setBalance(
         positionOwner,
@@ -776,7 +777,7 @@ contract EVEDEX is BaseDEX, IEVEDEX {
         collateral,
         _getBalance(fundingRateAccount, collateral) - (realizedFRCollateral * _INT_PRECISION) / collateralPrice
       );
-      posData.frAccumulated = (frCurrent * newPosition) / posData.position;
+      posData.frAccumulated = (frCurrent * newPosition) / oldPosition;
     }
 
     posData.position = newPosition;
