@@ -47,7 +47,8 @@ interface IEVEDEX {
     address indexed account,
     int112 balance,
     PositionInfo position,
-    int112 realizedPNL
+    int112 realizedPNL,
+    int112 realizedFR
   );
 
   event PositionLiquidated(
@@ -55,7 +56,8 @@ interface IEVEDEX {
     uint256 liquidatedInstrument,
     uint112 liquidationFee,
     int112 balance,
-    int112 realizedPNL
+    int112 realizedPNL,
+    int112 realizedFR
   );
 
   event NewTrade(

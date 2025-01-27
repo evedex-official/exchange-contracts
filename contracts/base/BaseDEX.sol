@@ -27,7 +27,6 @@ abstract contract BaseDEX is
     address sessionManager_,
     address marginCalculator_,
     address fundingRateAccount_,
-
     uint256 maxOpenPositions_,
     int112 soLevel_,
     int112 withdrawMarginLevel_,
@@ -169,7 +168,7 @@ abstract contract BaseDEX is
     emit InstrumentUpdate(index, ticker, leverage);
   }
 
-  //  100% = 10^8
+  //  100% = 10^11
   function setFR(uint256 index, int72 newFRLong, int72 newFRShort, uint48 timestamp) external onlyRole(MATCHER_ROLE) {
     _setFR(index, newFRLong, newFRShort, timestamp);
   }
@@ -187,7 +186,7 @@ abstract contract BaseDEX is
     emit NewFundingRate(index, newFRLong, newFRShort, len);
   }
 
-  //  100% = 10^8
+  //  100% = 10^11
   function setStaticFR(uint72 newStaticFr, uint48 timestamp) external onlyRole(MATCHER_ROLE) {
     _setStaticFR(newStaticFr, timestamp);
   }
