@@ -27,6 +27,7 @@ const prepareWallets = async () => {
     aliceSessionWallet,
     bobSessionWallet,
     carolSessionWallet,
+    liquidatorSessionWallet,
   ] = await viem.getWalletClients();
   return {
     owner,
@@ -39,6 +40,7 @@ const prepareWallets = async () => {
     aliceSessionWallet,
     bobSessionWallet,
     carolSessionWallet,
+    liquidatorSessionWallet,
   };
 };
 
@@ -193,6 +195,75 @@ const populateDefaults = (config) => {
   return config;
 };
 
+/**
+ * @typedef {Object} EveDexConfig
+ * @property {number|bigint} maxOpenPositions - The maximum number of open positions allowed.
+ * @property {number}        soLevel          - The stop-out level (expressed as a fraction of the margin precision).
+ * @property {number}        withdrawMarginLevel - The margin level required to withdraw.
+ * @property {number}        liquidationFeePercent - The fee percentage charged upon liquidation.
+ */
+
+/**
+ * @typedef {Object} InstrumentConfig
+ * @property {string} symbol        - The symbol of the instrument (e.g., "BTC/USD").
+ * @property {number} leverage      - The leverage for this instrument.
+ * @property {number} dailyFRLong   - The daily funding rate for long positions.
+ * @property {number} dailyFRShort  - The daily funding rate for short positions.
+ */
+
+/**
+ * An object describing a single margin calculation level.
+ * @typedef {Object} MarginCalcLevel
+ * @property {bigint} accumulatedMarginLowerLevels - The accumulated margin lower levels (in big integer).
+ * @property {bigint} positionVolumeLowerBound     - The position volume lower bound (in big integer).
+ * @property {bigint} marginCoefficient            - The margin coefficient (in big integer).
+ */
+
+/**
+ * @typedef {Object} MarginCalcConfig
+ * @property {bigint}            maxMargin   - The maximum margin allowed.
+ * @property {bigint}            minMargin   - The minimum margin allowed.
+ * @property {MarginCalcLevel[][]} initLevels - A 2D array of margin calc levels for each instrument.
+ *                                             Each inner array corresponds to an instrument's levels.
+ */
+
+/**
+ * @typedef {Object} OracleConfig
+ * @property {bigint} window - The maximum time window in which price confidence is valid.
+ */
+
+/**
+ * @typedef {Object} StaticFr
+ * @property {number} staticFr   - The static funding rate.
+ * @property {number} timestamp  - The timestamp at which the static funding rate was set.
+ */
+
+/**
+ * The configuration for generating a suit.
+ * All properties are optional; if they are missing,
+ * defaults will be populated internally.
+ *
+ * @typedef {Object} SuitConfig
+ * @property {EveDexConfig}        [eveDexConfig]         - Configures EveDex parameters.
+ * @property {InstrumentConfig[]}  [initInstrumentConfigs] - Array of initial instrument configurations.
+ * @property {MarginCalcConfig}    [initMarginCalcConfig]  - Configuration for margin calculations.
+ * @property {OracleConfig}        [oracleConfig]          - Pyth price oracle configuration.
+ * @property {StaticFr}            [initStaticFr]          - Static funding rate and timestamp.
+ */
+
+/**
+ * Generates a new suit (test environment configuration) for a given ID.
+ * If a config object is not provided or is partially provided,
+ * default values will be used for missing properties.
+ *
+ * @async
+ * @function generateSuit
+ * @param {string} id - The suit identifier (must be unique).
+ * @param {SuitConfig} [config={}] - Optional configuration object.
+ * @returns {Promise<Object>} A suit object containing all relevant
+ *                            deployed contracts, wallets, tokens, etc.
+ */
+
 const generateSuit = async (id, config = {}) => {
   if (!id) throw new Error('Suit id is required');
   populateDefaults(config);
@@ -207,7 +278,7 @@ const generateSuit = async (id, config = {}) => {
     aliceSessionWallet,
     bobSessionWallet,
     carolSessionWallet,
-    initStaticFr,
+    liquidatorSessionWallet,
   } = await prepareWallets();
   const { usdtToken, btcToken } = await prepareTokens([
     owner,
@@ -217,7 +288,6 @@ const generateSuit = async (id, config = {}) => {
     liquidator,
     fundingRateAccount,
     matcher,
-    carolSessionWallet,
   ]);
   const { orderLib, sessions, vault, depositDex, eveDex, marginCalculator, pythMock, oracle } = await prepareContracts({
     owner,
@@ -249,6 +319,7 @@ const generateSuit = async (id, config = {}) => {
     aliceSessionWallet,
     bobSessionWallet,
     carolSessionWallet,
+    liquidatorSessionWallet,
     marginCalculator,
     oracle,
     pythMock,

@@ -220,12 +220,23 @@ const removeSession = async ({ userWallet, sessionManagerContract, sessionAccoun
   });
 };
 
-const parsePrice = (priceFloat, { precisionDecimals = 8n, tokenDecimals = 0n } = {}) => {
-  const shift = Number(10n ** precisionDecimals);
-  const priceShifted = BigInt(Math.round(priceFloat * shift));
-  return tokenDecimals > precisionDecimals
-    ? priceShifted / 10n ** (tokenDecimals - precisionDecimals)
-    : priceShifted * 10n ** (precisionDecimals - tokenDecimals);
+const parsePrice = (price, { precisionDecimals = 8n, tokenDecimals = 0n } = {}) => {
+  const shiftBn = 10n ** precisionDecimals;
+  if (typeof price === 'number') {
+    const shift = Number(shiftBn);
+    const priceShifted = BigInt(Math.round(price * shift));
+    return tokenDecimals > precisionDecimals
+      ? priceShifted / 10n ** (tokenDecimals - precisionDecimals)
+      : priceShifted * 10n ** (precisionDecimals - tokenDecimals);
+  }
+  if (typeof price === 'string' || typeof price === 'bigint') {
+    const priceBn = BigInt(price);
+    const priceShifted = priceBn * shiftBn;
+    return tokenDecimals > precisionDecimals
+      ? priceShifted / 10n ** (tokenDecimals - precisionDecimals)
+      : priceShifted * 10n ** (precisionDecimals - tokenDecimals);
+  }
+  throw new Error('Invalid price type');
 };
 
 /**
@@ -327,6 +338,11 @@ const signMultiLiquidationOrder = async ({ wallet, order, contractAddress }) => 
 };
 
 const absBn = (value) => (value < 0n ? -value : value);
+
+const pipe =
+  (...fns) =>
+  (x) =>
+    fns.reduce((v, f) => v.then(f), Promise.resolve(x));
 
 module.exports = {
   createWithdrawOrder,

@@ -392,10 +392,14 @@ contract EVEDEX is BaseDEX, IEVEDEX {
       historySearchHint
     );
     if (validMargin) revert SufficientMargin();
-    uint80 liquidatorPositionAvgPrice = _positionInfo[liquidationOrder.index][liquidationOrder.accountToLiquidate]
-      .positionAvgPrice;
+    PositionInfo memory positionInfo = _positionInfo[liquidationOrder.index][liquidationOrder.accountToLiquidate];
+    uint80 liquidatorPositionAvgPrice = positionInfo.positionAvgPrice;
     uint80 liquidationPrice = uint80(liquidationOrder.prices[0].price);
-    if (liquidationPrice < liquidatorPositionAvgPrice) revert PriceBelowLiquidatorPositionAvgPrice();
+    if (
+      positionInfo.position > 0
+        ? liquidationPrice > liquidatorPositionAvgPrice
+        : liquidationPrice < liquidatorPositionAvgPrice
+    ) revert PriceBelowLiquidatorPositionAvgPrice();
 
     _liquidatePosition(
       liquidationOrder.index,
