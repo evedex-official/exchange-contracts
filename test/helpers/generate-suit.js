@@ -62,6 +62,7 @@ const prepareContracts = async ({
   initInstrumentConfigs,
   initMarginCalcConfig,
   oracleConfig,
+  initStaticFr,
 }) => {
   const [orderLib, sessions, vault, marginCalculator, pythMock] = await Promise.all([
     viemDeployWithLibraries('OrderValidationLib', []),
@@ -138,6 +139,9 @@ const prepareContracts = async ({
       marginCalculator.write.setLevels([i, initMarginCalcConfig.initLevels[i]]),
     ]);
   }
+  await eveDex.write.setStaticFR([initStaticFr.staticFr, initStaticFr.timestamp], {
+    account: matcher.account.address,
+  });
 
   return { orderLib, sessions, vault, depositDex, eveDex, marginCalculator, oracle, pythMock };
 };
@@ -180,6 +184,12 @@ const populateDefaults = (config) => {
   if (!config.oracleConfig) {
     config.oracleConfig = { window: maxUint256 };
   }
+  if (!config.initStaticFr) {
+    config.initStaticFr = {
+      staticFr: 0,
+      timestamp: 0,
+    };
+  }
   return config;
 };
 
@@ -197,6 +207,7 @@ const generateSuit = async (id, config = {}) => {
     aliceSessionWallet,
     bobSessionWallet,
     carolSessionWallet,
+    initStaticFr,
   } = await prepareWallets();
   const { usdtToken, btcToken } = await prepareTokens([
     owner,
@@ -218,6 +229,7 @@ const generateSuit = async (id, config = {}) => {
     eveDexConfig: config.eveDexConfig,
     initInstrumentConfigs: config.initInstrumentConfigs,
     initMarginCalcConfig: config.initMarginCalcConfig,
+    initStaticFr: config.initStaticFr,
   });
   suits[id] = {
     owner,

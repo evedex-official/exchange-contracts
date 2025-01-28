@@ -112,6 +112,7 @@ describe('EVEDEX contract', function () {
     const frLong = 86400;
     const frShort = 86400;
     await eveDex.addInstrument(ticker, leverage, frLong, frShort, Math.floor(Date.now() / 1000));
+    await eveDex.connect(matcher).setStaticFR(0, 1);
 
     // set margin levels
     await marginCalculator.setLevels(0, [

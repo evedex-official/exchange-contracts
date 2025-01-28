@@ -77,6 +77,8 @@ describe('EVEDEX contract', function () {
 
     const withdrawRole = await vault.WITHDRAWER_ROLE();
     await vault.grantRole(withdrawRole, depositDex.getAddress());
+
+    await eveDex.connect(matcher).setStaticFR(0, 1);
   });
 
   it('should fill and search FR array ', async function () {

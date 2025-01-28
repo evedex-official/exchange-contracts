@@ -91,8 +91,9 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     return
       shortFRStored < 0
         ? shortFRStored
-        : shortFRStored *
-          (int72(_FR_PRECISION) - int72(_getStaticFundingRateInfo(historyTimestamp, historySearchHint).staticFr));
+        : (shortFRStored *
+          (int72(_FR_PRECISION) - int72(_getStaticFundingRateInfo(historyTimestamp, historySearchHint).staticFr))) /
+          int72(_FR_PRECISION);
   }
 
   function getTotalLongFR(
@@ -104,8 +105,9 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     return
       longFRStored < 0
         ? longFRStored
-        : longFRStored *
-          (int72(_FR_PRECISION) - int72(_getStaticFundingRateInfo(historyTimestamp, historySearchHint).staticFr));
+        : (longFRStored *
+          (int72(_FR_PRECISION) - int72(_getStaticFundingRateInfo(historyTimestamp, historySearchHint).staticFr))) /
+          int72(_FR_PRECISION);
   }
 
   function getStaticFR(uint256 historyTimestamp, uint256 historySearchHint) external view returns (uint72) {

@@ -103,6 +103,7 @@ describe('DepositDex contract', function () {
       0, //dailyFRShort
       0, //timestamp
     );
+    await eveDex.connect(matcher).setStaticFR(0, 1);
   });
 
   it('contracts are correctly initialized', async function () {
