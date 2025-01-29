@@ -1,7 +1,13 @@
 'use strict';
 
 const { BTC_USD_INDEX, USDT_COLLATERAL_INDEX, BUY_SIDE, SELL_SIDE } = require('./helpers/constants');
-const { createSession, calculateBoundaryOrderAmount, createOrderExtended, signOrder } = require('./helpers/utils');
+const {
+  createSession,
+  calculateBoundaryOrderAmount,
+  createOrderExtended,
+  signOrder,
+  getFullPricesBtcUsdt,
+} = require('./helpers/utils');
 const { generateSuit } = require('./helpers/generate-suit');
 const { writeContract } = require('viem/actions');
 const { maxUint256 } = require('viem');
@@ -95,28 +101,13 @@ const createOrders = async ({
   eveDex,
   config,
 }) => {
-  // Set up prices for instruments and collateral
-  const buildFullPrices = (btcPrice) => ({
-    instrumentPrices: [
-      {
-        index: BTC_USD_INDEX,
-        price: btcPrice,
-      },
-    ],
-    collateralPrices: [
-      {
-        collateral: usdtToken.address,
-        price: config.USDT_PRICE,
-      },
-      {
-        collateral: btcToken.address,
-        price: btcPrice,
-      },
-    ],
-  });
-
-  const createOrder = async ({ side, userWallet, userSessionWallet, price }) => {
-    const { collateralPrices, instrumentPrices } = buildFullPrices(price);
+  const createOrder = async ({ side, userWallet, userSessionWallet, price, orderSizePercent }) => {
+    const { collateralPrices, instrumentPrices } = getFullPricesBtcUsdt(
+      price,
+      config.USDT_PRICE,
+      btcToken.address,
+      usdtToken.address,
+    );
     const boundaryAmount = await calculateBoundaryOrderAmount({
       eveDexContract: eveDex,
       instrumentPrices,
@@ -125,7 +116,7 @@ const createOrders = async ({
       instrumentIndex: BTC_USD_INDEX,
       collateralPrices,
     });
-    const amount = (boundaryAmount * config.INITIAL_ORDER_SIZE_PERCENT) / 100n;
+    const amount = (boundaryAmount * orderSizePercent) / 100n;
 
     const orderExt = createOrderExtended({
       collateralIndex: USDT_COLLATERAL_INDEX,
@@ -154,24 +145,28 @@ const createOrders = async ({
       userWallet: alice,
       userSessionWallet: aliceSessionWallet,
       price: config.BTC_PRICE_USERS_TRADE,
+      orderSizePercent: config.USER_ORDER_SIZE_PERCENT,
     }),
     createOrder({
       side: SELL_SIDE,
       userWallet: bob,
       userSessionWallet: bobSessionWallet,
       price: config.BTC_PRICE_USERS_TRADE,
+      orderSizePercent: config.USER_ORDER_SIZE_PERCENT,
     }),
     createOrder({
       side: config.LIQUIDATOR_ORDER_SIDE,
       userWallet: liquidator,
       userSessionWallet: liquidatorSessionWallet,
       price: config.BTC_PRICE_LIQUIDATOR_TRADE,
+      orderSizePercent: config.LIQUIDATOR_ORDER_SIZE_PERCENT,
     }),
     createOrder({
       side: config.LIQUIDATOR_ORDER_SIDE === BUY_SIDE ? SELL_SIDE : BUY_SIDE,
       userWallet: carol,
       userSessionWallet: carolSessionWallet,
       price: config.BTC_PRICE_LIQUIDATOR_TRADE,
+      orderSizePercent: config.LIQUIDATOR_ORDER_SIZE_PERCENT,
     }),
   ]);
   return {
@@ -183,27 +178,6 @@ const createOrders = async ({
 };
 
 const matchOrders = async ({ matcher, usdtToken, btcToken, eveDex, orders, config }) => {
-  // fullPrices is a structure with prices of all collaterals and instruments
-  // instrumentPrices is a list of all futures prices available on dex
-  // collateralPrices is a list of all collateral prices available on dex
-  const buildFullPrices = (btcPrice) => ({
-    instrumentPrices: [
-      {
-        index: BTC_USD_INDEX,
-        price: btcPrice,
-      },
-    ],
-    collateralPrices: [
-      {
-        collateral: usdtToken.address,
-        price: config.USDT_PRICE,
-      },
-      {
-        collateral: btcToken.address,
-        price: btcPrice,
-      },
-    ],
-  });
   const historyTimestamp = Math.trunc(Date.now() / 1000);
   const historySearchHint = 0n; // element index in funding rate array. Hint from backend to reduce tx gas cost
 
@@ -216,7 +190,7 @@ const matchOrders = async ({ matcher, usdtToken, btcToken, eveDex, orders, confi
       orders.shortOrderExt,
       config.BTC_PRICE_USERS_TRADE,
       orders.longOrderExt.order.amount,
-      buildFullPrices(config.BTC_PRICE_USERS_TRADE),
+      getFullPricesBtcUsdt(config.BTC_PRICE_USERS_TRADE, config.USDT_PRICE, btcToken.address, usdtToken.address),
       historyTimestamp,
       historySearchHint,
     ],
@@ -233,7 +207,12 @@ const matchOrders = async ({ matcher, usdtToken, btcToken, eveDex, orders, confi
             orders.carolOrderExt,
             config.BTC_PRICE_LIQUIDATOR_TRADE,
             orders.liquidatorOrderExt.order.amount,
-            buildFullPrices(config.BTC_PRICE_LIQUIDATOR_TRADE),
+            getFullPricesBtcUsdt(
+              config.BTC_PRICE_LIQUIDATOR_TRADE,
+              config.USDT_PRICE,
+              btcToken.address,
+              usdtToken.address,
+            ),
             historyTimestamp,
             historySearchHint,
           ]
@@ -242,7 +221,12 @@ const matchOrders = async ({ matcher, usdtToken, btcToken, eveDex, orders, confi
             orders.liquidatorOrderExt,
             config.BTC_PRICE_LIQUIDATOR_TRADE,
             orders.carolOrderExt.order.amount,
-            buildFullPrices(config.BTC_PRICE_LIQUIDATOR_TRADE),
+            getFullPricesBtcUsdt(
+              config.BTC_PRICE_LIQUIDATOR_TRADE,
+              config.USDT_PRICE,
+              btcToken.address,
+              usdtToken.address,
+            ),
             historyTimestamp,
             historySearchHint,
           ],

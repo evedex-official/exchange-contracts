@@ -7,7 +7,7 @@ const {
 } = require('./eip712-types');
 const { signTypedData, readContract, writeContract } = require('viem/actions');
 const { maxUint32, maxUint128, maxUint64, zeroHash, encodeAbiParameters, keccak256 } = require('viem');
-const { INT_PRECISION_EVEDEX, ORDER_TYPEHASH, EVEDEX_MARGIN_PRECISION } = require('./constants');
+const { INT_PRECISION_EVEDEX, ORDER_TYPEHASH, EVEDEX_MARGIN_PRECISION, BTC_USD_INDEX } = require('./constants');
 const { StandardMerkleTree } = require('@openzeppelin/merkle-tree');
 
 const signWithdrawOrder = async ({ wallet, order, contractAddress }) => {
@@ -344,6 +344,29 @@ const pipe =
   (x) =>
     fns.reduce((v, f) => v.then(f), Promise.resolve(x));
 
+// hardcoded indexes, instrument and collateral sorting
+// used to shorten the code
+const getFullPricesBtcUsdt = (btcPrice, usdtPrice, btcAddress, usdtAddress) => {
+  return {
+    instrumentPrices: [
+      {
+        index: BTC_USD_INDEX,
+        price: btcPrice,
+      },
+    ],
+    collateralPrices: [
+      {
+        collateral: usdtAddress,
+        price: usdtPrice,
+      },
+      {
+        collateral: btcAddress,
+        price: btcPrice,
+      },
+    ],
+  };
+};
+
 module.exports = {
   createWithdrawOrder,
   signWithdrawOrder,
@@ -359,4 +382,5 @@ module.exports = {
   absBn,
   getOrderDigest,
   toMultiOrders,
+  getFullPricesBtcUsdt,
 };
