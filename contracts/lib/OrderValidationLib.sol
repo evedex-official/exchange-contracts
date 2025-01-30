@@ -232,11 +232,11 @@ library OrderValidationLib {
       );
   }
 
-  function _getOrderDigest(Order memory order) public view returns (bytes32) {
+  function getOrderDigest(Order memory order) public view returns (bytes32) {
     return keccak256(abi.encodePacked("\x19\x01", buildDomainSeparator(), _getOrderTypeValueHash(order)));
   }
 
-  function _getMultiOrderDigest(Order memory order) public view returns (bytes32, bytes32) {
+  function getMultiOrderDigest(Order memory order) public view returns (bytes32, bytes32) {
     bytes32 digest = keccak256(
       abi.encodePacked("\x19\x01", buildDomainSeparator(), _getMultiOrderTypeValueHash(order))
     );
@@ -256,7 +256,7 @@ library OrderValidationLib {
     if (!MerkleProof.verify(proof, root, leaf)) revert InvalidMerkleTree();
   }
 
-  function checkLiquidationOrder(OrderLiquidation memory liquidationOrder, uint256 historyTimestamp) public view {
+  function checkLiquidationOrder(OrderLiquidation memory liquidationOrder, uint256 historyTimestamp) external view {
     _checkTimeline(historyTimestamp, liquidationOrder.expiration);
     bytes32 digest = keccak256(
       abi.encodePacked("\x19\x01", buildDomainSeparator(), _getLiquidationOrderTypeValueHash(liquidationOrder))
@@ -264,7 +264,10 @@ library OrderValidationLib {
     _checkSignature(liquidationOrder.liquidator, digest, liquidationOrder.signature);
   }
 
-  function checkLiquidationOrder(MultiOrderLiquidation memory liquidationOrder, uint256 historyTimestamp) public view {
+  function checkLiquidationOrder(
+    MultiOrderLiquidation memory liquidationOrder,
+    uint256 historyTimestamp
+  ) external view {
     _checkTimeline(historyTimestamp, liquidationOrder.expiration);
     bytes32 digest = keccak256(
       abi.encodePacked("\x19\x01", buildDomainSeparator(), _getMultiLiquidationOrderTypeValueHash(liquidationOrder))
@@ -272,7 +275,7 @@ library OrderValidationLib {
     _checkSignature(liquidationOrder.liquidator, digest, liquidationOrder.signature);
   }
 
-  function checkWithdrawalOrder(OrderWithdrawal memory withdrawalOrder, address orderSigner) public view {
+  function checkWithdrawalOrder(OrderWithdrawal memory withdrawalOrder, address orderSigner) external view {
     _checkTimeline(block.timestamp, withdrawalOrder.expiration);
     bytes32 digest = keccak256(
       abi.encodePacked("\x19\x01", buildDomainSeparator(), _getWithdrawalOrderTypeValueHash(withdrawalOrder))
@@ -291,24 +294,24 @@ library OrderValidationLib {
     address allowedMatcher,
     uint256 instrumentsLength,
     uint256 historyTimestamp
-  ) public view returns (bytes32 buyOrderDigest, bytes32 sellOrderDigest) {
+  ) external view returns (bytes32 buyOrderDigest, bytes32 sellOrderDigest) {
     _checkTimeline(buyOrder.creationTime, historyTimestamp);
     _checkTimeline(sellOrder.creationTime, historyTimestamp);
 
     if (buyOrder.merkleRoot != 0x00) {
       bytes32 buyOrderLeaf;
-      (buyOrderDigest, buyOrderLeaf) = _getMultiOrderDigest(buyOrder);
+      (buyOrderDigest, buyOrderLeaf) = getMultiOrderDigest(buyOrder);
       _checkMerkleTree(buyOrder.merkleProof, buyOrder.merkleRoot, buyOrderLeaf);
     } else {
-      buyOrderDigest = _getOrderDigest(buyOrder);
+      buyOrderDigest = getOrderDigest(buyOrder);
     }
 
     if (sellOrder.merkleRoot != 0x00) {
       bytes32 sellOrderLeaf;
-      (sellOrderDigest, sellOrderLeaf) = _getMultiOrderDigest(sellOrder);
+      (sellOrderDigest, sellOrderLeaf) = getMultiOrderDigest(sellOrder);
       _checkMerkleTree(sellOrder.merkleProof, sellOrder.merkleRoot, sellOrderLeaf);
     } else {
-      sellOrderDigest = _getOrderDigest(sellOrder);
+      sellOrderDigest = getOrderDigest(sellOrder);
     }
 
     _checkSignature(buyOrderSigner, buyOrderDigest, buyOrder.signature);

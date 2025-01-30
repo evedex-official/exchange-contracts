@@ -7,18 +7,13 @@ import {IMarginCalc} from "./IMarginCalc.sol";
 struct FundingRateInfo {
   int72 longFRStored; // Accumulator for frLong
   int72 shortFRStored; // Accumulator for frShort
-  uint48 lastFRUpdateTime; // Last funding rate update time
+  int72 staticFr; // Static percentage of funding rate
+  uint40 lastFRUpdateTime; // Last funding rate update time
 }
 
 struct InstrumentInfo {
   InstrumentData instrumentData;
   FundingRateInfo[] fundingRateData;
-}
-
-// Static funding rate for all instruments in percents of original funding rate. 10**11 = 100%
-struct StaticFundingRateInfo {
-  uint72 staticFr; // Accumulator for staticFR.
-  uint48 lastFRUpdateTime; // Last funding rate update time
 }
 
 struct InstrumentData {
@@ -28,8 +23,13 @@ struct InstrumentData {
 
 interface IBaseDEX {
   event InstrumentUpdate(uint256 indexed index, string ticker, uint8 leverage);
-  event NewFundingRate(uint256 indexed index, int72 longFRStored, int72 shortFRStored, uint256 position);
-  event NewStaticFundingRate(uint72 staticFr);
+  event NewFundingRate(
+    uint256 indexed index,
+    int72 longFRStored,
+    int72 shortFRStored,
+    uint72 staticFR,
+    uint256 position
+  );
   event InstrumentDeleted(uint256 indexed index);
   event BasicParamsUpdate(
     address depositDex,
@@ -72,7 +72,8 @@ interface IBaseDEX {
     uint8 leverage,
     int72 newFRLong,
     int72 newFRShort,
-    uint48 timestamp
+    uint72 newStaticFR,
+    uint40 timestamp
   ) external;
 
   function deleteInstrument() external;
@@ -83,8 +84,9 @@ interface IBaseDEX {
     uint8 leverage,
     int72 newFRLong,
     int72 newFRShort,
-    uint48 timestamp
+    uint72 newStaticFR,
+    uint40 timestamp
   ) external;
 
-  function setFR(uint256 index, int72 newFRLong, int72 newFRShort, uint48 timestamp) external;
+  function setFR(uint256 index, int72 newFRLong, int72 newFRShort, uint72 newStaticFR, uint40 timestamp) external;
 }

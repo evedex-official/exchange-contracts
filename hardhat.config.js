@@ -25,7 +25,7 @@ module.exports = {
           viaIR: true,
           optimizer: {
             enabled: true,
-            runs: 200,
+            runs: 20,
           },
         },
       },
@@ -129,5 +129,12 @@ module.exports = {
     deployer: {
       '': 0,
     },
+  },
+  contractSizer: {
+    alphaSort: true,
+    disambiguatePaths: false,
+    runOnCompile: true,
+    strict: false,
+    only: [':EVEDEX$'],
   },
 };

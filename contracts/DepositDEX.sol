@@ -193,10 +193,10 @@ contract DepositDEX is IDepositDEX, UUPSUpgradeable {
     CollateralPriceData calldata priceTo
   ) external onlyRole(CONVERTER_ROLE) {
     _consultPrices(collateralFrom, collateralTo, priceFrom, priceTo);
-    int112 amountFrom = int112(int256(amount));
-    int112 amountTo = (amountFrom * int112(priceFrom.price)) / int112(priceTo.price);
-    _balances[account][collateralFrom] -= amountFrom;
-    _balances[account][collateralTo] += int112(int256(amountTo));
+    int256 amountFrom = int256(amount);
+    int256 amountTo = (amountFrom * int256(priceFrom.price)) / int256(priceTo.price);
+    _balances[account][collateralFrom] -= int112(amountFrom);
+    _balances[account][collateralTo] += int112(amountTo);
 
     emit ForcedSwap(account, collateralFrom, collateralTo, amount, priceFrom.price, priceTo.price);
   }
@@ -217,8 +217,8 @@ contract DepositDEX is IDepositDEX, UUPSUpgradeable {
     if (p2 < min || p2 > max) revert InvalidSlippage();
   }
 
-  function getBalance(address account, address collateral) public view returns (int112 balance) {
-    balance = int112((int256(_balances[account][collateral])));
+  function getBalance(address account, address collateral) public view returns (int256 balance) {
+    balance = _balances[account][collateral];
   }
 
   function getTotalBalance(address account, CollateralPriceData[] memory prices) public view returns (int112 balance) {
@@ -227,12 +227,12 @@ contract DepositDEX is IDepositDEX, UUPSUpgradeable {
     for (uint256 i; i < len; i++) {
       address collateral = _collaterals.at(i);
       if (prices[i].collateral != collateral) revert InvalidPrice(collateral);
-      balance += int112((int256(_balances[account][collateral]) * int112(prices[i].price))) / _INT_PRECISION;
+      balance += int112(((_balances[account][collateral]) * int256(prices[i].price))) / _INT_PRECISION;
     }
   }
 
-  function setBalance(address account_, address collateral_, int112 balance_) external onlyBaseDex {
-    _balances[account_][collateral_] = balance_;
+  function setBalance(address account_, address collateral_, int256 balance_) external onlyBaseDex {
+    _balances[account_][collateral_] = int112(balance_);
   }
 
   function setBasicParams(

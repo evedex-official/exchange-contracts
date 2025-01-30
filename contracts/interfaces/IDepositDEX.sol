@@ -56,9 +56,9 @@ interface IDepositDEX {
     uint256 priceTo
   );
 
-  function setBalance(address account, address collateral, int112 balance) external;
+  function setBalance(address account, address collateral, int256 balance) external;
 
-  function getBalance(address account, address collateral) external view returns (int112 balance);
+  function getBalance(address account, address collateral) external view returns (int256 balance);
 
   function getTotalBalance(address account, CollateralPriceData[] memory prices) external view returns (int112 balance);
 }

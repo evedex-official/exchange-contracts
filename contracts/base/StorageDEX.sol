@@ -2,16 +2,16 @@
 pragma solidity ^0.8.26;
 
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import {InstrumentInfo, StaticFundingRateInfo} from "../interfaces/IBaseDEX.sol";
+import {InstrumentInfo} from "../interfaces/IBaseDEX.sol";
 import {PositionInfo} from "../interfaces/IEVEDEX.sol";
 import "../interfaces/IStorageDEX.sol";
 
 abstract contract StorageDEX is IStorageDEX {
-  int256 internal constant _FR_PRECISION = 1e11;
+  int72 internal constant _FR_PRECISION = 1e11;
   int256 internal constant _INT_1DAY = 1e8;
-  int112 internal constant _INT_PRECISION = 1e8;
-  uint112 internal constant _UINT_PRECISION = 1e8;
-  int112 internal constant _MARGIN_LEVEL_PRECISION = 1e2;
+  int256 internal constant _INT_PRECISION = 1e8;
+  uint256 internal constant _UINT_PRECISION = 1e8;
+  int256 internal constant _MARGIN_LEVEL_PRECISION = 1e2;
   uint256 internal constant _WITHDRAW_DELAY = 7 days;
 
   bytes32 public constant MATCHER_ROLE = keccak256("MATCHER_ROLE");
@@ -22,8 +22,8 @@ abstract contract StorageDEX is IStorageDEX {
   address public depositDex;
   address public marginCalculator;
 
-  int112 public soLevel; // Minimal sufficient percent of margin at which a position can not be liquidated
-  int112 public withdrawMarginLevel; // Minimal sufficient percent of margin after withdraw when account has open position
+  int256 public soLevel; // Minimal sufficient percent of margin at which a position can not be liquidated
+  int256 public withdrawMarginLevel; // Minimal sufficient percent of margin after withdraw when account has open position
   uint256 public liquidationFeePercent; // Percent of margin for position which is taken as liquidation fee. 10**8 = 100%
   uint256 public instrumentsLength;
   uint256 public maxOpenPositions;
@@ -35,9 +35,7 @@ abstract contract StorageDEX is IStorageDEX {
 
   EnumerableSet.AddressSet internal _accountsWithOpenPositions;
   mapping(uint256 instrumentIndex => mapping(address account => PositionInfo position)) internal _positionInfo;
-  mapping(bytes32 orderHash => uint96 orderAmount) public filledAmounts;
-
-  StaticFundingRateInfo[] internal _staticFundingRateData;
+  mapping(bytes32 orderHash => uint256 orderAmount) public filledAmounts;
 
   uint256[50] private __gap;
 }
