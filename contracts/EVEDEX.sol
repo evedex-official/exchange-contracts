@@ -376,14 +376,14 @@ contract EVEDEX is BaseDEX, IEVEDEX {
       historySearchHint
     );
     if (validMargin) revert SufficientMargin();
-    PositionInfo memory positionInfo = _positionInfo[liquidationOrder.index][liquidationOrder.accountToLiquidate];
+    PositionInfo memory positionInfo = _positionInfo[liquidationOrder.index][liquidationOrder.liquidator];
     uint256 liquidatorPositionAvgPrice = uint80(positionInfo.positionAvgPrice);
     uint256 liquidationPrice = liquidationOrder.prices[0].price;
     if (
       positionInfo.position > 0
-        ? liquidationPrice > liquidatorPositionAvgPrice
-        : liquidationPrice < liquidatorPositionAvgPrice
-    ) revert PriceBelowLiquidatorPositionAvgPrice();
+        ? liquidationPrice < liquidatorPositionAvgPrice
+        : liquidationPrice > liquidatorPositionAvgPrice
+    ) revert UnprofitableTrade();
 
     _liquidatePosition(
       liquidationOrder.index,
@@ -452,7 +452,7 @@ contract EVEDEX is BaseDEX, IEVEDEX {
   //     uint256 index = collateralIndices.indicesToLiquidate[i];
   //     collateral = fullPrices.collateralPrices[index].collateral;
   //     balanceOfLiquidator = _getBalance(liquidator, collateral);
-  //     if (balanceOfLiquidator < collaterals[i]) revert PriceBelowLiquidatorPositionAvgPrice();
+  //     if (balanceOfLiquidator < collaterals[i]) revert UnprofitableTrade();
   //   }
   // }
 
