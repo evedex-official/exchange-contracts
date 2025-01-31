@@ -95,12 +95,16 @@ contract EVEDEX is BaseDEX, IEVEDEX {
 
   function _getTotalLongFRInternal(FundingRateInfo memory frInfo) internal pure returns (int72) {
     int72 longFRStored = frInfo.longFRStored;
-    return longFRStored < 0 ? longFRStored : (longFRStored * (_FR_PRECISION - frInfo.staticFr)) / _FR_PRECISION;
+    return
+      longFRStored < 0 ? longFRStored : int72(int256(longFRStored) - int256(frInfo.staticFr) * longFRStored / _FR_PRECISION);
   }
 
   function _getTotalShortFRInternal(FundingRateInfo memory frInfo) internal pure returns (int72) {
     int72 shortFRStored = frInfo.shortFRStored;
-    return shortFRStored < 0 ? shortFRStored : (shortFRStored * (_FR_PRECISION - frInfo.staticFr)) / _FR_PRECISION;
+    return
+      shortFRStored < 0
+        ? shortFRStored
+        : int72(int256(shortFRStored) - (int256(frInfo.staticFr) * shortFRStored) / _FR_PRECISION);
   }
 
   function getAccountFR(
@@ -656,47 +660,6 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     positionInfo.positionLastUpdate = uint32(historyTimestamp);
     emit FrCollected(index, account, collateralIndex, _getBalance(account, collateral));
   }
-
-  // todo: remove in prod
-  //  function _collectFr(
-  //    uint256 index,
-  //    address account,
-  //    FullPrices calldata fullPrices,
-  //    uint256 collateralIndex,
-  //    uint256 historyTimestamp,
-  //    uint256 historySearchHint
-  //  ) internal {
-  //    PositionInfo storage positionInfo = _positionInfo[index][account];
-  //    int256 frCurrent = getAccountFR(account, index, historyTimestamp, historySearchHint);
-  //    int256 staticFr = getStaticFR(historyTimestamp, historySearchHint);
-  //    FundingRateInfo memory frInfo = _getFundingRateInfo(index, historyTimestamp, historySearchHint);
-  //    int256 newFrLongStored = _getTotalLongFRInternal(frInfo);
-  //    int256 newFrShortStored = _getTotalShortFRInternal(frInfo);
-  //    if (frCurrent == 0) return;
-  //    address collateral = fullPrices.collateralPrices[collateralIndex].collateral;
-  //    int256 collateralPrice = int112(fullPrices.collateralPrices[collateralIndex].price);
-  //    int256 realizedFRCollateral = (frCurrent * int112(uint112(positionInfo.positionAvgPrice))) / _INT_PRECISION;
-  //    int256 collateralFee = (realizedFRCollateral * _INT_PRECISION) / collateralPrice;
-  //    int256 accountNewBalance;
-  //    if (collateralFee < 0) {
-  //      accountNewBalance = _getBalance(account, collateral) + collateralFee;
-  //    } else {
-  //      int256 staticFee = (realizedFRCollateral *
-  //        int256(staticFr) *
-  //        _INT_PRECISION) /
-  //        collateralPrice /
-  //        int256(_FR_PRECISION);
-  //      accountNewBalance = _getBalance(account, collateral) + collateralFee - staticFee;
-  //      _setBalance(staticFundingRateAccount, collateral, _getBalance(staticFundingRateAccount, collateral) + staticFee);
-  //    }
-  //    _setBalance(fundingRateAccount, collateral, _getBalance(fundingRateAccount, collateral) - collateralFee);
-  //    _setBalance(account, collateral, accountNewBalance);
-  //    positionInfo.frAccumulated = 0; // todo: what to do with this?
-  //    positionInfo.positionLongFRStored = int72(newFrLongStored);
-  //    positionInfo.positionShortFRStored = int72(newFrShortStored);
-  //    positionInfo.positionLastUpdate = uint32(historyTimestamp);
-  //    emit FrCollected(index, account, collateralIndex, accountNewBalance);
-  //  }
 
   function _changePosition(
     uint256 index,
