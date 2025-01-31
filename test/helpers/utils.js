@@ -7,7 +7,14 @@ const {
 } = require('./eip712-types');
 const { signTypedData, readContract, writeContract } = require('viem/actions');
 const { maxUint32, maxUint128, maxUint64, zeroHash, encodeAbiParameters, keccak256 } = require('viem');
-const { INT_PRECISION_EVEDEX, ORDER_TYPEHASH, EVEDEX_MARGIN_PRECISION, BTC_USD_INDEX } = require('./constants');
+const {
+  ORDER_TYPEHASH,
+  EVEDEX_MARGIN_PRECISION,
+  BTC_USD_INDEX,
+  USD_DECIMALS,
+  PRECISION_DECIMALS_DEPOSIT_DEX,
+  PRECISION_DECIMALS_EVEDEX,
+} = require('./constants');
 const { StandardMerkleTree } = require('@openzeppelin/merkle-tree');
 
 const signWithdrawOrder = async ({ wallet, order, contractAddress }) => {
@@ -220,25 +227,6 @@ const removeSession = async ({ userWallet, sessionManagerContract, sessionAccoun
   });
 };
 
-const parsePrice = (price, { precisionDecimals = 8n, tokenDecimals = 0n } = {}) => {
-  const shiftBn = 10n ** precisionDecimals;
-  if (typeof price === 'number') {
-    const shift = Number(shiftBn);
-    const priceShifted = BigInt(Math.round(price * shift));
-    return tokenDecimals > precisionDecimals
-      ? priceShifted / 10n ** (tokenDecimals - precisionDecimals)
-      : priceShifted * 10n ** (precisionDecimals - tokenDecimals);
-  }
-  if (typeof price === 'string' || typeof price === 'bigint') {
-    const priceBn = BigInt(price);
-    const priceShifted = priceBn * shiftBn;
-    return tokenDecimals > precisionDecimals
-      ? priceShifted / 10n ** (tokenDecimals - precisionDecimals)
-      : priceShifted * 10n ** (precisionDecimals - tokenDecimals);
-  }
-  throw new Error('Invalid price type');
-};
-
 /**
  * Calculate the maximum  FIRST position size that maintains margin above the stop-out level
  */
@@ -276,7 +264,7 @@ const calculateBoundaryOrderAmount = async ({
 
   // formula used in contracts
   const positionSize =
-    (leverage * (equity * BigInt(EVEDEX_MARGIN_PRECISION) - margin * soLevel - 1n) * INT_PRECISION_EVEDEX) /
+    (leverage * (equity * BigInt(EVEDEX_MARGIN_PRECISION) - margin * soLevel - 1n) * 10n ** PRECISION_DECIMALS_EVEDEX) /
     (soLevel * instrumentPrice);
   return positionSize;
 };
@@ -339,29 +327,56 @@ const signMultiLiquidationOrder = async ({ wallet, order, contractAddress }) => 
 
 const absBn = (value) => (value < 0n ? -value : value);
 
+const parsePrice = (floatPrice, { tokenInDecimals = 0n, tokenOutDecimals = 0n, precisionDecimals } = {}) => {
+  const shift = Number(10n ** precisionDecimals);
+  return (BigInt(Math.round(floatPrice * shift)) * 10n ** tokenOutDecimals) / 10n ** tokenInDecimals;
+};
+
+const positionToUsd = (amount, price, precisionDecimals = PRECISION_DECIMALS_EVEDEX) => {
+  const priceBn = typeof price === 'bigint' ? price : parsePrice(price, { precisionDecimals });
+  return (amount * priceBn) / 10n ** precisionDecimals;
+};
+
+const usdToCollateral = (
+  amount,
+  collateralPrice,
+  collateralDecimals,
+  precisionDecimals = PRECISION_DECIMALS_DEPOSIT_DEX,
+) => {
+  const collateralPriceBn =
+    typeof collateralPrice === 'bigint'
+      ? collateralPrice
+      : parsePrice(collateralPrice, {
+          precisionDecimals,
+          tokenInDecimals: collateralDecimals,
+          tokenOutDecimals: USD_DECIMALS,
+        });
+  return (amount * 10n ** precisionDecimals) / collateralPriceBn;
+};
+
 const pipe =
   (...fns) =>
   (x) =>
-    fns.reduce((v, f) => v.then(f), Promise.resolve(x));
+    fns.reduce((v, f) => f(v), x);
 
 // hardcoded indexes, instrument and collateral sorting
 // used to shorten the code
-const getFullPricesBtcUsdt = (btcPrice, usdtPrice, btcAddress, usdtAddress) => {
+const getFullPricesBtcUsdt = (btcInstrumentPrice, btcCollateralPrice, usdtCollateralPrice, btcAddress, usdtAddress) => {
   return {
     instrumentPrices: [
       {
         index: BTC_USD_INDEX,
-        price: btcPrice,
+        price: btcInstrumentPrice,
       },
     ],
     collateralPrices: [
       {
         collateral: usdtAddress,
-        price: usdtPrice,
+        price: usdtCollateralPrice,
       },
       {
         collateral: btcAddress,
-        price: btcPrice,
+        price: btcCollateralPrice,
       },
     ],
   };
@@ -383,4 +398,7 @@ module.exports = {
   getOrderDigest,
   toMultiOrders,
   getFullPricesBtcUsdt,
+  pipe,
+  positionToUsd,
+  usdToCollateral,
 };

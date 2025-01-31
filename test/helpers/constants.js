@@ -13,18 +13,21 @@ module.exports = {
   BTC_COLLATERAL_INDEX: 1,
   MARGIN_CALC_MARGIN_PRECISION: 10_000, // Precision for margin calculations: contracts/helpers/MarginCalc.sol:15
   EVEDEX_MARGIN_PRECISION: 100, // Precision for margin calculations: contracts/helpers/EvedexMargin.sol:15
-  INT_PRECISION_EVEDEX: 10n ** 8n,
   ALLOWED_SLIPPAGE_EVEDEX: 3n * 10n ** 5n, // 0.3% max slippage between oracle prices and prices passed to convertBalance function
   INT_PRECISION_DEPOSIT_DEX: 10n ** 8n,
   ALLOWED_SLIPPAGE_DEPOSIT_DEX: 3n * 10n ** 5n, // 0.3% max slippage between oracle prices and prices passed to convertBalance function
+  FR_PRECISION: 10n ** 11n,
+  // todo: change all to the form: 10n ** x
   USDT_DECIMALS: 6n,
   BTC_DECIMALS: 8n,
+  USD_DECIMALS: 8n,
+  PRECISION_DECIMALS_DEPOSIT_DEX: 12n,
+  PRECISION_DECIMALS_EVEDEX: 8n,
   ORDER_TYPEHASH: keccak256(
     toBytes(
       'Order(uint256 orderId,address senderAddress,address matcherAddress,uint256 instrumentIndex,uint256 amount,uint256 price,uint16 leverage,uint256 matcherFee,uint256 creationTime,uint8 side)',
     ),
   ),
-  FR_PRECISION: 10n ** 11n,
   PYTH_IDS: {
     USDT_PYTH_ID: toBytes('USDT_PYTH_ID', {
       size: 32,

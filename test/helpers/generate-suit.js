@@ -136,14 +136,12 @@ const prepareContracts = async ({
         leverage, //leverage
         dailyFRLong, //dailyFRLong
         dailyFRShort, //dailyFRShort
+        initStaticFr.staticFr, //staticFr
         Math.floor(Date.now() / 1000) - 100, //timestamp
       ]),
       marginCalculator.write.setLevels([i, initMarginCalcConfig.initLevels[i]]),
     ]);
   }
-  await eveDex.write.setStaticFR([initStaticFr.staticFr, initStaticFr.timestamp], {
-    account: matcher.account.address,
-  });
 
   return { orderLib, sessions, vault, depositDex, eveDex, marginCalculator, oracle, pythMock };
 };
@@ -162,8 +160,8 @@ const populateDefaults = (config) => {
       {
         symbol: BTC_USD_SYMBOL,
         leverage: 100,
-        dailyFRLong: 0,
-        dailyFRShort: 0,
+        dailyFRLong: 0, // initially no funding rates
+        dailyFRShort: 0, // initially no funding rates
       },
     ];
   }
@@ -188,8 +186,7 @@ const populateDefaults = (config) => {
   }
   if (!config.initStaticFr) {
     config.initStaticFr = {
-      staticFr: 0,
-      timestamp: 0,
+      staticFr: 0, // initially no funding rates
     };
   }
   return config;
@@ -266,7 +263,9 @@ const populateDefaults = (config) => {
 
 const generateSuit = async (id, config = {}) => {
   if (!id) throw new Error('Suit id is required');
+
   populateDefaults(config);
+
   const {
     owner,
     alice,

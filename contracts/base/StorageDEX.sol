@@ -10,6 +10,8 @@ abstract contract StorageDEX is IStorageDEX {
   int72 internal constant _FR_PRECISION = 1e11;
   int256 internal constant _INT_1DAY = 1e8;
   int256 internal constant _INT_PRECISION = 1e8;
+  int256 internal constant _COLLATERAL_PRECISION = 1e12;
+  uint256 internal constant _UINT_COLLATERAL_PRECISION = 1e12;
   uint256 internal constant _UINT_PRECISION = 1e8;
   int256 internal constant _MARGIN_LEVEL_PRECISION = 1e2;
   uint256 internal constant _WITHDRAW_DELAY = 7 days;

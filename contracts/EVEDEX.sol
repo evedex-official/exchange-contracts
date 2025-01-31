@@ -293,7 +293,7 @@ contract EVEDEX is BaseDEX, IEVEDEX {
       collateralIndices.liquidatorIndex,
       accountToLiquidatePosition.position,
       liquidationPrice,
-      100,
+      _MARGIN_LEVEL_PRECISION,
       liquidatorLeverage,
       fullPrices,
       historyTimestamp,
@@ -334,14 +334,18 @@ contract EVEDEX is BaseDEX, IEVEDEX {
       balance = _getBalance(accountToLiquidate, collateral);
       balanceOfLiquidator = _getBalance(liquidator, collateral);
 
-      int256 newBalance = balance + ((sumPnlFr - liquidationFee) * _INT_PRECISION) / collateralPrice;
+      int256 newBalance = balance + ((sumPnlFr - liquidationFee) * _COLLATERAL_PRECISION) / collateralPrice;
       if (newBalance > 0) {
         _setBalance(accountToLiquidate, collateral, newBalance);
-        _setBalance(liquidator, collateral, balanceOfLiquidator + (liquidationFee * _INT_PRECISION) / collateralPrice);
+        _setBalance(
+          liquidator,
+          collateral,
+          balanceOfLiquidator + (liquidationFee * _COLLATERAL_PRECISION) / collateralPrice
+        );
         sumPnlFr = 0;
       } else {
         _setBalance(accountToLiquidate, collateral, 0);
-        sumPnlFr = sumPnlFr + (balance * collateralPrice) / _INT_PRECISION;
+        sumPnlFr = sumPnlFr + (balance * collateralPrice) / _COLLATERAL_PRECISION;
       }
     }
 
@@ -349,7 +353,7 @@ contract EVEDEX is BaseDEX, IEVEDEX {
       _setBalance(
         liquidator,
         collateral,
-        balanceOfLiquidator + balance + (sumPnlFr * _INT_PRECISION) / collateralPrice
+        balanceOfLiquidator + balance + (sumPnlFr * _COLLATERAL_PRECISION) / collateralPrice
       );
     }
   }
@@ -534,10 +538,12 @@ contract EVEDEX is BaseDEX, IEVEDEX {
       buyOrder.order.matcherFee = (buyOrder.order.matcherFee * filledAmount) / buyOrder.order.amount;
       sellOrder.order.matcherFee = (sellOrder.order.matcherFee * filledAmount) / sellOrder.order.amount;
       int256 buyOrderMatcherFee = int256(
-        (buyOrder.order.matcherFee * _UINT_PRECISION) / fullPrices.collateralPrices[buyOrder.collateralIndex].price
+        (buyOrder.order.matcherFee * _UINT_COLLATERAL_PRECISION) /
+          fullPrices.collateralPrices[buyOrder.collateralIndex].price
       );
       int256 sellOrderMatcherFee = int256(
-        (sellOrder.order.matcherFee * _UINT_PRECISION) / fullPrices.collateralPrices[sellOrder.collateralIndex].price
+        (sellOrder.order.matcherFee * _UINT_COLLATERAL_PRECISION) /
+          fullPrices.collateralPrices[sellOrder.collateralIndex].price
       );
       _setBalance(
         buyOrder.order.senderAddress,
@@ -638,7 +644,7 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     address collateral = fullPrices.collateralPrices[collateralIndex].collateral;
     int256 collateralPrice = int256(fullPrices.collateralPrices[collateralIndex].price);
     int256 realizedFRCollateral = (frCurrent * positionInfo.positionAvgPrice) / _INT_PRECISION;
-    int256 collateralFee = (realizedFRCollateral * _INT_PRECISION) / collateralPrice;
+    int256 collateralFee = (realizedFRCollateral * _COLLATERAL_PRECISION) / collateralPrice;
     _setBalance(fundingRateAccount, collateral, _getBalance(fundingRateAccount, collateral) - collateralFee);
     _setBalance(account, collateral, _getBalance(account, collateral) + collateralFee);
     positionInfo.frAccumulated = 0; // todo: what to do with this?
@@ -799,12 +805,14 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     _setBalance(
       positionOwner,
       collateral,
-      _getBalance(positionOwner, collateral) + ((realizedFRCollateral + realizedPNL) * _INT_PRECISION) / collateralPrice
+      _getBalance(positionOwner, collateral) +
+        ((realizedFRCollateral + realizedPNL) * _COLLATERAL_PRECISION) /
+        collateralPrice
     );
     _setBalance(
       fundingRateAccount,
       collateral,
-      _getBalance(fundingRateAccount, collateral) - (realizedFRCollateral * _INT_PRECISION) / collateralPrice
+      _getBalance(fundingRateAccount, collateral) - (realizedFRCollateral * _COLLATERAL_PRECISION) / collateralPrice
     );
     posData.frAccumulated = 0;
     posData.positionAvgPrice = int80(price);
@@ -847,12 +855,14 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     _setBalance(
       positionOwner,
       collateral,
-      _getBalance(positionOwner, collateral) + ((realizedFRCollateral + realizedPNL) * _INT_PRECISION) / collateralPrice
+      _getBalance(positionOwner, collateral) +
+        ((realizedFRCollateral + realizedPNL) * _COLLATERAL_PRECISION) /
+        collateralPrice
     );
     _setBalance(
       fundingRateAccount,
       collateral,
-      _getBalance(fundingRateAccount, collateral) - (realizedFRCollateral * _INT_PRECISION) / collateralPrice
+      _getBalance(fundingRateAccount, collateral) - (realizedFRCollateral * _COLLATERAL_PRECISION) / collateralPrice
     );
     posData.frAccumulated = int112((frCurrent * newPosition) / oldPosition);
   }

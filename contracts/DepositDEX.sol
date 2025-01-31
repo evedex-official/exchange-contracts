@@ -15,7 +15,7 @@ contract DepositDEX is IDepositDEX, UUPSUpgradeable {
   bytes32 public constant MATCHER_ROLE = keccak256("MATCHER_ROLE");
   bytes32 internal constant _DEFAULT_ADMIN_ROLE = 0x00;
   uint256 internal constant _UINT_PRECISION = 1e8;
-  int112 internal constant _INT_PRECISION = 1e8;
+  int112 internal constant _INT_PRECISION = 1e12;
 
   address public baseDex;
   address public vault;
