@@ -52,10 +52,12 @@ struct AdlOrderLiquidation {
   address accountToLiquidate;
   address liquidator;
   uint256 index;
+  int256 amount;
   PriceData[] prices;
-  uint16 leverage;
-  uint256 liquidationTimestamp;
-  uint256 expiration;
+  uint256 collateralIndexLiquidator;
+  uint256 collateralIndexToLiquidate;
+  uint16 leverageLiquidator;
+  uint16 leverageToLiquidate;
 }
 
 struct OrderWithdrawal {
