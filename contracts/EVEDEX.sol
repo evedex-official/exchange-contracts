@@ -293,7 +293,7 @@ contract EVEDEX is BaseDEX, IEVEDEX {
       collateralIndices.liquidatorIndex,
       accountToLiquidatePosition.position,
       liquidationPrice,
-      100,
+      _MARGIN_LEVEL_PRECISION,
       liquidatorLeverage,
       fullPrices,
       historyTimestamp,
@@ -360,15 +360,16 @@ contract EVEDEX is BaseDEX, IEVEDEX {
   function adlLiquidation(
     AdlOrderLiquidation memory liquidationOrder,
     FullPrices calldata fullPrices,
-    LiquidationCollaterals calldata collateralIndices,
     uint256 historyTimestamp,
     uint256 historySearchHint
   ) external onlyRole(MATCHER_ROLE) {
-    if (liquidationOrder.prices[0].index != liquidationOrder.index) revert PriceOfLiquidatedInstrumentNotFirst();
+    uint256 index = liquidationOrder.index;
+    if (liquidationOrder.prices[0].index != index) revert PriceOfLiquidatedInstrumentNotFirst();
 
+    int256 soLevel_ = soLevel;
     (bool validMargin, ) = _checkMargin(
       liquidationOrder.accountToLiquidate,
-      soLevel,
+      soLevel_,
       liquidationOrder.prices,
       fullPrices.collateralPrices,
       true,
@@ -376,23 +377,39 @@ contract EVEDEX is BaseDEX, IEVEDEX {
       historySearchHint
     );
     if (validMargin) revert SufficientMargin();
-    PositionInfo memory positionInfo = _positionInfo[liquidationOrder.index][liquidationOrder.liquidator];
-    uint256 liquidatorPositionAvgPrice = uint80(positionInfo.positionAvgPrice);
+    PositionInfo storage positionInfoLiquidator = _positionInfo[index][liquidationOrder.liquidator];
+    PositionInfo storage positionInfoToLiquidate = _positionInfo[index][liquidationOrder.accountToLiquidate];
+    uint256 liquidatorPositionAvgPrice = uint80(positionInfoLiquidator.positionAvgPrice);
     uint256 liquidationPrice = liquidationOrder.prices[0].price;
     if (
-      positionInfo.position > 0
+      positionInfoLiquidator.position > 0
         ? liquidationPrice < liquidatorPositionAvgPrice
         : liquidationPrice > liquidatorPositionAvgPrice
     ) revert UnprofitableTrade();
 
-    _liquidatePosition(
-      liquidationOrder.index,
-      liquidationOrder.accountToLiquidate,
+    _changePosition(
+      index,
       liquidationOrder.liquidator,
-      int256(liquidationOrder.prices[0].price),
+      positionInfoLiquidator,
+      liquidationOrder.collateralIndexLiquidator,
+      liquidationOrder.amount,
+      int256(liquidationPrice),
+      soLevel_,
+      liquidationOrder.leverageLiquidator,
       fullPrices,
-      collateralIndices,
-      liquidationOrder.leverage,
+      historyTimestamp,
+      historySearchHint
+    );
+    _changePosition(
+      index,
+      liquidationOrder.accountToLiquidate,
+      positionInfoToLiquidate,
+      liquidationOrder.collateralIndexToLiquidate,
+      -liquidationOrder.amount,
+      int256(liquidationPrice),
+      _MARGIN_LEVEL_PRECISION,
+      liquidationOrder.leverageToLiquidate,
+      fullPrices,
       historyTimestamp,
       historySearchHint
     );
