@@ -68,7 +68,13 @@ interface IEVEDEX {
     uint256 filledAmount
   );
 
-  event FrCollected(uint256 indexed index, address indexed account, uint256 collateralIndex, int256 accountNewBalance);
+  event FrCollected(
+    uint256 indexed index,
+    address indexed account,
+    address collateral,
+    int256 accountNewBalance,
+    int256 staticCollateralFee
+  );
 
   error InvalidSession();
   error ZeroPositionLiquidation();
@@ -98,7 +104,7 @@ interface IEVEDEX {
     uint256 index,
     uint256 historyTimestamp,
     uint256 historySearchHint
-  ) external view returns (int256);
+  ) external view returns (int256, int256);
 
   function getPNL(address account, uint256 index, int256 price) external view returns (int256);
 

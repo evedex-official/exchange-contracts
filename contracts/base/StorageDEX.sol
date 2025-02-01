@@ -36,6 +36,7 @@ abstract contract StorageDEX is IStorageDEX {
   EnumerableSet.AddressSet internal _accountsWithOpenPositions;
   mapping(uint256 instrumentIndex => mapping(address account => PositionInfo position)) internal _positionInfo;
   mapping(bytes32 orderHash => uint256 orderAmount) public filledAmounts;
+  mapping(address collateral => int256 collected) public totalStaticFee;
 
   uint256[50] private __gap;
 }
