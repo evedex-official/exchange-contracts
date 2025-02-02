@@ -27,6 +27,7 @@ abstract contract BaseDEX is
     address sessionManager_,
     address marginCalculator_,
     address fundingRateAccount_,
+    address staticFundingRateAccount_,
     uint256 maxOpenPositions_,
     int112 soLevel_,
     int112 withdrawMarginLevel_,
@@ -37,6 +38,7 @@ abstract contract BaseDEX is
       sessionManager_,
       marginCalculator_,
       fundingRateAccount_,
+      staticFundingRateAccount_,
       soLevel_,
       withdrawMarginLevel_,
       maxOpenPositions_,
@@ -77,6 +79,7 @@ abstract contract BaseDEX is
     address sessionManager_,
     address marginCalculator_,
     address fundingRateAccount_,
+    address staticFundingRateAccount_,
     int112 soLevel_,
     int112 withdrawMarginLevel_,
     uint256 maxOpenPositions_,
@@ -87,6 +90,7 @@ abstract contract BaseDEX is
       sessionManager_,
       marginCalculator_,
       fundingRateAccount_,
+      staticFundingRateAccount_,
       soLevel_,
       withdrawMarginLevel_,
       maxOpenPositions_,
@@ -99,6 +103,7 @@ abstract contract BaseDEX is
     address sessionManager_,
     address marginCalculator_,
     address fundingRateAccount_,
+    address staticFundingRateAccount_,
     int112 soLevel_,
     int112 withdrawMarginLevel_,
     uint256 maxOpenPositions_,
@@ -108,6 +113,7 @@ abstract contract BaseDEX is
     sessionManager = sessionManager_;
     marginCalculator = marginCalculator_;
     fundingRateAccount = fundingRateAccount_;
+    staticFundingRateAccount = staticFundingRateAccount_;
     withdrawMarginLevel = withdrawMarginLevel_;
     soLevel = soLevel_;
     maxOpenPositions = maxOpenPositions_;
@@ -117,6 +123,7 @@ abstract contract BaseDEX is
       sessionManager_,
       marginCalculator_,
       fundingRateAccount_,
+      staticFundingRateAccount_,
       soLevel_,
       withdrawMarginLevel_,
       maxOpenPositions_,
