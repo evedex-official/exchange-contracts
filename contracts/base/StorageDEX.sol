@@ -17,6 +17,7 @@ abstract contract StorageDEX is IStorageDEX {
   bytes32 public constant MATCHER_ROLE = keccak256("MATCHER_ROLE");
   bytes32 public constant WITHDRAW_GUARDIAN_ROLE = keccak256("WITHDRAW_GUARDIAN_ROLE");
 
+  address public staticFundingRateAccount;
   address public fundingRateAccount;
   address public sessionManager;
   address public depositDex;
@@ -36,7 +37,6 @@ abstract contract StorageDEX is IStorageDEX {
   EnumerableSet.AddressSet internal _accountsWithOpenPositions;
   mapping(uint256 instrumentIndex => mapping(address account => PositionInfo position)) internal _positionInfo;
   mapping(bytes32 orderHash => uint256 orderAmount) public filledAmounts;
-  mapping(address collateral => int256 collected) public totalStaticFee;
 
   uint256[50] private __gap;
 }
