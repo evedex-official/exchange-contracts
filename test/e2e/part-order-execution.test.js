@@ -44,11 +44,11 @@ describe(flow, () => {
 
     const aliceBtcPrice = ALICE_ORDER_CONFIG.instrumentPrice.price;
     const aliceBtcUsdt = aliceBtcPrice / USDT_PRICE;
-    const aliceAmount = ALICE_ORDER_CONFIG.amount * aliceBtcUsdt * 10n ** USDT_DECIMALS;
+    const aliceAmount = ALICE_ORDER_CONFIG.amount * aliceBtcUsdt * USDT_DECIMALS;
 
     const bobBtcPrice = BOB_ORDER_CONFIG.instrumentPrice.price;
     const bobBtcUsdt = bobBtcPrice / USDT_PRICE;
-    const bobAmount = BOB_ORDER_CONFIG.amount * bobBtcUsdt * 10n ** USDT_DECIMALS;
+    const bobAmount = BOB_ORDER_CONFIG.amount * bobBtcUsdt * USDT_DECIMALS;
 
     await Promise.all([deposit({ user: alice, amount: aliceAmount }), deposit({ user: bob, amount: bobAmount })]);
   });

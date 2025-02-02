@@ -4,7 +4,7 @@ const { parsePrice } = require('../helpers/utils');
 const { BTC_DECIMALS, USDT_DECIMALS } = require('../helpers/constants');
 
 module.exports = {
-  USDT_DEPOSIT_AMOUNT: 100n * 10n ** USDT_DECIMALS, // collateral
+  USDT_DEPOSIT_AMOUNT: 100n * USDT_DECIMALS, // collateral
   BTC_INITIAL_PRICE: parsePrice(100_000, {
     tokenDecimals: BTC_DECIMALS,
   }), // price of the order

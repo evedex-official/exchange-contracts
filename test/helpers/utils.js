@@ -264,7 +264,7 @@ const calculateBoundaryOrderAmount = async ({
 
   // formula used in contracts
   const positionSize =
-    (leverage * (equity * BigInt(EVEDEX_MARGIN_PRECISION) - margin * soLevel - 1n) * 10n ** PRECISION_DECIMALS_EVEDEX) /
+    (leverage * (equity * BigInt(EVEDEX_MARGIN_PRECISION) - margin * soLevel - 1n) * PRECISION_DECIMALS_EVEDEX) /
     (soLevel * instrumentPrice);
   return positionSize;
 };
@@ -327,14 +327,14 @@ const signMultiLiquidationOrder = async ({ wallet, order, contractAddress }) => 
 
 const absBn = (value) => (value < 0n ? -value : value);
 
-const parsePrice = (floatPrice, { tokenInDecimals = 0n, tokenOutDecimals = 0n, precisionDecimals } = {}) => {
-  const shift = Number(10n ** precisionDecimals);
-  return (BigInt(Math.round(floatPrice * shift)) * 10n ** tokenOutDecimals) / 10n ** tokenInDecimals;
+const parsePrice = (floatPrice, { tokenInDecimals = 10n ** 0n, tokenOutDecimals = 10n ** 0n, precisionDecimals } = {}) => {
+  const shift = Number(precisionDecimals);
+  return (BigInt(Math.round(floatPrice * shift)) * tokenOutDecimals) / tokenInDecimals;
 };
 
 const positionToUsd = (amount, price, precisionDecimals = PRECISION_DECIMALS_EVEDEX) => {
   const priceBn = typeof price === 'bigint' ? price : parsePrice(price, { precisionDecimals });
-  return (amount * priceBn) / 10n ** precisionDecimals;
+  return (amount * priceBn) / precisionDecimals;
 };
 
 const usdToCollateral = (

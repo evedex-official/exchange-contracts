@@ -11,7 +11,7 @@ describe('adl tests', () => {
 
   const config = {
     suit: 'adl tests',
-    USDT_DEPOSIT_AMOUNT: 100n * 10n ** USDT_DECIMALS, // collateral
+    USDT_DEPOSIT_AMOUNT: 100n * USDT_DECIMALS, // collateral
     BTC_PRICE_USERS_TRADE: parsePrice(100_000, {
       tokenDecimals: BTC_DECIMALS,
     }), // price of the order

@@ -33,7 +33,7 @@ describe('fr tests', async () => {
 
   const config = {
     suit: 'fr tests',
-    USDT_DEPOSIT_AMOUNT: 100n * 10n ** USDT_DECIMALS, // collateral
+    USDT_DEPOSIT_AMOUNT: 100n * USDT_DECIMALS, // collateral
     BTC_PRICE_INSTRUMENT_USERS_TRADE: parsePrice(100_000, {
       precisionDecimals: PRECISION_DECIMALS_EVEDEX,
     }), // price of the order
@@ -172,13 +172,13 @@ describe('fr tests', async () => {
     const [, [{ positionAvgPrice: longAvgPrice }]] = await eveDex.read.getActiveInstrumentsPositions([
       orders.longOrderExt.order.senderAddress,
     ]);
-    const longPositionFr = (longAvgPrice * accountFRLong) / 10n ** PRECISION_DECIMALS_EVEDEX;
-    const longCollateralFee = (longPositionFr * 10n ** PRECISION_DECIMALS_DEPOSIT_DEX) / config.USDT_PRICE_COLLATERAL;
+    const longPositionFr = (longAvgPrice * accountFRLong) / PRECISION_DECIMALS_EVEDEX;
+    const longCollateralFee = (longPositionFr * PRECISION_DECIMALS_DEPOSIT_DEX) / config.USDT_PRICE_COLLATERAL;
     const [, [{ positionAvgPrice: shortAvgPrice }]] = await eveDex.read.getActiveInstrumentsPositions([
       orders.shortOrderExt.order.senderAddress,
     ]);
-    const shortPositionFr = (shortAvgPrice * accountFRShort) / 10n ** PRECISION_DECIMALS_EVEDEX;
-    const shortCollateralFee = (shortPositionFr * 10n ** PRECISION_DECIMALS_DEPOSIT_DEX) / config.USDT_PRICE_COLLATERAL;
+    const shortPositionFr = (shortAvgPrice * accountFRShort) / PRECISION_DECIMALS_EVEDEX;
+    const shortCollateralFee = (shortPositionFr * PRECISION_DECIMALS_DEPOSIT_DEX) / config.USDT_PRICE_COLLATERAL;
 
     expect(-usdtDiff).to.equal(longCollateralFee + shortCollateralFee); // todo: problems with rounding in fair count through the fr formula
   });
@@ -269,14 +269,13 @@ describe('fr tests', async () => {
       const [, [{ positionAvgPrice: longAvgPrice }]] = await eveDex.read.getActiveInstrumentsPositions([
         orders.longOrderExt.order.senderAddress,
       ]);
-      const longPositionFr = (longAvgPrice * accountFRLong) / 10n ** PRECISION_DECIMALS_EVEDEX;
-      const longCollateralFee = (longPositionFr * 10n ** PRECISION_DECIMALS_DEPOSIT_DEX) / config.USDT_PRICE_COLLATERAL;
+      const longPositionFr = (longAvgPrice * accountFRLong) / PRECISION_DECIMALS_EVEDEX;
+      const longCollateralFee = (longPositionFr * PRECISION_DECIMALS_DEPOSIT_DEX) / config.USDT_PRICE_COLLATERAL;
       const [, [{ positionAvgPrice: shortAvgPrice }]] = await eveDex.read.getActiveInstrumentsPositions([
         orders.shortOrderExt.order.senderAddress,
       ]);
-      const shortPositionFr = (shortAvgPrice * accountFRShort) / 10n ** PRECISION_DECIMALS_EVEDEX;
-      const shortCollateralFee =
-        (shortPositionFr * 10n ** PRECISION_DECIMALS_DEPOSIT_DEX) / config.USDT_PRICE_COLLATERAL;
+      const shortPositionFr = (shortAvgPrice * accountFRShort) / PRECISION_DECIMALS_EVEDEX;
+      const shortCollateralFee = (shortPositionFr * PRECISION_DECIMALS_DEPOSIT_DEX) / config.USDT_PRICE_COLLATERAL;
       expect(-usdtDiff).to.equal(longCollateralFee + shortCollateralFee);
     }
   });
@@ -409,17 +408,16 @@ describe('fr tests', async () => {
       distributorFrAddress,
     ]);
     const distributorFR = await eveDex.read.getAccountFR([distributorFrAddress, BTC_USD_INDEX, timestamp, 0]);
-    const distributorPositionFr = (distributorAvgPrice * distributorFR) / 10n ** PRECISION_DECIMALS_EVEDEX;
+    const distributorPositionFr = (distributorAvgPrice * distributorFR) / PRECISION_DECIMALS_EVEDEX;
     const distributorCollateralFee =
-      (distributorPositionFr * 10n ** PRECISION_DECIMALS_DEPOSIT_DEX) / config.USDT_PRICE_COLLATERAL;
+      (distributorPositionFr * PRECISION_DECIMALS_DEPOSIT_DEX) / config.USDT_PRICE_COLLATERAL;
 
     const [, [{ positionAvgPrice: receiverAvgPrice }]] = await eveDex.read.getActiveInstrumentsPositions([
       recieverFrAddress,
     ]);
     const receiverFR = await eveDex.read.getAccountFR([recieverFrAddress, BTC_USD_INDEX, timestamp, 0]);
-    const receiverPositionFr = (receiverAvgPrice * receiverFR) / 10n ** PRECISION_DECIMALS_EVEDEX;
-    const receiverCollateralFee =
-      (receiverPositionFr * 10n ** PRECISION_DECIMALS_DEPOSIT_DEX) / config.USDT_PRICE_COLLATERAL;
+    const receiverPositionFr = (receiverAvgPrice * receiverFR) / PRECISION_DECIMALS_EVEDEX;
+    const receiverCollateralFee = (receiverPositionFr * PRECISION_DECIMALS_DEPOSIT_DEX) / config.USDT_PRICE_COLLATERAL;
 
     const distributorCollateralBefore = await depositDex.read.getBalance([distributorFrAddress, usdtToken.address]);
     const receiverCollateralBefore = await depositDex.read.getBalance([recieverFrAddress, usdtToken.address]);

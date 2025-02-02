@@ -18,11 +18,11 @@ module.exports = {
   ALLOWED_SLIPPAGE_DEPOSIT_DEX: 3n * 10n ** 5n, // 0.3% max slippage between oracle prices and prices passed to convertBalance function
   FR_PRECISION: 10n ** 11n,
   // todo: change all to the form: 10n ** x
-  USDT_DECIMALS: 6n,
-  BTC_DECIMALS: 8n,
-  USD_DECIMALS: 8n,
-  PRECISION_DECIMALS_DEPOSIT_DEX: 12n,
-  PRECISION_DECIMALS_EVEDEX: 8n,
+  USDT_DECIMALS: 10n ** 6n,
+  BTC_DECIMALS: 10n ** 8n,
+  USD_DECIMALS: 10n ** 8n,
+  PRECISION_DECIMALS_DEPOSIT_DEX: 10n ** 12n,
+  PRECISION_DECIMALS_EVEDEX: 10n ** 8n,
   ORDER_TYPEHASH: keccak256(
     toBytes(
       'Order(uint256 orderId,address senderAddress,address matcherAddress,uint256 instrumentIndex,uint256 amount,uint256 price,uint16 leverage,uint256 matcherFee,uint256 creationTime,uint8 side)',

@@ -11,5 +11,5 @@ module.exports = {
     tokenDecimals: USDT_DECIMALS,
   }),
   ORDER_LEVERAGE: 100n,
-  USDT_DEPOSIT_AMOUNT: 100n * 10n ** USDT_DECIMALS,
+  USDT_DEPOSIT_AMOUNT: 100n * USDT_DECIMALS,
 };
