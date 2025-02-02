@@ -553,13 +553,17 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     int256 collateralPrice = int256(fullPrices.collateralPrices[collateralIndex].price);
     int256 posAvgPrice = positionInfo.positionAvgPrice;
     int256 collateralFee = (frCurrent * posAvgPrice) / collateralPrice;
-    int256 staticCollateralFee = (staticFee * posAvgPrice) / collateralPrice;
+    int256 staticCollateralFee;
+    if (staticFee != 0) {
+      staticCollateralFee = (staticFee * posAvgPrice) / collateralPrice;
+      _setBalance(staticFundingRateAccount, collateral, _getBalance(account, collateral) + staticCollateralFee);
+    }
+
     _setBalance(
       fundingRateAccount,
       collateral,
       _getBalance(fundingRateAccount, collateral) - collateralFee - staticCollateralFee
     );
-    _setBalance(staticFundingRateAccount, collateral, _getBalance(account, collateral) + staticCollateralFee);
     int256 newBalance = _getBalance(account, collateral) + collateralFee;
     _setBalance(account, collateral, newBalance);
     positionInfo.frAccumulated = 0;
