@@ -7,14 +7,14 @@ const { maxUint128, maxUint256 } = require('viem');
 describe('EVEDEX contract', function () {
   let depositDex, vault, eveDex, sessions, token, tokenAddress, orderLib, marginCalculator, oracle, pythMock;
 
-  let owner, alice, bob, liquidator, fundingRateAccount, matcher;
+  let owner, alice, bob, liquidator, fundingRateAccount, staticFundingRateAccount, matcher;
 
   before(async function () {
     await upgrades.silenceWarnings();
   });
 
   beforeEach(async function () {
-    [owner, alice, bob, liquidator, fundingRateAccount, matcher] = await ethers.getSigners();
+    [owner, alice, bob, liquidator, fundingRateAccount, staticFundingRateAccount, matcher] = await ethers.getSigners();
 
     orderLib = await deployWithLibraries('OrderValidationLib', []);
     sessions = await deployWithLibraries('SessionManager', [owner.address]);
@@ -49,6 +49,7 @@ describe('EVEDEX contract', function () {
         await sessions.getAddress(),
         await marginCalculator.getAddress(),
         fundingRateAccount.address,
+        staticFundingRateAccount.address,
         128,
         0.8 * EVEDEX_MARGIN_PRECISION,
         1 * EVEDEX_MARGIN_PRECISION,
@@ -77,30 +78,28 @@ describe('EVEDEX contract', function () {
 
     const withdrawRole = await vault.WITHDRAWER_ROLE();
     await vault.grantRole(withdrawRole, depositDex.getAddress());
-
-    await eveDex.connect(matcher).setStaticFR(0, 1);
   });
 
   it('should fill and search FR array ', async function () {
     const ticker = 'ETHUSD';
     const leverage = 100;
-    await eveDex.addInstrument(ticker, leverage, 1, 1, 100);
+    await eveDex.addInstrument(ticker, leverage, 1, 1, 0, 100);
 
-    await eveDex.connect(matcher).setFR(0, 10, 10, 200);
-    await eveDex.connect(matcher).setFR(0, 100, 100, 300);
-    await eveDex.connect(matcher).setFR(0, 1000, 1000, 400);
+    await eveDex.connect(matcher).setFR(0, 10, 10, 0, 200);
+    await eveDex.connect(matcher).setFR(0, 100, 100, 0, 300);
+    await eveDex.connect(matcher).setFR(0, 1000, 1000, 0, 400);
 
-    expect((await eveDex.getFundingRateData(0, 0, 999))[3][2]).to.equal(400);
-    await expect(eveDex.getTotalLongFR(0, 99, 0))
+    expect((await eveDex.getFundingRateData(0, 0, 999))[3][3]).to.equal(400);
+    await expect(eveDex.getTotalFR(0, 99, 0))
       .to.be.revertedWithCustomError(eveDex, 'SearchWithHintFailed')
       .withArgs(0);
-    expect(await eveDex.getTotalLongFR(0, 100, 0)).to.equal(1);
-    expect(await eveDex.getTotalLongFR(0, 199, 0)).to.equal(1);
-    expect(await eveDex.getTotalLongFR(0, 200, 0)).to.equal(10);
-    expect(await eveDex.getTotalLongFR(0, 299, 0)).to.equal(10);
-    expect(await eveDex.getTotalLongFR(0, 300, 0)).to.equal(100);
-    expect(await eveDex.getTotalLongFR(0, 399, 0)).to.equal(100);
-    expect(await eveDex.getTotalLongFR(0, 400, 0)).to.equal(1000);
-    expect(await eveDex.getTotalLongFR(0, Math.floor(Date.now() / 1000), 0)).to.equal(1000);
+    expect((await eveDex.getTotalFR(0, 100, 0))[0]).to.equal(1);
+    expect((await eveDex.getTotalFR(0, 199, 0))[0]).to.equal(1);
+    expect((await eveDex.getTotalFR(0, 200, 0))[0]).to.equal(10);
+    expect((await eveDex.getTotalFR(0, 299, 0))[0]).to.equal(10);
+    expect((await eveDex.getTotalFR(0, 300, 0))[0]).to.equal(100);
+    expect((await eveDex.getTotalFR(0, 399, 0))[0]).to.equal(100);
+    expect((await eveDex.getTotalFR(0, 400, 0))[0]).to.equal(1000);
+    expect((await eveDex.getTotalFR(0, Math.floor(Date.now() / 1000), 0))[0]).to.equal(1000);
   });
 });
