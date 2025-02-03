@@ -8,14 +8,16 @@ const { createSession, createOrderExtended, signOrder, toMultiOrders } = require
 const {
   USDT_DEPOSIT_AMOUNT,
   MARKET_ORDER_AMOUNT,
-  INITIAL_BTC_PRICE,
   ORDER_LEVERAGE,
-  USDT_PRICE,
   TP_ORDER_AMOUNT,
   TP_ORDER_PRICE,
   SL_ORDER_AMOUNT,
   SL_ORDER_PRICE,
   TRIGGER_BTC_PRICE,
+  BTC_INSTRUMENT_INITIAL_PRICE,
+  USDT_COLLATERAL_PRICE,
+  BTC_COLLATERAL_PRICE,
+  BTC_COLLATERAL_TRIGGER_PRICE,
 } = require('./tp-sl-order.config');
 
 /**
@@ -81,7 +83,7 @@ describe(flow, () => {
       instrumentIndex: BTC_USD_INDEX,
       side: BUY_SIDE,
       amount: MARKET_ORDER_AMOUNT,
-      price: INITIAL_BTC_PRICE,
+      price: BTC_INSTRUMENT_INITIAL_PRICE,
       leverage: ORDER_LEVERAGE,
       userSession: aliceSessionWallet.account.address,
     });
@@ -126,7 +128,7 @@ describe(flow, () => {
       instrumentIndex: BTC_USD_INDEX,
       side: SELL_SIDE,
       amount: MARKET_ORDER_AMOUNT,
-      price: INITIAL_BTC_PRICE,
+      price: BTC_INSTRUMENT_INITIAL_PRICE,
       leverage: ORDER_LEVERAGE,
       userSession: bobSessionWallet.account.address,
     });
@@ -144,17 +146,17 @@ describe(flow, () => {
     const instrumentPrices = [
       {
         index: BTC_USD_INDEX,
-        price: INITIAL_BTC_PRICE,
+        price: BTC_INSTRUMENT_INITIAL_PRICE,
       },
     ];
     const collateralPrices = [
       {
         collateral: usdtToken.address,
-        price: USDT_PRICE,
+        price: USDT_COLLATERAL_PRICE,
       },
       {
         collateral: btcToken.address,
-        price: INITIAL_BTC_PRICE,
+        price: BTC_COLLATERAL_PRICE,
       },
     ];
     const fullPrices = { instrumentPrices, collateralPrices };
@@ -167,7 +169,7 @@ describe(flow, () => {
       args: [
         aliceMarketOrderExt,
         bobOrderExt,
-        INITIAL_BTC_PRICE,
+        BTC_INSTRUMENT_INITIAL_PRICE,
         aliceMarketOrderExt.order.amount,
         fullPrices,
         historyTimestamp,
@@ -185,7 +187,7 @@ describe(flow, () => {
   it('Bob create market order after price changes', async () => {
     const { eveDex, bob, matcher, bobSessionWallet } = await restoreSuit(flow);
 
-    const isUp = TRIGGER_BTC_PRICE > INITIAL_BTC_PRICE;
+    const isUp = TRIGGER_BTC_PRICE > BTC_INSTRUMENT_INITIAL_PRICE;
     const amount = isUp ? TP_ORDER_AMOUNT : SL_ORDER_AMOUNT;
     const price = isUp ? TP_ORDER_PRICE : SL_ORDER_PRICE;
 
@@ -215,7 +217,7 @@ describe(flow, () => {
       console.warn(`NOTHING TO TRIGGER! Price has not reached TP or SL order`);
       return;
     }
-    const isUp = TRIGGER_BTC_PRICE > INITIAL_BTC_PRICE;
+    const isUp = TRIGGER_BTC_PRICE > BTC_INSTRUMENT_INITIAL_PRICE;
     const aliceOrderExt = isUp ? aliceTpOrderExt : aliceSlOrderExt;
     const instrumentPrice = isUp ? TP_ORDER_PRICE : SL_ORDER_PRICE;
 
@@ -228,11 +230,11 @@ describe(flow, () => {
     const collateralPrices = [
       {
         collateral: usdtToken.address,
-        price: USDT_PRICE,
+        price: USDT_COLLATERAL_PRICE,
       },
       {
         collateral: btcToken.address,
-        price: instrumentPrice,
+        price: BTC_COLLATERAL_TRIGGER_PRICE,
       },
     ];
     const fullPrices = { instrumentPrices, collateralPrices };

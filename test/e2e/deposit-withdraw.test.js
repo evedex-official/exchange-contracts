@@ -6,8 +6,14 @@ const { expect } = require('chai');
 const { createWithdrawOrder, signWithdrawOrder, createSession } = require('../helpers/utils');
 const { zeroAddress, maxUint256 } = require('viem');
 const { writeContract, readContract } = require('viem/actions');
-const { BTC_USD_INDEX, INT_PRECISION_DEPOSIT_DEX } = require('../helpers/constants');
-const { DEPOSIT_AMOUNT, USDT_PRICE, BTC_PRICE, WITHDRAW_AMOUNT } = require('./deposit-withdraw.config');
+const { BTC_USD_INDEX, PRECISION_DECIMALS_DEPOSIT_DEX } = require('../helpers/constants');
+const {
+  DEPOSIT_AMOUNT,
+  WITHDRAW_AMOUNT,
+  USDT_COLLATERAL_PRICE,
+  BTC_COLLATERAL_PRICE,
+  BTC_INSTRUMENT_PRICE,
+} = require('./deposit-withdraw.config');
 
 /**
  * Basic flow of moving funds between user's account and depositDex contract
@@ -61,11 +67,11 @@ describe(flow, () => {
     const collateralPriceData = [
       {
         collateral: usdtToken.address,
-        price: USDT_PRICE,
+        price: USDT_COLLATERAL_PRICE,
       },
       {
         collateral: btcToken.address,
-        price: BTC_PRICE,
+        price: BTC_COLLATERAL_PRICE,
       },
     ];
 
@@ -76,8 +82,8 @@ describe(flow, () => {
       args: [alice.account.address, collateralPriceData],
     });
 
-    const expectedBalance = DEPOSIT_AMOUNT * USDT_PRICE + DEPOSIT_AMOUNT * BTC_PRICE;
-    expect(expectedBalance / INT_PRECISION_DEPOSIT_DEX).to.deep.equal(totalBalance);
+    const expectedBalance = DEPOSIT_AMOUNT * USDT_COLLATERAL_PRICE + DEPOSIT_AMOUNT * BTC_COLLATERAL_PRICE;
+    expect(expectedBalance / PRECISION_DECIMALS_DEPOSIT_DEX).to.deep.equal(totalBalance);
   });
 
   it('create session', async () => {
@@ -142,17 +148,17 @@ describe(flow, () => {
       instrumentPrices: [
         {
           index: BTC_USD_INDEX,
-          price: BTC_PRICE,
+          price: BTC_INSTRUMENT_PRICE,
         },
       ],
       collateralPrices: [
         {
           collateral: usdtToken.address,
-          price: USDT_PRICE,
+          price: USDT_COLLATERAL_PRICE,
         },
         {
           collateral: btcToken.address,
-          price: BTC_PRICE,
+          price: BTC_COLLATERAL_PRICE,
         },
       ],
     };
@@ -222,17 +228,17 @@ describe(flow, () => {
       instrumentPrices: [
         {
           index: BTC_USD_INDEX,
-          price: BTC_PRICE,
+          price: BTC_INSTRUMENT_PRICE,
         },
       ],
       collateralPrices: [
         {
           collateral: usdtToken.address,
-          price: USDT_PRICE,
+          price: USDT_COLLATERAL_PRICE,
         },
         {
           collateral: btcToken.address,
-          price: BTC_PRICE,
+          price: BTC_COLLATERAL_PRICE,
         },
       ],
     };

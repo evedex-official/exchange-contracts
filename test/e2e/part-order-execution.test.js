@@ -2,11 +2,22 @@
 
 const { upgrades } = require('hardhat');
 const { expect } = require('chai');
-const { BUY_SIDE, USDT_COLLATERAL_INDEX, USDT_DECIMALS } = require('../helpers/constants');
+const {
+  BUY_SIDE,
+  USDT_COLLATERAL_INDEX,
+  USDT_DECIMALS,
+  PRECISION_DECIMALS_EVEDEX,
+  PRECISION_DECIMALS_DEPOSIT_DEX,
+} = require('../helpers/constants');
 const { generateSuit, restoreSuit } = require('../helpers/generate-suit');
 const { writeContract, readContract } = require('viem/actions');
 const { createSession, createOrderExtended, signOrder, absBn } = require('../helpers/utils');
-const { ALICE_ORDER_CONFIG, USDT_PRICE, BOB_ORDER_CONFIG, BTC_PRICE } = require('./part-order-execution.config');
+const {
+  ALICE_ORDER_CONFIG,
+  BOB_ORDER_CONFIG,
+  USDT_COLLATERAL_PRICE,
+  BTC_COLLATERAL_PRICE,
+} = require('./part-order-execution.config');
 
 const flow = 'deposit -> create sessions -> create orders -> part orders execution -> check open positions';
 describe(flow, () => {
@@ -43,12 +54,16 @@ describe(flow, () => {
     };
 
     const aliceBtcPrice = ALICE_ORDER_CONFIG.instrumentPrice.price;
-    const aliceBtcUsdt = aliceBtcPrice / USDT_PRICE;
-    const aliceAmount = ALICE_ORDER_CONFIG.amount * aliceBtcUsdt * USDT_DECIMALS;
+    const aliceAmount =
+      (ALICE_ORDER_CONFIG.amount * aliceBtcPrice * PRECISION_DECIMALS_DEPOSIT_DEX) /
+      PRECISION_DECIMALS_EVEDEX /
+      USDT_COLLATERAL_PRICE;
 
     const bobBtcPrice = BOB_ORDER_CONFIG.instrumentPrice.price;
-    const bobBtcUsdt = bobBtcPrice / USDT_PRICE;
-    const bobAmount = BOB_ORDER_CONFIG.amount * bobBtcUsdt * USDT_DECIMALS;
+    const bobAmount =
+      (BOB_ORDER_CONFIG.amount * bobBtcPrice * PRECISION_DECIMALS_DEPOSIT_DEX) /
+      PRECISION_DECIMALS_EVEDEX /
+      USDT_COLLATERAL_PRICE;
 
     await Promise.all([deposit({ user: alice, amount: aliceAmount }), deposit({ user: bob, amount: bobAmount })]);
   });
@@ -128,11 +143,11 @@ describe(flow, () => {
       collateralPrices: [
         {
           collateral: usdtToken.address,
-          price: USDT_PRICE,
+          price: USDT_COLLATERAL_PRICE,
         },
         {
           collateral: btcToken.address,
-          price: BTC_PRICE,
+          price: BTC_COLLATERAL_PRICE,
         },
       ],
     };

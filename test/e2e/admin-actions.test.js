@@ -8,14 +8,13 @@ const {
   NEW_BTC_FR_LONG,
   NEW_BTC_FR_SHORT,
   USDT_DEPOSIT_AMOUNT,
-  BTC_PRICE,
   ORDER_AMOUNT,
-  USDT_PRICE,
   ORDER_LEVERAGE,
 } = require('./admin-actions.config');
 const { expect } = require('chai');
 const { BTC_USD_INDEX, USDT_COLLATERAL_INDEX, BUY_SIDE, FR_PRECISION } = require('../helpers/constants');
 const { createSession, createOrderExtended, signOrder } = require('../helpers/utils');
+const { BTC_INSTRUMENT_PRICE, USDT_COLLATERAL_PRICE, BTC_COLLATERAL_PRICE } = require('./order-buy-sell.config');
 
 const flow = 'admin configuration actions';
 describe(flow, () => {
@@ -41,6 +40,7 @@ describe(flow, () => {
         ETH_USD_INSTRUMENT.MAX_LEVERAGE,
         ETH_USD_INSTRUMENT.DAILY_FR_LONG,
         ETH_USD_INSTRUMENT.DAILY_FR_SHORT,
+        ETH_USD_INSTRUMENT.STATIC_FR,
         Math.floor(Date.now() / 1000), //timestamp
       ],
     });
@@ -74,6 +74,7 @@ describe(flow, () => {
         ETH_USD_INSTRUMENT.MAX_LEVERAGE + 1n,
         ETH_USD_INSTRUMENT.DAILY_FR_LONG,
         ETH_USD_INSTRUMENT.DAILY_FR_SHORT,
+        ETH_USD_INSTRUMENT.STATIC_FR,
         Math.floor(Date.now() / 1000) + 1, // timestamp
       ],
     });
@@ -167,7 +168,7 @@ describe(flow, () => {
         instrumentIndex: BTC_USD_INDEX,
         side,
         amount: ORDER_AMOUNT,
-        price: BTC_PRICE,
+        price: BTC_INSTRUMENT_PRICE,
         leverage: ORDER_LEVERAGE,
         userSession: userSessionWallet.account.address,
       });
@@ -200,11 +201,11 @@ describe(flow, () => {
       collateralPrices: [
         {
           collateral: usdtToken.address,
-          price: USDT_PRICE,
+          price: USDT_COLLATERAL_PRICE,
         },
         {
           collateral: btcToken.address,
-          price: BTC_PRICE,
+          price: BTC_COLLATERAL_PRICE,
         },
       ],
     };
@@ -228,7 +229,7 @@ describe(flow, () => {
   it('check accounts funding rate after order execution', async () => {
     const { alice, bob, eveDex } = await restoreSuit(flow);
 
-    const aliceFr = await readContract(alice, {
+    const [aliceFr] = await readContract(alice, {
       abi: eveDex.abi,
       address: eveDex.address,
       args: [alice.account.address, BTC_USD_INDEX, orderExecutionTimestamp, 0n],
@@ -236,7 +237,7 @@ describe(flow, () => {
     });
     expect(aliceFr).to.equal(0n);
 
-    const bobFr = await readContract(bob, {
+    const [bobFr] = await readContract(bob, {
       abi: eveDex.abi,
       address: eveDex.address,
       args: [alice.account.address, BTC_USD_INDEX, orderExecutionTimestamp, 0n],
@@ -252,7 +253,7 @@ describe(flow, () => {
       abi: eveDex.abi,
       address: eveDex.address,
       functionName: 'setFR',
-      args: [BTC_USD_INDEX, NEW_BTC_FR_LONG, NEW_BTC_FR_SHORT, newFrTimestamp],
+      args: [BTC_USD_INDEX, NEW_BTC_FR_LONG, NEW_BTC_FR_SHORT, ETH_USD_INSTRUMENT.STATIC_FR, newFrTimestamp],
     });
   });
 
@@ -278,7 +279,7 @@ describe(flow, () => {
     const { alice, bob, eveDex } = await restoreSuit(flow);
     const currentTimestamp = newFrTimestamp;
 
-    const aliceFr = await readContract(alice, {
+    const [aliceFr] = await readContract(alice, {
       abi: eveDex.abi,
       address: eveDex.address,
       args: [alice.account.address, BTC_USD_INDEX, currentTimestamp, 0n],
@@ -288,7 +289,7 @@ describe(flow, () => {
     const expectedAliceFr = (NEW_BTC_FR_LONG * ORDER_AMOUNT) / FR_PRECISION;
     expect(aliceFr).to.equal(expectedAliceFr);
 
-    const bobFr = await readContract(bob, {
+    const [bobFr] = await readContract(bob, {
       abi: eveDex.abi,
       address: eveDex.address,
       args: [bob.account.address, BTC_USD_INDEX, currentTimestamp, 0n],

@@ -17,11 +17,13 @@ const { BUY_SIDE, BTC_USD_INDEX, USDT_COLLATERAL_INDEX, SELL_SIDE } = require('.
 const {
   USDT_DEPOSIT_AMOUNT,
   ORDER_LEVERAGE,
-  BTC_CURRENT_PRICE,
-  USDT_CURRENT_PRICE,
-  USDT_INITIAL_PRICE,
-  BTC_INITIAL_PRICE,
   INITIAL_ORDER_SIZE_PERCENT,
+  BTC_INSTRUMENT_INITIAL_PRICE,
+  USDT_COLLATERAL_INITIAL_PRICE,
+  BTC_COLLATERAL_INITIAL_PRICE,
+  BTC_INSTRUMENT_CURRENT_PRICE,
+  USDT_COLLATERAL_CURRENT_PRICE,
+  BTC_COLLATERAL_CURRENT_PRICE,
 } = require('./liquidation.config');
 
 const flow = 'deposit -> create session -> buy/sell orders -> order liquidation';
@@ -115,17 +117,17 @@ describe(flow, () => {
     const instrumentPrices = [
       {
         index: BTC_USD_INDEX,
-        price: BTC_INITIAL_PRICE, // BTC price
+        price: BTC_INSTRUMENT_INITIAL_PRICE, // BTC price
       },
     ];
     const collateralPrices = [
       {
         collateral: usdtToken.address,
-        price: USDT_INITIAL_PRICE, // USDT price
+        price: USDT_COLLATERAL_INITIAL_PRICE, // USDT price
       },
       {
         collateral: btcToken.address,
-        price: BTC_INITIAL_PRICE, // BTC price (if BTC is used as collateral)
+        price: BTC_COLLATERAL_INITIAL_PRICE, // BTC price (if BTC is used as collateral)
       },
     ];
 
@@ -148,7 +150,7 @@ describe(flow, () => {
         instrumentIndex: BTC_USD_INDEX,
         side,
         amount,
-        price: BTC_INITIAL_PRICE,
+        price: BTC_INSTRUMENT_INITIAL_PRICE,
         leverage: ORDER_LEVERAGE,
         userSession: userSessionWallet.account.address,
       });
@@ -181,17 +183,17 @@ describe(flow, () => {
       instrumentPrices: [
         {
           index: BTC_USD_INDEX,
-          price: BTC_INITIAL_PRICE,
+          price: BTC_INSTRUMENT_INITIAL_PRICE,
         },
       ],
       collateralPrices: [
         {
           collateral: usdtToken.address,
-          price: USDT_INITIAL_PRICE,
+          price: USDT_COLLATERAL_INITIAL_PRICE,
         },
         {
           collateral: btcToken.address,
-          price: BTC_INITIAL_PRICE,
+          price: BTC_COLLATERAL_INITIAL_PRICE,
         },
       ],
     };
@@ -204,7 +206,7 @@ describe(flow, () => {
       args: [
         longOrderExt,
         shortOrderExt,
-        BTC_INITIAL_PRICE,
+        BTC_INSTRUMENT_INITIAL_PRICE,
         longOrderExt.order.amount,
         fullPrices,
         historyTimestamp,
@@ -219,17 +221,17 @@ describe(flow, () => {
     const currentInstrumentPrices = [
       {
         index: BTC_USD_INDEX,
-        price: BTC_CURRENT_PRICE,
+        price: BTC_INSTRUMENT_CURRENT_PRICE,
       },
     ];
     const currentCollateralPrices = [
       {
         collateral: usdtToken.address,
-        price: USDT_CURRENT_PRICE,
+        price: USDT_COLLATERAL_CURRENT_PRICE,
       },
       {
         collateral: btcToken.address,
-        price: BTC_CURRENT_PRICE,
+        price: BTC_COLLATERAL_CURRENT_PRICE,
       },
     ];
 
@@ -266,17 +268,17 @@ describe(flow, () => {
     const currentInstrumentPrices = [
       {
         index: BTC_USD_INDEX,
-        price: BTC_CURRENT_PRICE,
+        price: BTC_INSTRUMENT_CURRENT_PRICE,
       },
     ];
     const currentCollateralPrices = [
       {
         collateral: usdtToken.address,
-        price: USDT_CURRENT_PRICE,
+        price: USDT_COLLATERAL_CURRENT_PRICE,
       },
       {
         collateral: btcToken.address,
-        price: BTC_CURRENT_PRICE,
+        price: BTC_COLLATERAL_CURRENT_PRICE,
       },
     ];
 

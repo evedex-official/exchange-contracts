@@ -2,14 +2,15 @@ const { restoreSuit, generateSuit } = require('../helpers/generate-suit');
 const { BTC_USD_INDEX, USDT_COLLATERAL_INDEX, BUY_SIDE, SELL_SIDE } = require('../helpers/constants');
 const { createOrderExtended, signOrder, createSession, getOrderDigest } = require('../helpers/utils');
 const {
-  BTC_PRICE,
   ORDER_LEVERAGE,
   ORDER_AMOUNT,
   USDT_DEPOSIT_AMOUNT,
   NEW_ORDER_AMOUNT,
+  BTC_INSTRUMENT_PRICE,
+  USDT_COLLATERAL_PRICE,
+  BTC_COLLATERAL_PRICE,
 } = require('./order-replacement.config');
 const { writeContract, readContract } = require('viem/actions');
-const { USDT_PRICE } = require('./part-order-execution.config');
 const { expect } = require('chai');
 
 const flow = 'deposit -> create session -> simple order replacement -> partially executed order replacement';
@@ -72,7 +73,7 @@ describe(flow, () => {
       instrumentIndex: BTC_USD_INDEX,
       side: BUY_SIDE,
       amount: ORDER_AMOUNT,
-      price: BTC_PRICE,
+      price: BTC_INSTRUMENT_PRICE,
       leverage: ORDER_LEVERAGE,
       userSession: aliceSessionWallet.account.address,
       expiration: Math.floor(Date.now() / 1000) + 300,
@@ -106,7 +107,7 @@ describe(flow, () => {
       instrumentIndex: BTC_USD_INDEX,
       side: BUY_SIDE,
       amount: NEW_ORDER_AMOUNT,
-      price: BTC_PRICE,
+      price: BTC_INSTRUMENT_PRICE,
       leverage: ORDER_LEVERAGE,
       userSession: aliceSessionWallet.account.address,
       // event if the rest of the params are the same, expiration of the order will be changed
@@ -145,7 +146,7 @@ describe(flow, () => {
         instrumentIndex: BTC_USD_INDEX,
         side,
         amount,
-        price: BTC_PRICE,
+        price: BTC_INSTRUMENT_PRICE,
         leverage: ORDER_LEVERAGE,
         userSession: userSessionWallet.account.address,
       });
@@ -190,11 +191,11 @@ describe(flow, () => {
       collateralPrices: [
         {
           collateral: usdtToken.address,
-          price: USDT_PRICE,
+          price: USDT_COLLATERAL_PRICE,
         },
         {
           collateral: btcToken.address,
-          price: BTC_PRICE,
+          price: BTC_COLLATERAL_PRICE,
         },
       ],
     };
@@ -238,7 +239,7 @@ describe(flow, () => {
       instrumentIndex: BTC_USD_INDEX,
       side: BUY_SIDE,
       amount: actualNewAmount,
-      price: BTC_PRICE,
+      price: BTC_INSTRUMENT_PRICE,
       leverage: ORDER_LEVERAGE,
       userSession: aliceSessionWallet.account.address,
       creationTime: Math.floor(Date.now() / 1000),
