@@ -287,7 +287,7 @@ contract EVEDEX is BaseDEX, IEVEDEX {
       collateralIndices.liquidatorIndex,
       accountToLiquidatePosition.position,
       liquidationPrice,
-      _MARGIN_LEVEL_PRECISION,
+      soLevel,
       liquidatorLeverage,
       fullPrices,
       historyTimestamp,
