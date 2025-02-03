@@ -8,7 +8,7 @@ const { PYTH_IDS, ALLOWED_SLIPPAGE_DEPOSIT_DEX, EVEDEX_MARGIN_PRECISION } = requ
 describe('DepositDex contract', function () {
   let depositDex, vault, eveDex, sessions, usdt, btcToken, tokenAddress, orderLib, marginCalculator, oracle, pythMock;
 
-  let owner, alice, bob, liquidator, fundingRateAccount, matcher;
+  let owner, alice, bob, liquidator, fundingRateAccount, staticFundingRateAccount, matcher;
 
   const createSignedWithdrawOrder = async (signer, collateral, amount, session, expiration) => {
     const withdrawalOrder = {
@@ -30,7 +30,7 @@ describe('DepositDex contract', function () {
   });
 
   beforeEach(async function () {
-    [owner, alice, bob, liquidator, fundingRateAccount, matcher] = await ethers.getSigners();
+    [owner, alice, bob, liquidator, fundingRateAccount, staticFundingRateAccount, matcher] = await ethers.getSigners();
 
     orderLib = await deployWithLibraries('OrderValidationLib', []);
     sessions = await deployWithLibraries('SessionManager', [owner.address]);
@@ -66,6 +66,7 @@ describe('DepositDex contract', function () {
         await sessions.getAddress(),
         await marginCalculator.getAddress(),
         fundingRateAccount.address,
+        staticFundingRateAccount.address,
         128,
         0.8 * EVEDEX_MARGIN_PRECISION,
         1 * EVEDEX_MARGIN_PRECISION,
@@ -101,9 +102,9 @@ describe('DepositDex contract', function () {
       10, //leverage
       0, //dailyFRLong
       0, //dailyFRShort
+      0, //staticFR
       0, //timestamp
     );
-    await eveDex.connect(matcher).setStaticFR(0, 1);
   });
 
   it('contracts are correctly initialized', async function () {
@@ -122,7 +123,7 @@ describe('DepositDex contract', function () {
 
     await depositDex.connect(alice).depositCollateral(tokenAddress, amount);
 
-    const collateralPriceData = [{ collateral: tokenAddress, price: 100000000 }];
+    const collateralPriceData = [{ collateral: tokenAddress, price: 1000000000000 }];
     const totalBalance = await depositDex.getTotalBalance(alice.address, collateralPriceData);
     expect(totalBalance).to.equal(amount, 'wrong total balance');
   });
