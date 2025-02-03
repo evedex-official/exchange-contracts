@@ -17,7 +17,6 @@ module.exports = {
   INT_PRECISION_DEPOSIT_DEX: 10n ** 8n,
   ALLOWED_SLIPPAGE_DEPOSIT_DEX: 3n * 10n ** 5n, // 0.3% max slippage between oracle prices and prices passed to convertBalance function
   FR_PRECISION: 10n ** 11n,
-  // todo: change all to the form: 10n ** x
   USDT_DECIMALS: 10n ** 6n,
   BTC_DECIMALS: 10n ** 8n,
   USD_DECIMALS: 10n ** 8n,

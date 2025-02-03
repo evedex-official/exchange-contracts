@@ -115,7 +115,8 @@ describe('fr tests', async () => {
   });
 
   it('should distribute fr', async () => {
-    const { eveDex, matcher, orders, btcToken, usdtToken, depositDex, fundingRateAccount } = await prepare(config);
+    const { eveDex, matcher, orders, btcToken, usdtToken, depositDex, fundingRateAccount, staticFundingRateAccount } =
+      await prepare(config);
     // 3%
     const newFr = (3n * FR_PRECISION) / 100n;
     // long pay to short
@@ -127,13 +128,13 @@ describe('fr tests', async () => {
       account: matcher.account.address,
     });
 
-    const accountFRLong = await eveDex.read.getAccountFR([
+    const [accountFRLong] = await eveDex.read.getAccountFR([
       orders.longOrderExt.order.senderAddress,
       BTC_USD_INDEX,
       timestamp,
       0,
     ]);
-    const accountFRShort = await eveDex.read.getAccountFR([
+    const [accountFRShort] = await eveDex.read.getAccountFR([
       orders.shortOrderExt.order.senderAddress,
       BTC_USD_INDEX,
       timestamp,
@@ -141,6 +142,10 @@ describe('fr tests', async () => {
     ]);
     const frAccountBalanceBefore = await depositDex.read.getBalance([
       fundingRateAccount.account.address,
+      usdtToken.address,
+    ]);
+    const staticFrAccountBalanceBefore = await depositDex.read.getBalance([
+      staticFundingRateAccount.account.address,
       usdtToken.address,
     ]);
     const fullPrices = getFullPricesBtcUsdt(
@@ -167,7 +172,12 @@ describe('fr tests', async () => {
       fundingRateAccount.account.address,
       usdtToken.address,
     ]);
-    const usdtDiff = frAccountBalanceAfter - frAccountBalanceBefore;
+    const staticFrAccountBalanceAfter = await depositDex.read.getBalance([
+      staticFundingRateAccount.account.address,
+      usdtToken.address,
+    ]);
+    const frAccountUsdtDiff = frAccountBalanceAfter - frAccountBalanceBefore;
+    const staticFrAccountUsdtDiff = staticFrAccountBalanceAfter - staticFrAccountBalanceBefore;
 
     const [, [{ positionAvgPrice: longAvgPrice }]] = await eveDex.read.getActiveInstrumentsPositions([
       orders.longOrderExt.order.senderAddress,
@@ -180,11 +190,13 @@ describe('fr tests', async () => {
     const shortPositionFr = (shortAvgPrice * accountFRShort) / PRECISION_DECIMALS_EVEDEX;
     const shortCollateralFee = (shortPositionFr * PRECISION_DECIMALS_DEPOSIT_DEX) / config.USDT_PRICE_COLLATERAL;
 
-    expect(-usdtDiff).to.equal(longCollateralFee + shortCollateralFee); // todo: problems with rounding in fair count through the fr formula
+    expect(-staticFrAccountUsdtDiff).to.equal(longCollateralFee + shortCollateralFee); // todo: problems with rounding in fair count through the fr formula
+    expect(frAccountUsdtDiff).to.equal(0n);
   });
 
   it('should collect fr according to timestamp', async () => {
-    const { eveDex, matcher, orders, btcToken, usdtToken, depositDex, fundingRateAccount } = await prepare(config);
+    const { eveDex, matcher, orders, btcToken, usdtToken, depositDex, staticFundingRateAccount } =
+      await prepare(config);
     // 3%
     const newFr = (3n * FR_PRECISION) / 100n;
     // long pay to short
@@ -224,28 +236,28 @@ describe('fr tests', async () => {
           account: matcher.account.address,
         },
       );
-      const frAccountBalanceAfter = await depositDex.read.getBalance([
-        fundingRateAccount.account.address,
+      const staticfrAccountBalanceAfter = await depositDex.read.getBalance([
+        staticFundingRateAccount.account.address,
         usdtToken.address,
       ]);
-      expect(frAccountBalanceAfter).to.equal(0n);
+      expect(staticfrAccountBalanceAfter).to.equal(0n);
     }
     // block before updatedTimestamp
     {
-      const accountFRLong = await eveDex.read.getAccountFR([
+      const [accountFRLong] = await eveDex.read.getAccountFR([
         orders.longOrderExt.order.senderAddress,
         BTC_USD_INDEX,
         oldTimestamp,
         0,
       ]);
-      const accountFRShort = await eveDex.read.getAccountFR([
+      const [accountFRShort] = await eveDex.read.getAccountFR([
         orders.shortOrderExt.order.senderAddress,
         BTC_USD_INDEX,
         oldTimestamp,
         0,
       ]);
-      const frAccountBalanceBefore = await depositDex.read.getBalance([
-        fundingRateAccount.account.address,
+      const staticFrAccountBalanceBefore = await depositDex.read.getBalance([
+        staticFundingRateAccount.account.address,
         usdtToken.address,
       ]);
       await eveDex.write.collectFr(
@@ -260,11 +272,11 @@ describe('fr tests', async () => {
           account: matcher.account.address,
         },
       );
-      const frAccountBalanceAfter = await depositDex.read.getBalance([
-        fundingRateAccount.account.address,
+      const staticFrAccountBalanceAfter = await depositDex.read.getBalance([
+        staticFundingRateAccount.account.address,
         usdtToken.address,
       ]);
-      const usdtDiff = frAccountBalanceAfter - frAccountBalanceBefore;
+      const usdtDiff = staticFrAccountBalanceAfter - staticFrAccountBalanceBefore;
 
       const [, [{ positionAvgPrice: longAvgPrice }]] = await eveDex.read.getActiveInstrumentsPositions([
         orders.longOrderExt.order.senderAddress,
@@ -337,7 +349,7 @@ describe('fr tests', async () => {
       abi: depositDex.abi,
       args: [usdtToken.address, config.USDT_DEPOSIT_AMOUNT],
     });
-    const fr = await eveDex.read.getAccountFR([orders.longOrderExt.order.senderAddress, BTC_USD_INDEX, timestamp, 0]);
+    const [fr] = await eveDex.read.getAccountFR([orders.longOrderExt.order.senderAddress, BTC_USD_INDEX, timestamp, 0]);
     await writeContract(matcher, {
       functionName: 'liquidatePositions',
       address: eveDex.address,
@@ -350,7 +362,7 @@ describe('fr tests', async () => {
         0n, // history search hint
       ],
     });
-    const frAfter = await eveDex.read.getAccountFR([
+    const [frAfter] = await eveDex.read.getAccountFR([
       orders.longOrderExt.order.senderAddress,
       BTC_USD_INDEX,
       timestamp,
@@ -407,7 +419,7 @@ describe('fr tests', async () => {
     const [, [{ positionAvgPrice: distributorAvgPrice }]] = await eveDex.read.getActiveInstrumentsPositions([
       distributorFrAddress,
     ]);
-    const distributorFR = await eveDex.read.getAccountFR([distributorFrAddress, BTC_USD_INDEX, timestamp, 0]);
+    const [distributorFR] = await eveDex.read.getAccountFR([distributorFrAddress, BTC_USD_INDEX, timestamp, 0]);
     const distributorPositionFr = (distributorAvgPrice * distributorFR) / PRECISION_DECIMALS_EVEDEX;
     const distributorCollateralFee =
       (distributorPositionFr * PRECISION_DECIMALS_DEPOSIT_DEX) / config.USDT_PRICE_COLLATERAL;
@@ -415,7 +427,7 @@ describe('fr tests', async () => {
     const [, [{ positionAvgPrice: receiverAvgPrice }]] = await eveDex.read.getActiveInstrumentsPositions([
       recieverFrAddress,
     ]);
-    const receiverFR = await eveDex.read.getAccountFR([recieverFrAddress, BTC_USD_INDEX, timestamp, 0]);
+    const [receiverFR] = await eveDex.read.getAccountFR([recieverFrAddress, BTC_USD_INDEX, timestamp, 0]);
     const receiverPositionFr = (receiverAvgPrice * receiverFR) / PRECISION_DECIMALS_EVEDEX;
     const receiverCollateralFee = (receiverPositionFr * PRECISION_DECIMALS_DEPOSIT_DEX) / config.USDT_PRICE_COLLATERAL;
 

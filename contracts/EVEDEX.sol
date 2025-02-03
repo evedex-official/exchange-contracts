@@ -111,9 +111,9 @@ contract EVEDEX is BaseDEX, IEVEDEX {
       accumulatedPercentage = (frInfo.longFRStored - positionInfo_.positionLongFRStored);
     }
     if (accumulatedPercentage > 0) {
-      staticFee = (absPosition * accumulatedPercentage * frInfo.staticFr) / _FR_PRECISION;
+      staticFee = (absPosition * accumulatedPercentage * frInfo.staticFr) / _FR_PRECISION / _FR_PRECISION;
     }
-    return (positionInfo_.frAccumulated + (absPosition * accumulatedPercentage - staticFee) / _FR_PRECISION, staticFee);
+    return (positionInfo_.frAccumulated - staticFee + (absPosition * accumulatedPercentage) / _FR_PRECISION, staticFee);
   }
 
   function getPNL(address account, uint256 index, int256 price) public view returns (int256) {
@@ -403,7 +403,7 @@ contract EVEDEX is BaseDEX, IEVEDEX {
       liquidationOrder.collateralIndexToLiquidate,
       -liquidationOrder.amount,
       int256(liquidationPrice),
-      _MARGIN_LEVEL_PRECISION,
+      type(int256).min,
       liquidationOrder.leverageToLiquidate,
       fullPrices,
       historyTimestamp,
@@ -558,7 +558,11 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     int256 staticCollateralFee;
     if (staticFee != 0) {
       staticCollateralFee = (staticFee * posAvgPrice * _COLLATERAL_PRECISION) / collateralPrice / _INT_PRECISION;
-      _setBalance(staticFundingRateAccount, collateral, _getBalance(account, collateral) + staticCollateralFee);
+      _setBalance(
+        staticFundingRateAccount,
+        collateral,
+        _getBalance(staticFundingRateAccount, collateral) + staticCollateralFee
+      );
     }
 
     _setBalance(

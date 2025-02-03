@@ -104,7 +104,8 @@ const createOrders = async ({
   const createOrder = async ({ side, userWallet, userSessionWallet, price, orderSizePercent }) => {
     const { collateralPrices, instrumentPrices } = getFullPricesBtcUsdt(
       price,
-      config.USDT_PRICE,
+      config.BTC_PRICE_COLLATERAL,
+      config.USDT_PRICE_COLLATERAL,
       btcToken.address,
       usdtToken.address,
     );
@@ -190,7 +191,13 @@ const matchOrders = async ({ matcher, usdtToken, btcToken, eveDex, orders, confi
       orders.shortOrderExt,
       config.BTC_PRICE_USERS_TRADE,
       orders.longOrderExt.order.amount,
-      getFullPricesBtcUsdt(config.BTC_PRICE_USERS_TRADE, config.USDT_PRICE, btcToken.address, usdtToken.address),
+      getFullPricesBtcUsdt(
+        config.BTC_PRICE_USERS_TRADE,
+        config.BTC_PRICE_COLLATERAL,
+        config.USDT_PRICE_COLLATERAL,
+        btcToken.address,
+        usdtToken.address,
+      ),
       historyTimestamp,
       historySearchHint,
     ],
@@ -209,7 +216,8 @@ const matchOrders = async ({ matcher, usdtToken, btcToken, eveDex, orders, confi
             orders.liquidatorOrderExt.order.amount,
             getFullPricesBtcUsdt(
               config.BTC_PRICE_LIQUIDATOR_TRADE,
-              config.USDT_PRICE,
+              config.BTC_PRICE_COLLATERAL,
+              config.USDT_PRICE_COLLATERAL,
               btcToken.address,
               usdtToken.address,
             ),
@@ -223,7 +231,8 @@ const matchOrders = async ({ matcher, usdtToken, btcToken, eveDex, orders, confi
             orders.carolOrderExt.order.amount,
             getFullPricesBtcUsdt(
               config.BTC_PRICE_LIQUIDATOR_TRADE,
-              config.USDT_PRICE,
+              config.BTC_PRICE_COLLATERAL,
+              config.USDT_PRICE_COLLATERAL,
               btcToken.address,
               usdtToken.address,
             ),

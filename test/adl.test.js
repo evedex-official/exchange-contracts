@@ -2,7 +2,16 @@
 
 const { upgrades } = require('hardhat');
 const { prepare } = require('./adl.fixture');
-const { USDT_DECIMALS, BTC_DECIMALS, USDT_COLLATERAL_INDEX, BUY_SIDE, SELL_SIDE } = require('./helpers/constants');
+const {
+  USDT_DECIMALS,
+  BTC_DECIMALS,
+  USDT_COLLATERAL_INDEX,
+  BUY_SIDE,
+  SELL_SIDE,
+  PRECISION_DECIMALS_EVEDEX,
+  USD_DECIMALS,
+  PRECISION_DECIMALS_DEPOSIT_DEX,
+} = require('./helpers/constants');
 const { parsePrice, getFullPricesBtcUsdt } = require('./helpers/utils');
 const { expect } = require('chai');
 
@@ -13,17 +22,24 @@ describe('adl tests', () => {
     suit: 'adl tests',
     USDT_DEPOSIT_AMOUNT: 100n * USDT_DECIMALS, // collateral
     BTC_PRICE_USERS_TRADE: parsePrice(100_000, {
-      tokenDecimals: BTC_DECIMALS,
+      precisionDecimals: PRECISION_DECIMALS_EVEDEX,
     }), // price of the order
     BTC_PRICE_LIQUIDATOR_TRADE: parsePrice(100_000, {
-      tokenDecimals: BTC_DECIMALS,
+      precisionDecimals: PRECISION_DECIMALS_EVEDEX,
     }),
-    USDT_PRICE: parsePrice(1.0, {
-      tokenDecimals: USDT_DECIMALS,
-    }), // initial price of the usdt (used as a collateral)
+    USDT_PRICE_COLLATERAL: parsePrice(1.0, {
+      tokenInDecimals: USDT_DECIMALS,
+      tokenOutDecimals: USD_DECIMALS,
+      precisionDecimals: PRECISION_DECIMALS_DEPOSIT_DEX,
+    }),
+    BTC_PRICE_COLLATERAL: parsePrice(100_000, {
+      tokenInDecimals: BTC_DECIMALS,
+      tokenOutDecimals: USD_DECIMALS,
+      precisionDecimals: PRECISION_DECIMALS_DEPOSIT_DEX,
+    }),
     ORDER_LEVERAGE: 1n,
     USER_ORDER_SIZE_PERCENT: 80n, // user's order size in percents of the margin level at stop-out boundary
-    LIQUIDATOR_ORDER_SIZE_PERCENT: 10n, // liquidator's order size in percents of the margin level at stop-out boundary
+    LIQUIDATOR_ORDER_SIZE_PERCENT: 10n, // liquidator's initial position size in percents of the margin level at stop-out boundary
     LIQUIDATOR_ORDER_SIDE: BUY_SIDE,
   };
 
@@ -31,7 +47,8 @@ describe('adl tests', () => {
     const { orders, eveDex, usdtToken, btcToken, matcher } = await prepare(config);
     const fullPrices = getFullPricesBtcUsdt(
       config.BTC_PRICE_USERS_TRADE,
-      config.USDT_PRICE,
+      config.BTC_PRICE_COLLATERAL,
+      config.USDT_PRICE_COLLATERAL,
       btcToken.address,
       usdtToken.address,
     );
@@ -40,17 +57,15 @@ describe('adl tests', () => {
       accountToLiquidate: orders.longOrderExt.order.senderAddress,
       liquidator: orders.liquidatorOrderExt.order.senderAddress,
       index: orders.longOrderExt.order.instrumentIndex,
+      amount: orders.longOrderExt.order.amount,
       prices: fullPrices.instrumentPrices,
-      leverage: config.ORDER_LEVERAGE,
-      liquidationTimestamp: historyTimestamp,
-      expiration: historyTimestamp + 60,
-    };
-    const collateralIndices = {
-      liquidatorIndex: USDT_COLLATERAL_INDEX, // index of collateral that was used in extended order
-      indicesToLiquidate: [USDT_COLLATERAL_INDEX], // indices of user's collaterals that will be used for liquidation
+      collateralIndexLiquidator: USDT_COLLATERAL_INDEX,
+      collateralIndexToLiquidate: USDT_COLLATERAL_INDEX,
+      leverageLiquidator: config.ORDER_LEVERAGE,
+      leverageToLiquidate: config.ORDER_LEVERAGE,
     };
     try {
-      await eveDex.write.adlLiquidation([liquidationOrder, fullPrices, collateralIndices, historyTimestamp, 0n], {
+      await eveDex.write.adlLiquidation([liquidationOrder, fullPrices, historyTimestamp, 0n], {
         account: matcher.account.address,
       });
       expect.fail('Expected SufficientMargin() revert, but transaction succeeded.');
@@ -63,6 +78,8 @@ describe('adl tests', () => {
     const { eveDex, usdtToken, btcToken, matcher, depositDex, orders } = await prepare(config);
     const delta = (config.BTC_PRICE_USERS_TRADE * (101n - config.USER_ORDER_SIZE_PERCENT)) / 100n;
     const boundaryPrice = config.BTC_PRICE_USERS_TRADE + delta;
+    const collateralPriceDelta = (config.BTC_PRICE_COLLATERAL * (101n - config.USER_ORDER_SIZE_PERCENT)) / 100n;
+    const boundaryCollateralPrice = config.BTC_PRICE_COLLATERAL + collateralPriceDelta;
 
     const userCollateralBalanceBefore = await depositDex.read.getBalance([
       orders.shortOrderExt.order.senderAddress,
@@ -76,22 +93,26 @@ describe('adl tests', () => {
     const liquidatorPosBefore = await eveDex.read.getActiveInstrumentsPositions([
       orders.liquidatorOrderExt.order.senderAddress,
     ]);
-    const fullPrices = getFullPricesBtcUsdt(boundaryPrice, config.USDT_PRICE, btcToken.address, usdtToken.address);
+    const fullPrices = getFullPricesBtcUsdt(
+      boundaryPrice,
+      boundaryCollateralPrice,
+      config.USDT_PRICE_COLLATERAL,
+      btcToken.address,
+      usdtToken.address,
+    );
     const historyTimestamp = Math.trunc(Date.now() / 1000);
     const liquidationOrder = {
       accountToLiquidate: orders.shortOrderExt.order.senderAddress,
       liquidator: orders.liquidatorOrderExt.order.senderAddress,
       index: orders.shortOrderExt.order.instrumentIndex,
+      amount: -orders.shortOrderExt.order.amount,
       prices: fullPrices.instrumentPrices,
-      leverage: config.ORDER_LEVERAGE,
-      liquidationTimestamp: historyTimestamp,
-      expiration: historyTimestamp + 60,
+      collateralIndexLiquidator: USDT_COLLATERAL_INDEX,
+      collateralIndexToLiquidate: USDT_COLLATERAL_INDEX,
+      leverageLiquidator: config.ORDER_LEVERAGE,
+      leverageToLiquidate: config.ORDER_LEVERAGE,
     };
-    const collateralIndices = {
-      liquidatorIndex: USDT_COLLATERAL_INDEX, // index of collateral that was used in extended order
-      indicesToLiquidate: [USDT_COLLATERAL_INDEX], // indices of user's collaterals that will be used for liquidation
-    };
-    await eveDex.write.adlLiquidation([liquidationOrder, fullPrices, collateralIndices, historyTimestamp, 0n], {
+    await eveDex.write.adlLiquidation([liquidationOrder, fullPrices, historyTimestamp, 0n], {
       account: matcher.account.address,
     });
 
@@ -125,6 +146,8 @@ describe('adl tests', () => {
     const { eveDex, usdtToken, btcToken, matcher, depositDex, orders } = await prepare(config);
     const delta = (config.BTC_PRICE_USERS_TRADE * (101n - config.USER_ORDER_SIZE_PERCENT)) / 100n;
     const boundaryPrice = config.BTC_PRICE_USERS_TRADE - delta;
+    const collateralPriceDelta = (config.BTC_PRICE_COLLATERAL * (101n - config.USER_ORDER_SIZE_PERCENT)) / 100n;
+    const boundaryCollateralPrice = config.BTC_PRICE_COLLATERAL - collateralPriceDelta;
 
     const userCollateralBalanceBefore = await depositDex.read.getBalance([
       orders.longOrderExt.order.senderAddress,
@@ -139,22 +162,26 @@ describe('adl tests', () => {
       orders.liquidatorOrderExt.order.senderAddress,
     ]);
 
-    const fullPrices = getFullPricesBtcUsdt(boundaryPrice, config.USDT_PRICE, btcToken.address, usdtToken.address);
+    const fullPrices = getFullPricesBtcUsdt(
+      boundaryPrice,
+      boundaryCollateralPrice,
+      config.USDT_PRICE_COLLATERAL,
+      btcToken.address,
+      usdtToken.address,
+    );
     const historyTimestamp = Math.trunc(Date.now() / 1000);
     const liquidationOrder = {
       accountToLiquidate: orders.longOrderExt.order.senderAddress,
       liquidator: orders.liquidatorOrderExt.order.senderAddress,
       index: orders.longOrderExt.order.instrumentIndex,
+      amount: orders.longOrderExt.order.amount,
       prices: fullPrices.instrumentPrices,
-      leverage: config.ORDER_LEVERAGE,
-      liquidationTimestamp: historyTimestamp,
-      expiration: historyTimestamp + 60,
+      collateralIndexLiquidator: USDT_COLLATERAL_INDEX,
+      collateralIndexToLiquidate: USDT_COLLATERAL_INDEX,
+      leverageLiquidator: config.ORDER_LEVERAGE,
+      leverageToLiquidate: config.ORDER_LEVERAGE,
     };
-    const collateralIndices = {
-      liquidatorIndex: USDT_COLLATERAL_INDEX, // index of collateral that was used in extended order
-      indicesToLiquidate: [USDT_COLLATERAL_INDEX], // indices of user's collaterals that will be used for liquidation
-    };
-    await eveDex.write.adlLiquidation([liquidationOrder, fullPrices, collateralIndices, historyTimestamp, 0n], {
+    await eveDex.write.adlLiquidation([liquidationOrder, fullPrices, historyTimestamp, 0n], {
       account: matcher.account.address,
     });
 
@@ -189,24 +216,30 @@ describe('adl tests', () => {
     const { eveDex, usdtToken, btcToken, matcher, orders } = await prepare(config);
     const delta = (config.BTC_PRICE_USERS_TRADE * (101n - config.USER_ORDER_SIZE_PERCENT)) / 100n;
     const boundaryPrice = config.BTC_PRICE_USERS_TRADE - delta;
+    const collateralPriceDelta = (config.BTC_PRICE_COLLATERAL * (101n - config.USER_ORDER_SIZE_PERCENT)) / 100n;
+    const boundaryCollateralPrice = config.BTC_PRICE_COLLATERAL - collateralPriceDelta;
 
-    const fullPrices = getFullPricesBtcUsdt(boundaryPrice, config.USDT_PRICE, btcToken.address, usdtToken.address);
+    const fullPrices = getFullPricesBtcUsdt(
+      boundaryPrice,
+      boundaryCollateralPrice,
+      config.USDT_PRICE_COLLATERAL,
+      btcToken.address,
+      usdtToken.address,
+    );
     const historyTimestamp = Math.trunc(Date.now() / 1000);
     const liquidationOrder = {
       accountToLiquidate: orders.longOrderExt.order.senderAddress,
       liquidator: orders.liquidatorOrderExt.order.senderAddress,
       index: orders.longOrderExt.order.instrumentIndex,
+      amount: orders.longOrderExt.order.amount,
       prices: fullPrices.instrumentPrices,
-      leverage: config.ORDER_LEVERAGE,
-      liquidationTimestamp: historyTimestamp,
-      expiration: historyTimestamp + 60,
-    };
-    const collateralIndices = {
-      liquidatorIndex: USDT_COLLATERAL_INDEX, // index of collateral that was used in extended order
-      indicesToLiquidate: [USDT_COLLATERAL_INDEX], // indices of user's collaterals that will be used for liquidation
+      collateralIndexLiquidator: USDT_COLLATERAL_INDEX,
+      collateralIndexToLiquidate: USDT_COLLATERAL_INDEX,
+      leverageLiquidator: config.ORDER_LEVERAGE,
+      leverageToLiquidate: config.ORDER_LEVERAGE,
     };
     try {
-      await eveDex.write.adlLiquidation([liquidationOrder, fullPrices, collateralIndices, historyTimestamp, 0n], {
+      await eveDex.write.adlLiquidation([liquidationOrder, fullPrices, historyTimestamp, 0n], {
         account: matcher.account.address,
       });
       expect.fail('Expected UnprofitableTrade() revert, but transaction succeeded.');
@@ -222,24 +255,30 @@ describe('adl tests', () => {
     const { eveDex, usdtToken, btcToken, matcher, orders } = await prepare(config);
     const delta = (config.BTC_PRICE_USERS_TRADE * (101n - config.USER_ORDER_SIZE_PERCENT)) / 100n;
     const boundaryPrice = config.BTC_PRICE_USERS_TRADE + delta;
+    const collateralPriceDelta = (config.BTC_PRICE_COLLATERAL * (101n - config.USER_ORDER_SIZE_PERCENT)) / 100n;
+    const boundaryCollateralPrice = config.BTC_PRICE_COLLATERAL + collateralPriceDelta;
 
-    const fullPrices = getFullPricesBtcUsdt(boundaryPrice, config.USDT_PRICE, btcToken.address, usdtToken.address);
+    const fullPrices = getFullPricesBtcUsdt(
+      boundaryPrice,
+      boundaryCollateralPrice,
+      config.USDT_PRICE_COLLATERAL,
+      btcToken.address,
+      usdtToken.address,
+    );
     const historyTimestamp = Math.trunc(Date.now() / 1000);
     const liquidationOrder = {
       accountToLiquidate: orders.shortOrderExt.order.senderAddress,
       liquidator: orders.liquidatorOrderExt.order.senderAddress,
       index: orders.shortOrderExt.order.instrumentIndex,
+      amount: -orders.shortOrderExt.order.amount,
       prices: fullPrices.instrumentPrices,
-      leverage: config.ORDER_LEVERAGE,
-      liquidationTimestamp: historyTimestamp,
-      expiration: historyTimestamp + 60,
-    };
-    const collateralIndices = {
-      liquidatorIndex: USDT_COLLATERAL_INDEX, // index of collateral that was used in extended order
-      indicesToLiquidate: [USDT_COLLATERAL_INDEX], // indices of user's collaterals that will be used for liquidation
+      collateralIndexLiquidator: USDT_COLLATERAL_INDEX,
+      collateralIndexToLiquidate: USDT_COLLATERAL_INDEX,
+      leverageLiquidator: config.ORDER_LEVERAGE,
+      leverageToLiquidate: config.ORDER_LEVERAGE,
     };
     try {
-      await eveDex.write.adlLiquidation([liquidationOrder, fullPrices, collateralIndices, historyTimestamp, 0n], {
+      await eveDex.write.adlLiquidation([liquidationOrder, fullPrices, historyTimestamp, 0n], {
         account: matcher.account.address,
       });
       expect.fail('Expected UnprofitableTrade() revert, but transaction succeeded.');
@@ -250,7 +289,6 @@ describe('adl tests', () => {
     config.LIQUIDATOR_ORDER_SIDE = BUY_SIDE;
   });
 
-  it('historical liquidation');
-
-  it('test function check');
+  it('partial liquidation (long)', async () => {});
+  it('partial liquidation (short)', async () => {});
 });

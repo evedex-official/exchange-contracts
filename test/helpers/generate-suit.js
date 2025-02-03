@@ -28,6 +28,7 @@ const prepareWallets = async () => {
     bobSessionWallet,
     carolSessionWallet,
     liquidatorSessionWallet,
+    staticFundingRateAccount,
   ] = await viem.getWalletClients();
   return {
     owner,
@@ -41,13 +42,16 @@ const prepareWallets = async () => {
     bobSessionWallet,
     carolSessionWallet,
     liquidatorSessionWallet,
+    staticFundingRateAccount,
   };
 };
 
 const prepareTokens = async (wallets) => {
+  const usdtDecimals = 6n;
+  const btcDecimals = 8n;
   const [usdtToken, btcToken] = await Promise.all([
-    viem.deployContract('ERC20MockDecimals', ['USDT', USDT_DECIMALS]),
-    viem.deployContract('ERC20MockDecimals', ['WBTC', BTC_DECIMALS]),
+    viem.deployContract('ERC20MockDecimals', ['USDT', usdtDecimals]),
+    viem.deployContract('ERC20MockDecimals', ['WBTC', btcDecimals]),
   ]);
   await Promise.all(wallets.map((user) => usdtToken.write.mint([user.account.address, maxUint112])));
   await Promise.all(wallets.map((wallet) => btcToken.write.mint([wallet.account.address, maxUint112])));
@@ -65,6 +69,7 @@ const prepareContracts = async ({
   initMarginCalcConfig,
   oracleConfig,
   initStaticFr,
+  staticFundingRateAccount,
 }) => {
   const [orderLib, sessions, vault, marginCalculator, pythMock] = await Promise.all([
     viemDeployWithLibraries('OrderValidationLib', []),
@@ -100,6 +105,7 @@ const prepareContracts = async ({
       sessions.address,
       marginCalculator.address,
       fundingRateAccount.account.address,
+      staticFundingRateAccount.account.address,
       eveDexConfig.maxOpenPositions,
       eveDexConfig.soLevel,
       eveDexConfig.withdrawMarginLevel,
@@ -278,6 +284,7 @@ const generateSuit = async (id, config = {}) => {
     bobSessionWallet,
     carolSessionWallet,
     liquidatorSessionWallet,
+    staticFundingRateAccount,
   } = await prepareWallets();
   const { usdtToken, btcToken } = await prepareTokens([
     owner,
@@ -286,6 +293,7 @@ const generateSuit = async (id, config = {}) => {
     carol,
     liquidator,
     fundingRateAccount,
+    staticFundingRateAccount,
     matcher,
   ]);
   const { orderLib, sessions, vault, depositDex, eveDex, marginCalculator, pythMock, oracle } = await prepareContracts({
@@ -294,6 +302,7 @@ const generateSuit = async (id, config = {}) => {
     usdtToken,
     btcToken,
     fundingRateAccount,
+    staticFundingRateAccount,
     oracleConfig: config.oracleConfig,
     eveDexConfig: config.eveDexConfig,
     initInstrumentConfigs: config.initInstrumentConfigs,
@@ -307,6 +316,7 @@ const generateSuit = async (id, config = {}) => {
     carol,
     liquidator,
     fundingRateAccount,
+    staticFundingRateAccount,
     matcher,
     usdtToken,
     btcToken,

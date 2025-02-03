@@ -327,7 +327,10 @@ const signMultiLiquidationOrder = async ({ wallet, order, contractAddress }) => 
 
 const absBn = (value) => (value < 0n ? -value : value);
 
-const parsePrice = (floatPrice, { tokenInDecimals = 10n ** 0n, tokenOutDecimals = 10n ** 0n, precisionDecimals } = {}) => {
+const parsePrice = (
+  floatPrice,
+  { tokenInDecimals = 10n ** 0n, tokenOutDecimals = 10n ** 0n, precisionDecimals } = {},
+) => {
   const shift = Number(precisionDecimals);
   return (BigInt(Math.round(floatPrice * shift)) * tokenOutDecimals) / tokenInDecimals;
 };
@@ -351,7 +354,7 @@ const usdToCollateral = (
           tokenInDecimals: collateralDecimals,
           tokenOutDecimals: USD_DECIMALS,
         });
-  return (amount * 10n ** precisionDecimals) / collateralPriceBn;
+  return (amount * precisionDecimals) / collateralPriceBn;
 };
 
 const pipe =
