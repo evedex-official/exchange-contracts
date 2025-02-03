@@ -21,7 +21,7 @@ const { maxUint128, maxUint256 } = require('viem');
 describe('EVEDEX contract', function () {
   let depositDex, vault, eveDex, sessions, token, tokenAddress, orderLib;
 
-  let owner, alice, bob, liquidator, fundingRateAccount, matcher;
+  let owner, alice, bob, liquidator, fundingRateAccount, staticFundingRateAccount, matcher;
 
   const createSignedWithdrawOrder = async (signer, collateral, amount, session, expiration) => {
     const withdrawalOrder = {
@@ -43,7 +43,7 @@ describe('EVEDEX contract', function () {
   });
 
   beforeEach(async function () {
-    [owner, alice, bob, liquidator, fundingRateAccount, matcher] = await ethers.getSigners();
+    [owner, alice, bob, liquidator, fundingRateAccount, staticFundingRateAccount, matcher] = await ethers.getSigners();
 
     orderLib = await deployWithLibraries('OrderValidationLib', []);
     sessions = await deployWithLibraries('SessionManager', [owner.address]);
@@ -78,6 +78,7 @@ describe('EVEDEX contract', function () {
         await sessions.getAddress(),
         await marginCalculator.getAddress(),
         fundingRateAccount.address,
+        staticFundingRateAccount.address,
         128,
         0.8 * EVEDEX_MARGIN_PRECISION,
         1 * EVEDEX_MARGIN_PRECISION,
@@ -111,8 +112,7 @@ describe('EVEDEX contract', function () {
     const leverage = 100;
     const frLong = 86400;
     const frShort = 86400;
-    await eveDex.addInstrument(ticker, leverage, frLong, frShort, Math.floor(Date.now() / 1000));
-    await eveDex.connect(matcher).setStaticFR(0, 1);
+    await eveDex.addInstrument(ticker, leverage, frLong, frShort, 0, Math.floor(Date.now() / 1000));
 
     // set margin levels
     await marginCalculator.setLevels(0, [
@@ -193,7 +193,7 @@ describe('EVEDEX contract', function () {
     const collateralPrices = [
       {
         collateral: tokenAddress,
-        price: 100000000,
+        price: 1000000000000,
       },
     ];
     await eveDex.connect(matcher).fillOrders(
@@ -346,7 +346,7 @@ describe('EVEDEX contract', function () {
     const collateralPrices = [
       {
         collateral: tokenAddress,
-        price: 100000000,
+        price: 1000000000000,
       },
     ];
 
@@ -561,7 +561,7 @@ describe('EVEDEX contract', function () {
     const collateralPrices = [
       {
         collateral: tokenAddress,
-        price: 100000000,
+        price: 1000000000000,
       },
     ];
 
