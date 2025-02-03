@@ -97,7 +97,8 @@ describe('DepositDex contract', function () {
     await vault.grantRole(withdrawRole, depositDex.getAddress());
 
     //add btc instrument
-    await eveDex.connect(owner).addInstrument(
+    await eveDex.connect(owner).changeInstrument(
+      0,
       'BTC/USD',
       10, //leverage
       0, //dailyFRLong

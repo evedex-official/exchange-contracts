@@ -23,9 +23,9 @@ abstract contract BaseDEX is
 
   function __BaseDEX_init(
     address initialOwner_,
-    address depositDex_,
-    address sessionManager_,
-    address marginCalculator_,
+    IDepositDEX depositDex_,
+    ISessionManager sessionManager_,
+    IMarginCalc marginCalculator_,
     address fundingRateAccount_,
     address staticFundingRateAccount_,
     uint256 maxOpenPositions_,
@@ -75,9 +75,9 @@ abstract contract BaseDEX is
   }
 
   function setBasicParams(
-    address depositDex_,
-    address sessionManager_,
-    address marginCalculator_,
+    IDepositDEX depositDex_,
+    ISessionManager sessionManager_,
+    IMarginCalc marginCalculator_,
     address fundingRateAccount_,
     address staticFundingRateAccount_,
     int112 soLevel_,
@@ -99,9 +99,9 @@ abstract contract BaseDEX is
   }
 
   function _setBasicParams(
-    address depositDex_,
-    address sessionManager_,
-    address marginCalculator_,
+    IDepositDEX depositDex_,
+    ISessionManager sessionManager_,
+    IMarginCalc marginCalculator_,
     address fundingRateAccount_,
     address staticFundingRateAccount_,
     int112 soLevel_,
@@ -131,17 +131,6 @@ abstract contract BaseDEX is
     );
   }
 
-  function addInstrument(
-    string calldata ticker,
-    uint8 leverage,
-    int72 newFRLong,
-    int72 newFRShort,
-    uint72 newStaticFR,
-    uint40 timestamp
-  ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-    _changeInstrument(instrumentsLength++, ticker, leverage, newFRLong, newFRShort, newStaticFR, timestamp);
-  }
-
   function deleteInstrument() external onlyRole(DEFAULT_ADMIN_ROLE) {
     InstrumentInfo memory empty;
     _instrumentInfo[--instrumentsLength] = empty;
@@ -157,6 +146,9 @@ abstract contract BaseDEX is
     uint72 newStaticFR,
     uint40 timestamp
   ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    uint256 len = instrumentsLength;
+    if (len < index) revert InvalidIndex();
+    if (len == index) instrumentsLength = len + 1;
     _changeInstrument(index, ticker, leverage, newFRLong, newFRShort, newStaticFR, timestamp);
   }
 
@@ -169,8 +161,6 @@ abstract contract BaseDEX is
     uint72 newStaticFR,
     uint40 timestamp
   ) internal {
-    if (instrumentsLength <= index) revert InstrumentDoesNotExist();
-
     InstrumentInfo storage instrumentInfo_ = _instrumentInfo[index];
     instrumentInfo_.instrumentData.ticker = ticker;
     instrumentInfo_.instrumentData.leverage = leverage;

@@ -3,6 +3,7 @@ pragma solidity ^0.8.21;
 
 import {IDepositDEX} from "./IDepositDEX.sol";
 import {IMarginCalc} from "./IMarginCalc.sol";
+import {ISessionManager} from "./ISessionManager.sol";
 
 struct FundingRateInfo {
   int72 longFRStored; // Accumulator for frLong
@@ -32,9 +33,9 @@ interface IBaseDEX {
   );
   event InstrumentDeleted(uint256 indexed index);
   event BasicParamsUpdate(
-    address depositDex,
-    address sessionManager,
-    address marginCalculator,
+    IDepositDEX depositDex,
+    ISessionManager sessionManager,
+    IMarginCalc marginCalculator,
     address fundingRateAccount,
     address staticFundingRateAccount,
     int112 soLevel,
@@ -46,7 +47,7 @@ interface IBaseDEX {
   error SearchWithHintFailed(uint256);
   error EmptyArrayToSearch();
   error InvalidFRTimestamp();
-  error InstrumentDoesNotExist();
+  error InvalidIndex();
   error InvalidPositionsRequest(uint256);
 
   function getInstrumentData(uint256 index) external view returns (InstrumentData memory);
@@ -58,24 +59,15 @@ interface IBaseDEX {
   ) external view returns (FundingRateInfo[] memory);
 
   function setBasicParams(
-    address depositDex_,
-    address sessionManager_,
-    address marginCalculator_,
+    IDepositDEX depositDex_,
+    ISessionManager sessionManager_,
+    IMarginCalc marginCalculator_,
     address fundingRateAccount_,
     address staticFundingRateAccount_,
     int112 soLevel_,
     int112 withdrawMarginLevel_,
     uint256 maxOpenPositions_,
     uint256 liquidationFeePercent_
-  ) external;
-
-  function addInstrument(
-    string calldata ticker,
-    uint8 leverage,
-    int72 newFRLong,
-    int72 newFRShort,
-    uint72 newStaticFR,
-    uint40 timestamp
   ) external;
 
   function deleteInstrument() external;

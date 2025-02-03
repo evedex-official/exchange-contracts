@@ -16,9 +16,9 @@ contract EVEDEX is BaseDEX, IEVEDEX {
 
   function initialize(
     address initialOwner_,
-    address depositDex_,
-    address sessionManager_,
-    address marginCalculator_,
+    IDepositDEX depositDex_,
+    ISessionManager sessionManager_,
+    IMarginCalc marginCalculator_,
     address fundingRateAccount_,
     address staticFundingRateAccount_,
     uint256 maxOpenPositions_,
@@ -110,10 +110,11 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     } else {
       accumulatedPercentage = (frInfo.longFRStored - positionInfo_.positionLongFRStored);
     }
+    int256 frDiff = (absPosition * accumulatedPercentage) / _FR_PRECISION;
     if (accumulatedPercentage > 0) {
-      staticFee = (absPosition * accumulatedPercentage * frInfo.staticFr) / _FR_PRECISION / _FR_PRECISION;
+      staticFee = (frDiff * frInfo.staticFr) / _FR_PRECISION;
     }
-    return (positionInfo_.frAccumulated - staticFee + (absPosition * accumulatedPercentage) / _FR_PRECISION, staticFee);
+    return (positionInfo_.frAccumulated - staticFee + frDiff, staticFee);
   }
 
   function getPNL(address account, uint256 index, int256 price) public view returns (int256) {
@@ -129,12 +130,13 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     uint256 historyTimestamp,
     uint256 historySearchHint
   ) public view returns (int256 marginLevel, int256 equity, int256 margin, int256[] memory pnls, int256[] memory frs) {
-    equity = IDepositDEX(depositDex).getTotalBalance(account, collateralPrices);
+    equity = depositDex.getTotalBalance(account, collateralPrices);
     margin = 0;
     uint256 len = prices.length;
     pnls = new int256[](len);
     frs = new int256[](len);
     uint256 pricesChecked = 0;
+    IMarginCalc calc = marginCalculator;
     for (uint256 i = 0; i < len; ++i) {
       uint256 index = prices[i].index;
       if (!_activeInstruments[account].contains(index)) continue;
@@ -145,7 +147,7 @@ contract EVEDEX is BaseDEX, IEVEDEX {
         leverage = leverage == 0 ? 1 : leverage;
         uint256 absPosition = SignedMath.abs(positionInfo_.position);
         uint256 positionVolume = (absPosition * uint80(positionInfo_.positionAvgPrice)) / _UINT_PRECISION / leverage;
-        margin += int256(IMarginCalc(marginCalculator).getMargin(index, positionVolume));
+        margin += int256(calc.getMargin(index, positionVolume));
       }
 
       pnls[i] = getPNL(account, index, int256(prices[i].price));
@@ -300,7 +302,7 @@ contract EVEDEX is BaseDEX, IEVEDEX {
       accountToLiquidate,
       index,
       liquidationFee,
-      IDepositDEX(depositDex).getTotalBalance(accountToLiquidate, fullPrices.collateralPrices),
+      depositDex.getTotalBalance(accountToLiquidate, fullPrices.collateralPrices),
       pnl,
       fr
     );
@@ -557,19 +559,12 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     int256 collateralFee = (frCurrent * posAvgPrice * _COLLATERAL_PRECISION) / collateralPrice / _INT_PRECISION;
     int256 staticCollateralFee;
     if (staticFee != 0) {
+      address staticFrAccount = staticFundingRateAccount;
       staticCollateralFee = (staticFee * posAvgPrice * _COLLATERAL_PRECISION) / collateralPrice / _INT_PRECISION;
-      _setBalance(
-        staticFundingRateAccount,
-        collateral,
-        _getBalance(staticFundingRateAccount, collateral) + staticCollateralFee
-      );
+      _setBalance(staticFrAccount, collateral, _getBalance(staticFrAccount, collateral) + staticCollateralFee);
     }
-
-    _setBalance(
-      fundingRateAccount,
-      collateral,
-      _getBalance(fundingRateAccount, collateral) - collateralFee - staticCollateralFee
-    );
+    address frAccount = fundingRateAccount;
+    _setBalance(frAccount, collateral, _getBalance(frAccount, collateral) - collateralFee - staticCollateralFee);
     int256 newBalance = _getBalance(account, collateral) + collateralFee;
     _setBalance(account, collateral, newBalance);
     positionInfo.frAccumulated = 0;
@@ -581,47 +576,6 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     positionInfo.positionLastUpdate = uint32(historyTimestamp);
     emit FrCollected(index, account, collateral, newBalance, staticCollateralFee);
   }
-
-  // todo: remove in prod
-  //  function _collectFr(
-  //    uint256 index,
-  //    address account,
-  //    FullPrices calldata fullPrices,
-  //    uint256 collateralIndex,
-  //    uint256 historyTimestamp,
-  //    uint256 historySearchHint
-  //  ) internal {
-  //    PositionInfo storage positionInfo = _positionInfo[index][account];
-  //    int256 frCurrent = getAccountFR(account, index, historyTimestamp, historySearchHint);
-  //    int256 staticFr = getStaticFR(historyTimestamp, historySearchHint);
-  //    FundingRateInfo memory frInfo = _getFundingRateInfo(index, historyTimestamp, historySearchHint);
-  //    int256 newFrLongStored = _getTotalLongFRInternal(frInfo);
-  //    int256 newFrShortStored = _getTotalShortFRInternal(frInfo);
-  //    if (frCurrent == 0) return;
-  //    address collateral = fullPrices.collateralPrices[collateralIndex].collateral;
-  //    int256 collateralPrice = int112(fullPrices.collateralPrices[collateralIndex].price);
-  //    int256 realizedFRCollateral = (frCurrent * int112(uint112(positionInfo.positionAvgPrice))) / _INT_PRECISION;
-  //    int256 collateralFee = (realizedFRCollateral * _INT_PRECISION) / collateralPrice;
-  //    int256 accountNewBalance;
-  //    if (collateralFee < 0) {
-  //      accountNewBalance = _getBalance(account, collateral) + collateralFee;
-  //    } else {
-  //      int256 staticFee = (realizedFRCollateral *
-  //        int256(staticFr) *
-  //        _INT_PRECISION) /
-  //        collateralPrice /
-  //        int256(_FR_PRECISION);
-  //      accountNewBalance = _getBalance(account, collateral) + collateralFee - staticFee;
-  //      _setBalance(staticFundingRateAccount, collateral, _getBalance(staticFundingRateAccount, collateral) + staticFee);
-  //    }
-  //    _setBalance(fundingRateAccount, collateral, _getBalance(fundingRateAccount, collateral) - collateralFee);
-  //    _setBalance(account, collateral, accountNewBalance);
-  //    positionInfo.frAccumulated = 0; // todo: what to do with this?
-  //    positionInfo.positionLongFRStored = int72(newFrLongStored);
-  //    positionInfo.positionShortFRStored = int72(newFrShortStored);
-  //    positionInfo.positionLastUpdate = uint32(historyTimestamp);
-  //    emit FrCollected(index, account, collateralIndex, accountNewBalance);
-  //  }
 
   function _changePosition(
     uint256 index,
@@ -730,10 +684,11 @@ contract EVEDEX is BaseDEX, IEVEDEX {
         ((realizedFRCollateral + realizedPNL) * _COLLATERAL_PRECISION) /
         collateralPrice
     );
+    address frAccount = fundingRateAccount;
     _setBalance(
-      fundingRateAccount,
+      frAccount,
       collateral,
-      _getBalance(fundingRateAccount, collateral) - (realizedFRCollateral * _COLLATERAL_PRECISION) / collateralPrice
+      _getBalance(frAccount, collateral) - (realizedFRCollateral * _COLLATERAL_PRECISION) / collateralPrice
     );
     posData.frAccumulated = 0;
     posData.positionAvgPrice = int80(price);
@@ -781,16 +736,17 @@ contract EVEDEX is BaseDEX, IEVEDEX {
         ((realizedFRCollateral + realizedPNL) * _COLLATERAL_PRECISION) /
         collateralPrice
     );
+    address frAccount = fundingRateAccount;
     _setBalance(
-      fundingRateAccount,
+      frAccount,
       collateral,
-      _getBalance(fundingRateAccount, collateral) - (realizedFRCollateral * _COLLATERAL_PRECISION) / collateralPrice
+      _getBalance(frAccount, collateral) - (realizedFRCollateral * _COLLATERAL_PRECISION) / collateralPrice
     );
     posData.frAccumulated = int112((frCurrent * newPosition) / oldPosition);
   }
 
   function _validateUserOrder(Order memory order) internal returns (address) {
-    return ISessionManager(sessionManager).validateUserOrder(order);
+    return sessionManager.validateUserOrder(order);
   }
 
   function _updateActivePositions(address account, uint256 index, int256 position) internal {

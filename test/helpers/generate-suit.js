@@ -137,7 +137,8 @@ const prepareContracts = async ({
   for (let i = 0; i < initInstrumentConfigs.length; i++) {
     const { symbol, leverage, dailyFRLong, dailyFRShort } = initInstrumentConfigs[i];
     await Promise.all([
-      eveDex.write.addInstrument([
+      eveDex.write.changeInstrument([
+        i,
         symbol,
         leverage, //leverage
         dailyFRLong, //dailyFRLong

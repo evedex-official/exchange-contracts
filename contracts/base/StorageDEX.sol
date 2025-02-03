@@ -17,13 +17,13 @@ abstract contract StorageDEX is IStorageDEX {
   uint256 internal constant _WITHDRAW_DELAY = 7 days;
 
   bytes32 public constant MATCHER_ROLE = keccak256("MATCHER_ROLE");
-  bytes32 public constant WITHDRAW_GUARDIAN_ROLE = keccak256("WITHDRAW_GUARDIAN_ROLE");
+
+  IMarginCalc public marginCalculator;
+  IDepositDEX public depositDex;
+  ISessionManager public sessionManager;
 
   address public staticFundingRateAccount;
   address public fundingRateAccount;
-  address public sessionManager;
-  address public depositDex;
-  address public marginCalculator;
 
   int256 public soLevel; // Minimal sufficient percent of margin at which a position can not be liquidated
   int256 public withdrawMarginLevel; // Minimal sufficient percent of margin after withdraw when account has open position

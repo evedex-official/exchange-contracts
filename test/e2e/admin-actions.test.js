@@ -34,8 +34,9 @@ describe(flow, () => {
     await writeContract(owner, {
       abi: eveDex.abi,
       address: eveDex.address,
-      functionName: 'addInstrument',
+      functionName: 'changeInstrument',
       args: [
+        ETH_USD_INSTRUMENT.INDEX,
         ETH_USD_INSTRUMENT.SYMBOL,
         ETH_USD_INSTRUMENT.MAX_LEVERAGE,
         ETH_USD_INSTRUMENT.DAILY_FR_LONG,

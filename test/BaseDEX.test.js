@@ -83,7 +83,7 @@ describe('EVEDEX contract', function () {
   it('should fill and search FR array ', async function () {
     const ticker = 'ETHUSD';
     const leverage = 100;
-    await eveDex.addInstrument(ticker, leverage, 1, 1, 0, 100);
+    await eveDex.changeInstrument(0, ticker, leverage, 1, 1, 0, 100);
 
     await eveDex.connect(matcher).setFR(0, 10, 10, 0, 200);
     await eveDex.connect(matcher).setFR(0, 100, 100, 0, 300);

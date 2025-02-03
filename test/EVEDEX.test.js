@@ -112,7 +112,7 @@ describe('EVEDEX contract', function () {
     const leverage = 100;
     const frLong = 86400;
     const frShort = 86400;
-    await eveDex.addInstrument(ticker, leverage, frLong, frShort, 0, Math.floor(Date.now() / 1000));
+    await eveDex.changeInstrument(0, ticker, leverage, frLong, frShort, 0, Math.floor(Date.now() / 1000));
 
     // set margin levels
     await marginCalculator.setLevels(0, [
@@ -443,7 +443,7 @@ describe('EVEDEX contract', function () {
     const collateralPrices = [
       {
         collateral: tokenAddress,
-        price: 100000000,
+        price: 1000000000000,
       },
     ];
 
@@ -507,7 +507,7 @@ describe('EVEDEX contract', function () {
 
     await token.mint(liquidator.address, ethers.parseEther('100000'));
     await token.connect(liquidator).approve(await depositDex.getAddress(), ethers.parseEther('100000'));
-    await depositDex.connect(liquidator).depositCollateral(tokenAddress, ethers.parseEther('10000'));
+    await depositDex.connect(liquidator).depositCollateral(tokenAddress, ethers.parseEther('100000'));
 
     const creationTime = Math.floor(Date.now() / 1000);
     const expiration = Math.floor(Date.now() / 1000) + 3600;
@@ -642,7 +642,7 @@ describe('EVEDEX contract', function () {
 
     await token.mint(liquidator.address, ethers.parseEther('100000'));
     await token.connect(liquidator).approve(await depositDex.getAddress(), ethers.parseEther('100000'));
-    await depositDex.connect(liquidator).depositCollateral(tokenAddress, ethers.parseEther('10000'));
+    await depositDex.connect(liquidator).depositCollateral(tokenAddress, ethers.parseEther('100000'));
 
     const creationTime = Math.floor(Date.now() / 1000);
     const expiration = Math.floor(Date.now() / 1000) + 3600;
@@ -696,11 +696,11 @@ describe('EVEDEX contract', function () {
     const collateralPrices = [
       {
         collateral: tokenAddress,
-        price: 100000000,
+        price: 1000000000000,
       },
       {
         collateral: token2Address,
-        price: 100000000,
+        price: 1000000000000,
       },
     ];
 
