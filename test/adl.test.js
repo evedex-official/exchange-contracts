@@ -289,6 +289,145 @@ describe('adl tests', () => {
     config.LIQUIDATOR_ORDER_SIDE = BUY_SIDE;
   });
 
-  it('partial liquidation (long)', async () => {});
-  it('partial liquidation (short)', async () => {});
+  it('partial liquidation (short)', async () => {
+    const { eveDex, usdtToken, btcToken, matcher, depositDex, orders } = await prepare(config);
+    const delta = (config.BTC_PRICE_USERS_TRADE * (101n - config.USER_ORDER_SIZE_PERCENT)) / 100n;
+    const boundaryPrice = config.BTC_PRICE_USERS_TRADE + delta;
+    const collateralPriceDelta = (config.BTC_PRICE_COLLATERAL * (101n - config.USER_ORDER_SIZE_PERCENT)) / 100n;
+    const boundaryCollateralPrice = config.BTC_PRICE_COLLATERAL + collateralPriceDelta;
+
+    const liquidationAmount = orders.shortOrderExt.order.amount / 2n;
+
+    const userCollateralBalanceBefore = await depositDex.read.getBalance([
+      orders.shortOrderExt.order.senderAddress,
+      usdtToken.address,
+    ]);
+    const userPosBefore = await eveDex.read.getActiveInstrumentsPositions([orders.shortOrderExt.order.senderAddress]);
+    const liquidatorCollateralBalanceBefore = await depositDex.read.getBalance([
+      orders.liquidatorOrderExt.order.senderAddress,
+      usdtToken.address,
+    ]);
+    const liquidatorPosBefore = await eveDex.read.getActiveInstrumentsPositions([
+      orders.liquidatorOrderExt.order.senderAddress,
+    ]);
+    const fullPrices = getFullPricesBtcUsdt(
+      boundaryPrice,
+      boundaryCollateralPrice,
+      config.USDT_PRICE_COLLATERAL,
+      btcToken.address,
+      usdtToken.address,
+    );
+    const historyTimestamp = Math.trunc(Date.now() / 1000);
+    const liquidationOrder = {
+      accountToLiquidate: orders.shortOrderExt.order.senderAddress,
+      liquidator: orders.liquidatorOrderExt.order.senderAddress,
+      index: orders.shortOrderExt.order.instrumentIndex,
+      amount: -liquidationAmount,
+      prices: fullPrices.instrumentPrices,
+      collateralIndexLiquidator: USDT_COLLATERAL_INDEX,
+      collateralIndexToLiquidate: USDT_COLLATERAL_INDEX,
+      leverageLiquidator: config.ORDER_LEVERAGE,
+      leverageToLiquidate: config.ORDER_LEVERAGE,
+    };
+    await eveDex.write.adlLiquidation([liquidationOrder, fullPrices, historyTimestamp, 0n], {
+      account: matcher.account.address,
+    });
+    const userCollateralBalanceAfter = await depositDex.read.getBalance([
+      orders.shortOrderExt.order.senderAddress,
+      usdtToken.address,
+    ]);
+    const userPosAfter = await eveDex.read.getActiveInstrumentsPositions([orders.shortOrderExt.order.senderAddress]);
+    const liquidatorCollateralBalanceAfter = await depositDex.read.getBalance([
+      orders.liquidatorOrderExt.order.senderAddress,
+      usdtToken.address,
+    ]);
+    const liquidatorPosAfter = await eveDex.read.getActiveInstrumentsPositions([
+      orders.liquidatorOrderExt.order.senderAddress,
+    ]);
+
+    const userCollateralBalanceDiff = userCollateralBalanceAfter - userCollateralBalanceBefore;
+    const liquidatorCollateralBalanceDiff = liquidatorCollateralBalanceAfter - liquidatorCollateralBalanceBefore;
+    const liquidatorPosDiff = liquidatorPosAfter[1][0].position - liquidatorPosBefore[1][0].position;
+    const userPosDiff = userPosAfter[1][0].position - userPosBefore[1][0].position;
+
+    expect(userCollateralBalanceDiff < 0n).true;
+    expect(liquidatorCollateralBalanceDiff > 0n).true;
+    expect(userPosDiff).to.equal(liquidationAmount);
+    expect(liquidatorPosDiff).to.equal(-liquidationAmount);
+    expect(liquidatorCollateralBalanceDiff).to.equal(-userCollateralBalanceDiff);
+  });
+
+  it('partial liquidation (long)', async () => {
+    config.LIQUIDATOR_ORDER_SIDE = SELL_SIDE;
+
+    const { eveDex, usdtToken, btcToken, matcher, depositDex, orders } = await prepare(config);
+    const delta = (config.BTC_PRICE_USERS_TRADE * (101n - config.USER_ORDER_SIZE_PERCENT)) / 100n;
+    const boundaryPrice = config.BTC_PRICE_USERS_TRADE - delta;
+    const collateralPriceDelta = (config.BTC_PRICE_COLLATERAL * (101n - config.USER_ORDER_SIZE_PERCENT)) / 100n;
+    const boundaryCollateralPrice = config.BTC_PRICE_COLLATERAL - collateralPriceDelta;
+
+    const liquidationAmount = orders.shortOrderExt.order.amount / 2n;
+
+    const userCollateralBalanceBefore = await depositDex.read.getBalance([
+      orders.longOrderExt.order.senderAddress,
+      usdtToken.address,
+    ]);
+    const userPosBefore = await eveDex.read.getActiveInstrumentsPositions([orders.longOrderExt.order.senderAddress]);
+    const liquidatorCollateralBalanceBefore = await depositDex.read.getBalance([
+      orders.liquidatorOrderExt.order.senderAddress,
+      usdtToken.address,
+    ]);
+    const liquidatorPosBefore = await eveDex.read.getActiveInstrumentsPositions([
+      orders.liquidatorOrderExt.order.senderAddress,
+    ]);
+
+    const fullPrices = getFullPricesBtcUsdt(
+      boundaryPrice,
+      boundaryCollateralPrice,
+      config.USDT_PRICE_COLLATERAL,
+      btcToken.address,
+      usdtToken.address,
+    );
+    const historyTimestamp = Math.trunc(Date.now() / 1000);
+    const liquidationOrder = {
+      accountToLiquidate: orders.longOrderExt.order.senderAddress,
+      liquidator: orders.liquidatorOrderExt.order.senderAddress,
+      index: orders.longOrderExt.order.instrumentIndex,
+      amount: liquidationAmount,
+      prices: fullPrices.instrumentPrices,
+      collateralIndexLiquidator: USDT_COLLATERAL_INDEX,
+      collateralIndexToLiquidate: USDT_COLLATERAL_INDEX,
+      leverageLiquidator: config.ORDER_LEVERAGE,
+      leverageToLiquidate: config.ORDER_LEVERAGE,
+    };
+    await eveDex.write.adlLiquidation([liquidationOrder, fullPrices, historyTimestamp, 0n], {
+      account: matcher.account.address,
+    });
+
+    const userCollateralBalanceAfter = await depositDex.read.getBalance([
+      orders.longOrderExt.order.senderAddress,
+      usdtToken.address,
+    ]);
+    const userPosAfter = await eveDex.read.getActiveInstrumentsPositions([orders.longOrderExt.order.senderAddress]);
+    const liquidatorCollateralBalanceAfter = await depositDex.read.getBalance([
+      orders.liquidatorOrderExt.order.senderAddress,
+      usdtToken.address,
+    ]);
+    const liquidatorPosAfter = await eveDex.read.getActiveInstrumentsPositions([
+      orders.liquidatorOrderExt.order.senderAddress,
+    ]);
+
+    const userCollateralBalanceDiff = userCollateralBalanceAfter - userCollateralBalanceBefore;
+    const liquidatorCollateralBalanceDiff = liquidatorCollateralBalanceAfter - liquidatorCollateralBalanceBefore;
+    const liquidatorPosDiff = liquidatorPosAfter[1][0].position - liquidatorPosBefore[1][0].position;
+    const userPosDiff = userPosAfter[1][0].position - userPosBefore[1][0].position;
+
+    expect(userCollateralBalanceDiff < 0n).true;
+    expect(liquidatorCollateralBalanceDiff > 0n).true;
+    expect(userPosDiff).to.equal(-liquidationAmount);
+    expect(liquidatorPosDiff).to.equal(liquidationAmount);
+    expect(liquidatorCollateralBalanceDiff).to.equal(-userCollateralBalanceDiff);
+
+    config.LIQUIDATOR_ORDER_SIDE = BUY_SIDE;
+  });
 });
