@@ -3,3 +3,6 @@ node_modules/
 config.js
 cache/
 artifacts/
+.idea
+.vscode
+todo.md

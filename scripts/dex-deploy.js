@@ -39,7 +39,8 @@ async function main() {
   console.log(`EveDEX: default matcher added: ${config.defaultMatcher}`);
   const validatorRole = await sessions.VALIDATOR_ROLE();
   await sessions.grantRole(validatorRole, await dex.getAddress());
-  console.log('SessionManager: EveDEX is added as validator');
+  await sessions.grantRole(validatorRole, await deposit.getAddress());
+  console.log('SessionManager: EveDEX&DepositDEX are added as validators');
 }
 
 async function deployAndVerify(contractName, args) {

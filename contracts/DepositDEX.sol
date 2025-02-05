@@ -10,15 +10,18 @@ contract DepositDEX is IDepositDEX, UUPSUpgradeable {
   using SafeERC20 for IERC20;
   using EnumerableSet for EnumerableSet.AddressSet;
 
-  uint256 internal constant _WITHDRAW_DELAY = 7 days;
-  bytes32 internal constant _WITHDRAW_GUARDIAN_ROLE = keccak256("WITHDRAW_GUARDIAN_ROLE");
-  bytes32 internal constant _MATCHER_ROLE = keccak256("MATCHER_ROLE");
+  bytes32 public constant WITHDRAW_GUARDIAN_ROLE = keccak256("WITHDRAW_GUARDIAN_ROLE");
+  bytes32 public constant CONVERTER_ROLE = keccak256("CONVERTER_ROLE");
+  bytes32 public constant MATCHER_ROLE = keccak256("MATCHER_ROLE");
   bytes32 internal constant _DEFAULT_ADMIN_ROLE = 0x00;
-  int112 internal constant _INT_PRECISION = 1e8;
-  address internal constant _NATIVE_ADDRESS = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
+  uint256 internal constant _UINT_PRECISION = 1e8;
+  int112 internal constant _INT_PRECISION = 1e12;
 
   address public baseDex;
   address public vault;
+  address public oracle;
+
+  uint256 public allowedSlippage;
 
   EnumerableSet.AddressSet internal _collaterals;
 
@@ -31,12 +34,33 @@ contract DepositDEX is IDepositDEX, UUPSUpgradeable {
     _disableInitializers();
   }
 
-  function initialize(address baseDex_, address vault_) external initializer {
-    _setBasicParams(baseDex_, vault_);
+  function initialize(
+    address baseDex_,
+    address vault_,
+    address oracle_,
+    uint256 allowedSlippage_
+  ) external initializer {
+    _setBasicParams(baseDex_, vault_, oracle_, allowedSlippage_);
+  }
+
+  function getCollaterals() external view returns (address[] memory) {
+    return _collaterals.values();
+  }
+
+  function getCollateralsAt(uint256 index) external view returns (address) {
+    return _collaterals.at(index);
+  }
+
+  function getCollateralsLength() external view returns (uint256) {
+    return _collaterals.length();
   }
 
   function getWithdrawRequest(bytes32 orderHash) external view returns (WithdrawRequest memory) {
     return _withdrawRequests[orderHash];
+  }
+
+  function getWithdrawOrderHash(OrderWithdrawal calldata order) public pure returns (bytes32) {
+    return keccak256(abi.encode(order));
   }
 
   function depositCollateral(address collateral, uint112 amount) external {
@@ -101,13 +125,9 @@ contract DepositDEX is IDepositDEX, UUPSUpgradeable {
     emit WithdrawRequestStatusUpdated(_orderHash, uint8(_status));
   }
 
-  function getWithdrawOrderHash(OrderWithdrawal calldata order) public pure returns (bytes32) {
-    return keccak256(abi.encode(order));
-  }
-
   function withdrawRequestCancel(OrderWithdrawal calldata order) external {
     address sender = msg.sender;
-    if (!(sender == order.account || _hasRole(_WITHDRAW_GUARDIAN_ROLE, sender))) revert UnauthorizedAccount(sender);
+    if (!(sender == order.account || _hasRole(WITHDRAW_GUARDIAN_ROLE, sender))) revert UnauthorizedAccount(sender);
 
     bytes32 orderHash = getWithdrawOrderHash(order);
     if (_withdrawRequests[orderHash].status != RequestStatus.Open)
@@ -121,7 +141,7 @@ contract DepositDEX is IDepositDEX, UUPSUpgradeable {
     FullPrices calldata fullPrices,
     uint256 historyTimestamp,
     uint256 historySearchHint
-  ) external onlyRole(_MATCHER_ROLE) {
+  ) external onlyRole(MATCHER_ROLE) {
     _checkWithdrawOrder(order);
     bytes32 orderHash = getWithdrawOrderHash(order);
     _requestStatusChange(orderHash, RequestStatus.Completed);
@@ -164,8 +184,41 @@ contract DepositDEX is IDepositDEX, UUPSUpgradeable {
     emit DepositBalanceChanged(msg.sender, collateral, -int112(amount), balance);
   }
 
-  function getBalance(address account, address collateral, uint112 price) public view returns (int112 balance) {
-    balance = int112((int256(_balances[account][collateral]) * int112(price)) / _INT_PRECISION);
+  function convertBalance(
+    address account,
+    uint256 amount,
+    address collateralFrom,
+    address collateralTo,
+    CollateralPriceData calldata priceFrom,
+    CollateralPriceData calldata priceTo
+  ) external onlyRole(CONVERTER_ROLE) {
+    _consultPrices(collateralFrom, collateralTo, priceFrom, priceTo);
+    int256 amountFrom = int256(amount);
+    int256 amountTo = (amountFrom * int256(priceFrom.price)) / int256(priceTo.price);
+    _balances[account][collateralFrom] -= int112(amountFrom);
+    _balances[account][collateralTo] += int112(amountTo);
+
+    emit ForcedSwap(account, collateralFrom, collateralTo, amount, priceFrom.price, priceTo.price);
+  }
+
+  function _consultPrices(
+    address collateralFrom,
+    address collateralTo,
+    CollateralPriceData calldata priceFrom,
+    CollateralPriceData calldata priceTo
+  ) internal view {
+    if (collateralFrom != priceFrom.collateral || collateralTo != priceTo.collateral) revert InvalidPrices();
+    uint256 oraclePriceFrom = IPriceOracle(oracle).getOraclePriceSafe(collateralFrom);
+    uint256 oraclePriceTo = IPriceOracle(oracle).getOraclePriceSafe(collateralTo);
+    uint256 p1 = oraclePriceFrom * priceTo.price;
+    uint256 p2 = oraclePriceTo * priceFrom.price;
+    uint256 min = (p1 * (_UINT_PRECISION - allowedSlippage)) / _UINT_PRECISION;
+    uint256 max = (p1 * (_UINT_PRECISION + allowedSlippage)) / _UINT_PRECISION;
+    if (p2 < min || p2 > max) revert InvalidSlippage();
+  }
+
+  function getBalance(address account, address collateral) public view returns (int256 balance) {
+    balance = _balances[account][collateral];
   }
 
   function getTotalBalance(address account, CollateralPriceData[] memory prices) public view returns (int112 balance) {
@@ -174,16 +227,21 @@ contract DepositDEX is IDepositDEX, UUPSUpgradeable {
     for (uint256 i; i < len; i++) {
       address collateral = _collaterals.at(i);
       if (prices[i].collateral != collateral) revert InvalidPrice(collateral);
-      balance += (_balances[account][collateral] * int112(prices[i].price)) / _INT_PRECISION;
+      balance += int112(((_balances[account][collateral]) * int256(prices[i].price))) / _INT_PRECISION;
     }
   }
 
-  function setBalance(address account_, address collateral_, int112 balance_) external onlyBaseDex {
-    _balances[account_][collateral_] = balance_;
+  function setBalance(address account_, address collateral_, int256 balance_) external onlyBaseDex {
+    _balances[account_][collateral_] = int112(balance_);
   }
 
-  function setBasicParams(address baseDex_, address vault_) external onlyRole(_DEFAULT_ADMIN_ROLE) {
-    _setBasicParams(baseDex_, vault_);
+  function setBasicParams(
+    address baseDex_,
+    address vault_,
+    address oracle_,
+    uint256 allowedSlippage_
+  ) external onlyRole(_DEFAULT_ADMIN_ROLE) {
+    _setBasicParams(baseDex_, vault_, oracle_, allowedSlippage_);
   }
 
   function setCollateralConfigs(
@@ -203,10 +261,12 @@ contract DepositDEX is IDepositDEX, UUPSUpgradeable {
     }
   }
 
-  function _setBasicParams(address baseDex_, address vault_) internal {
+  function _setBasicParams(address baseDex_, address vault_, address oracle_, uint256 allowedSlippage_) internal {
     vault = vault_;
     baseDex = baseDex_;
-    emit BasicParamsUpdate(baseDex_, vault_);
+    oracle = oracle_;
+    allowedSlippage = allowedSlippage_;
+    emit BasicParamsUpdate(baseDex_, vault_, oracle_, allowedSlippage_);
   }
 
   function _hasRole(bytes32 role_, address account_) internal view returns (bool) {

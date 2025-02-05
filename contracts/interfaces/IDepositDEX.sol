@@ -7,6 +7,7 @@ import {OrderValidationLib, OrderWithdrawal, PriceData} from "../lib/OrderValida
 import {ISessionManager} from "./ISessionManager.sol";
 import {IEVEDEX, FullPrices, CollateralPriceData} from "./IEVEDEX.sol";
 import {IStorageDEX} from "./IStorageDEX.sol";
+import {IPriceOracle} from "./IPriceOracle.sol";
 import {IVault} from "./IVault.sol";
 
 struct WithdrawRequest {
@@ -33,6 +34,8 @@ interface IDepositDEX {
   error UnsupportedCollateral();
   error IncompletePrices();
   error InvalidPrice(address);
+  error InvalidPrices();
+  error InvalidSlippage();
 
   event WithdrawRequestRegistered(address indexed account, OrderWithdrawal order);
 
@@ -40,13 +43,22 @@ interface IDepositDEX {
 
   event DepositBalanceChanged(address indexed account, address indexed collateral, int112 amount, int112 finalBalance);
 
-  event BasicParamsUpdate(address baseDex, address vault);
+  event BasicParamsUpdate(address baseDex, address vault, address oracle, uint256 allowedSlippage);
 
   event CollateralListUpdate(address indexed collateral, bool status);
 
-  function setBalance(address account, address collateral, int112 balance) external;
+  event ForcedSwap(
+    address indexed account,
+    address collateralFrom,
+    address collateralTo,
+    uint256 amount,
+    uint256 priceFrom,
+    uint256 priceTo
+  );
 
-  function getBalance(address account, address collateral, uint112 price) external view returns (int112 balance);
+  function setBalance(address account, address collateral, int256 balance) external;
+
+  function getBalance(address account, address collateral) external view returns (int256 balance);
 
   function getTotalBalance(address account, CollateralPriceData[] memory prices) external view returns (int112 balance);
 }

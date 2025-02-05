@@ -6,10 +6,15 @@
   "files": [
     "networks"
   ],
+  "engines": {
+    "node": ">=20",
+    "npm": ">=7"
+  },
   "scripts": {
     "test": "hardhat test",
     "lint:sol": "solhint 'contracts/**/*.sol' && prettier -c 'contracts/**/*.sol'",
     "lint:sol:fix": "prettier --write 'contracts/**/*.sol'",
+    "lint": "prettier --write './**/*.{js,sol,md}'",
     "deploy": "hardhat deploy",
     "export-abi": "hardhat export-abi --dir ./networks/abi",
     "export-deploy": "hardhat export-deployed --file ./networks/contracts.json --fields address,blockNumber,upgradable.proxyAdmin",
@@ -25,14 +30,18 @@
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.6",
     "@nomicfoundation/hardhat-ethers": "^3.0.5",
     "@nomicfoundation/hardhat-network-helpers": "^1.0.11",
+    "@nomicfoundation/hardhat-toolbox-viem": "^3.0.0",
     "@openzeppelin/contracts": "^5.0.2",
     "@openzeppelin/contracts-upgradeable": "^5.0.2",
     "@openzeppelin/hardhat-upgrades": "^3.1.0",
+    "@openzeppelin/merkle-tree": "^1.0.7",
+    "@pythnetwork/pyth-sdk-solidity": "^4.0.0",
     "big.js": "^6.2.1",
     "chai": "^4.4.1",
     "dotenv": "^16.4.5",
     "ethers": "^6.12.0",
     "hardhat": "^2.22.3",
+    "hardhat-contract-sizer": "^2.10.0",
     "hardhat-deploy": "^0.12.4",
     "hardhat-deploy-ethers": "^0.4.2",
     "prettier": "^3.2.5",
@@ -40,7 +49,7 @@
     "solc": "^0.8.25",
     "solc-0.8": "^0.0.1-security",
     "solhint": "^4.5.4",
-    "tiny-glob": "^0.2.9"
-  },
-  "devDependencies": {}
+    "tiny-glob": "^0.2.9",
+    "viem": "^2.21.54"
+  }
 }

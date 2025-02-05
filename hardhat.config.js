@@ -1,6 +1,8 @@
 require('@nomicfoundation/hardhat-ethers');
+require('@nomicfoundation/hardhat-toolbox-viem');
 require('@openzeppelin/hardhat-upgrades');
 require('@nomicfoundation/hardhat-chai-matchers');
+require('hardhat-contract-sizer');
 require('dotenv').config();
 const path = require('path');
 
@@ -23,7 +25,7 @@ module.exports = {
           viaIR: true,
           optimizer: {
             enabled: true,
-            runs: 200,
+            runs: 20,
           },
         },
       },
@@ -53,6 +55,7 @@ module.exports = {
     hardhat: {
       initialBaseFeePerGas: 0,
       blockGasLimit: 10000000,
+      allowUnlimitedContractSize: true,
     },
     // mainnet: {
     //   url: process.env.MAINNET,
@@ -126,5 +129,12 @@ module.exports = {
     deployer: {
       '': 0,
     },
+  },
+  contractSizer: {
+    alphaSort: true,
+    disambiguatePaths: false,
+    runOnCompile: true,
+    strict: false,
+    only: [':EVEDEX$'],
   },
 };

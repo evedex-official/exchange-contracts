@@ -4,6 +4,7 @@ pragma solidity 0.8.27;
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import {SignedMath} from "@openzeppelin/contracts/utils/math/SignedMath.sol";
 import {BaseDEX, FundingRateInfo} from "./base/BaseDEX.sol";
 import "./interfaces/IEVEDEX.sol";
 
@@ -15,9 +16,11 @@ contract EVEDEX is BaseDEX, IEVEDEX {
 
   function initialize(
     address initialOwner_,
-    address depositDex_,
-    address sessionManager_,
+    IDepositDEX depositDex_,
+    ISessionManager sessionManager_,
+    IMarginCalc marginCalculator_,
     address fundingRateAccount_,
+    address staticFundingRateAccount_,
     uint256 maxOpenPositions_,
     int112 soLevel_,
     int112 withdrawMarginLevel_,
@@ -27,7 +30,9 @@ contract EVEDEX is BaseDEX, IEVEDEX {
       initialOwner_,
       depositDex_,
       sessionManager_,
+      marginCalculator_,
       fundingRateAccount_,
+      staticFundingRateAccount_,
       maxOpenPositions_,
       soLevel_,
       withdrawMarginLevel_,
@@ -41,39 +46,52 @@ contract EVEDEX is BaseDEX, IEVEDEX {
 
   function getActiveInstrumentsPositions(
     address account
-  ) public view returns (uint256[] memory indexes, PositionInfo[] memory positions) {
+  ) external view returns (uint256[] memory indexes, PositionInfo[] memory positions) {
     indexes = _activeInstruments[account].values();
     uint256 indexesLen = indexes.length;
     positions = new PositionInfo[](indexesLen);
     for (uint i = 0; i < indexesLen; ++i) {
-      positions[i] = positionInfo[indexes[i]][account];
+      positions[i] = _positionInfo[indexes[i]][account];
     }
   }
 
-  function getTotalShortFR(
-    uint256 index,
-    uint256 historyTimestamp,
-    uint256 historySearchHint
-  ) public view override returns (int72) {
-    FundingRateInfo memory fundingRateInfo = _getFundingRateInfo(index, historyTimestamp, historySearchHint);
-    // return
-    //   fundingRateInfo.shortFRStored +
-    //   int72(uint72(historyTimestamp - fundingRateInfo.lastFRUpdateTime)) *
-    //   fundingRateInfo.frShort;
-    return fundingRateInfo.shortFRStored;
+  function getAccountsWithOpenPositionLength() external view returns (uint256) {
+    return _accountsWithOpenPositions.length();
   }
 
-  function getTotalLongFR(
+  function getAccountsWithOpenPositions(uint256 offset, uint256 limit) external view returns (address[] memory res) {
+    uint256 length = _accountsWithOpenPositions.length();
+    if (offset >= length) return res;
+    uint256 size = length - offset < limit ? length - offset : limit;
+    res = new address[](size);
+    for (uint256 i = offset; i < offset + size; ++i) {
+      res[i] = _accountsWithOpenPositions.at(i);
+    }
+  }
+
+  function getOpenPositions(uint256 offset, uint256 limit) external view returns (AccountPositions[] memory positions) {
+    uint256 length = _accountsWithOpenPositions.length();
+    if (offset >= length) return (positions);
+    uint256 size = length - offset < limit ? length - offset : limit;
+    positions = new AccountPositions[](size);
+    for (uint256 i = offset; i < offset + size; ++i) {
+      positions[i].account = _accountsWithOpenPositions.at(i);
+      uint256[] memory indexes = getActiveInstrumentsIndexes(positions[i].account);
+      uint256 len = indexes.length;
+      positions[i].positions = new PositionInfo[](len);
+      for (uint256 j = 0; j < len; ++j) {
+        positions[i].positions[j] = _positionInfo[indexes[j]][positions[i].account];
+      }
+    }
+  }
+
+  function getTotalFR(
     uint256 index,
     uint256 historyTimestamp,
     uint256 historySearchHint
-  ) public view override returns (int72) {
-    FundingRateInfo memory fundingRateInfo = _getFundingRateInfo(index, historyTimestamp, historySearchHint);
-    // return
-    //   fundingRateInfo.longFRStored +
-    //   int72(uint72(historyTimestamp - fundingRateInfo.lastFRUpdateTime)) *
-    //   fundingRateInfo.frLong;
-    return fundingRateInfo.longFRStored;
+  ) public view returns (int72, int72) {
+    FundingRateInfo memory frInfo = _getFundingRateInfo(index, historyTimestamp, historySearchHint);
+    return (frInfo.longFRStored, frInfo.shortFRStored);
   }
 
   function getAccountFR(
@@ -81,26 +99,29 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     uint256 index,
     uint256 historyTimestamp,
     uint256 historySearchHint
-  ) public view returns (int112) {
-    PositionInfo memory positionInfo_ = positionInfo[index][account];
+  ) public view returns (int256, int256) {
+    PositionInfo memory positionInfo_ = _positionInfo[index][account];
+    FundingRateInfo memory frInfo = _getFundingRateInfo(index, historyTimestamp, historySearchHint);
+    int256 absPosition = int256(SignedMath.abs(positionInfo_.position));
     int256 accumulatedPercentage;
+    int256 staticFee;
     if (positionInfo_.position < 0) {
-      accumulatedPercentage = (getTotalShortFR(index, historyTimestamp, historySearchHint) -
-        positionInfo_.positionShortFRStored);
+      accumulatedPercentage = (frInfo.shortFRStored - positionInfo_.positionShortFRStored);
     } else {
-      accumulatedPercentage = (getTotalLongFR(index, historyTimestamp, historySearchHint) -
-        positionInfo_.positionLongFRStored);
+      accumulatedPercentage = (frInfo.longFRStored - positionInfo_.positionLongFRStored);
     }
-    int112 absPosition = positionInfo_.position < 0 ? -positionInfo_.position : positionInfo_.position;
-    return int112(positionInfo_.frAccumulated + (absPosition * accumulatedPercentage) / _FR_PRECISION);
+    int256 frDiff = (absPosition * accumulatedPercentage) / _FR_PRECISION;
+    if (accumulatedPercentage > 0) {
+      staticFee = (frDiff * frInfo.staticFr) / _FR_PRECISION;
+    }
+    return (positionInfo_.frAccumulated - staticFee + frDiff, staticFee);
   }
 
-  function getPNL(address account, uint256 index, int112 price) public view returns (int112) {
-    PositionInfo memory positionInfo_ = positionInfo[index][account];
-    return (positionInfo_.position * (price - int112(uint112(positionInfo_.positionAvgPrice)))) / _INT_PRECISION;
+  function getPNL(address account, uint256 index, int256 price) public view returns (int256) {
+    PositionInfo memory positionInfo_ = _positionInfo[index][account];
+    return ((price - positionInfo_.positionAvgPrice) * positionInfo_.position) / _INT_PRECISION;
   }
 
-  // named return parameters because of stack to deep
   function calculateMarginLevel(
     address account,
     PriceData[] memory prices,
@@ -108,50 +129,51 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     bool checkPrices,
     uint256 historyTimestamp,
     uint256 historySearchHint
-  ) public view returns (int112 marginLevel, int112 equity, int112 margin, int112[] memory pnls, int112[] memory frs) {
-    equity = IDepositDEX(depositDex).getTotalBalance(account, collateralPrices);
+  ) public view returns (int256 marginLevel, int256 equity, int256 margin, int256[] memory pnls, int256[] memory frs) {
+    equity = depositDex.getTotalBalance(account, collateralPrices);
     margin = 0;
     uint256 len = prices.length;
-    pnls = new int112[](len);
-    frs = new int112[](len);
+    pnls = new int256[](len);
+    frs = new int256[](len);
     uint256 pricesChecked = 0;
+    IMarginCalc calc = marginCalculator;
     for (uint256 i = 0; i < len; ++i) {
       uint256 index = prices[i].index;
       if (!_activeInstruments[account].contains(index)) continue;
 
       {
-        PositionInfo memory positionInfo_ = positionInfo[index][account];
-        // int112 leverage = int112(uint112(_getInstrumentLeverage(index)));
-        int112 leverage = int112(uint112(positionInfo_.leverage));
-        int112 absPosition = positionInfo_.position < 0 ? -positionInfo_.position : positionInfo_.position;
-        margin += (absPosition * int112(uint112(positionInfo_.positionAvgPrice))) / _INT_PRECISION / leverage;
+        PositionInfo memory positionInfo_ = _positionInfo[index][account];
+        uint256 leverage = positionInfo_.leverage;
+        leverage = leverage == 0 ? 1 : leverage;
+        uint256 absPosition = SignedMath.abs(positionInfo_.position);
+        uint256 positionVolume = (absPosition * uint80(positionInfo_.positionAvgPrice)) / _UINT_PRECISION / leverage;
+        margin += int256(calc.getMargin(index, positionVolume));
       }
 
-      pnls[i] = getPNL(account, index, int112(uint112(prices[i].price)));
-      frs[i] =
-        (getAccountFR(account, index, historyTimestamp, historySearchHint) * int112(uint112(prices[i].price))) /
-        _INT_PRECISION;
+      pnls[i] = getPNL(account, index, int256(prices[i].price));
+      (int256 frsSingle, ) = getAccountFR(account, index, historyTimestamp, historySearchHint);
+      frs[i] = (frsSingle * int256(prices[i].price)) / _INT_PRECISION;
       equity += pnls[i] + frs[i];
       ++pricesChecked;
     }
     if (checkPrices && _activeInstruments[account].length() != pricesChecked) revert IncorrectInstrumentIndexes();
 
-    return (margin != 0 ? (equity * 100 - 1) / margin : int112(0), equity, margin, pnls, frs);
+    return (margin != 0 ? (equity * _MARGIN_LEVEL_PRECISION - 1) / margin : int256(0), equity, margin, pnls, frs);
   }
 
   function checkMarginWithPrices(
     address account,
-    int112 marginLevel,
+    int256 marginLevel,
     FullPrices calldata fullPrices,
     uint256 historyTimestamp,
     uint256 historySearchHint
-  ) public view returns (bool, int112) {
+  ) public view returns (bool, int256) {
     if (fullPrices.instrumentPrices.length != instrumentsLength) revert PriceArrayLengthError();
     uint256[] memory indices = _activeInstruments[account].values();
-    PriceData[] memory prices = new PriceData[](indices.length);
-    for (uint256 i = 0; i < indices.length; ++i) {
-      uint256 index = indices[i];
-      prices[i] = fullPrices.instrumentPrices[index];
+    uint256 len = indices.length;
+    PriceData[] memory prices = new PriceData[](len);
+    for (uint256 i = 0; i < len; ++i) {
+      prices[i] = fullPrices.instrumentPrices[indices[i]];
     }
     return
       _checkMargin(
@@ -167,14 +189,14 @@ contract EVEDEX is BaseDEX, IEVEDEX {
 
   function _checkMargin(
     address account,
-    int112 marginLevel,
+    int256 marginLevel,
     PriceData[] memory prices,
     CollateralPriceData[] memory collateralPrices,
     bool checkPrices,
     uint256 historyTimestamp,
     uint256 historySearchHint
-  ) internal view returns (bool, int112) {
-    (int112 accountMarginLevel, int112 equity, int112 margin, , ) = calculateMarginLevel(
+  ) internal view returns (bool, int256) {
+    (int256 accountMarginLevel, int256 equity, int256 margin, , ) = calculateMarginLevel(
       account,
       prices,
       collateralPrices,
@@ -185,42 +207,11 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     return ((margin == 0 || accountMarginLevel >= marginLevel), equity);
   }
 
-  function accountsWithOpenPositionLength() public view returns (uint256) {
-    return _accountsWithOpenPositions.length();
-  }
-
-  function getAccountsWithOpenPositions(uint256 offset, uint256 limit) public view returns (address[] memory res) {
-    uint256 length = _accountsWithOpenPositions.length();
-    if (offset >= length) return res;
-    uint256 size = length - offset < limit ? length - offset : limit;
-    res = new address[](size);
-    for (uint256 i = offset; i < offset + size; ++i) {
-      res[i] = _accountsWithOpenPositions.at(i);
-    }
-  }
-
-  function getOpenPositions(uint256 offset, uint256 limit) public view returns (AccountPositions[] memory positions) {
-    uint256 length = _accountsWithOpenPositions.length();
-    if (offset >= length) return (positions);
-    uint256 size = length - offset < limit ? length - offset : limit;
-    positions = new AccountPositions[](size);
-    for (uint256 i = offset; i < offset + size; ++i) {
-      positions[i].account = _accountsWithOpenPositions.at(i);
-      uint256[] memory indexes = getActiveInstrumentsIndexes(positions[i].account);
-      uint256 len = indexes.length;
-      positions[i].positions = new PositionInfo[](len);
-      for (uint256 j = 0; j < len; ++j) {
-        positions[i].positions[j] = positionInfo[indexes[j]][positions[i].account];
-      }
-    }
-  }
-
-  function _calculateLiquidationFee(PositionInfo memory position) internal view returns (uint112) {
-    uint112 absPosition = position.position < 0 ? uint112(-position.position) : uint112(position.position);
+  function _calculateLiquidationFee(PositionInfo memory position) internal view returns (uint256) {
+    uint256 absPosition = SignedMath.abs(position.position);
     // TODO make fixed with constant precision
-    // uint112 margin = (absPosition * position.positionAvgPrice) / _UINT_PRECISION / _getInstrumentLeverage(index);
-    uint112 margin = (absPosition * position.positionAvgPrice) / _UINT_PRECISION / position.leverage;
-    uint112 liquidationFee = (margin * uint112(liquidationFeePercent)) / _UINT_PRECISION;
+    uint256 margin = (absPosition * uint80(position.positionAvgPrice)) / _UINT_PRECISION / position.leverage;
+    uint256 liquidationFee = (margin * liquidationFeePercent) / _UINT_PRECISION;
 
     return liquidationFee;
   }
@@ -231,11 +222,11 @@ contract EVEDEX is BaseDEX, IEVEDEX {
   function liquidatePositions(
     MultiOrderLiquidation memory liquidationOrder,
     FullPrices calldata fullPrices,
-    uint256 collateralIndex,
+    LiquidationCollaterals calldata collateralIndices,
     uint256 historyTimestamp,
     uint256 historySearchHint
   ) external onlyRole(MATCHER_ROLE) {
-    OrderValidationLib.checkLiquidationOrder(liquidationOrder);
+    OrderValidationLib.checkLiquidationOrder(liquidationOrder, historyTimestamp);
 
     //TODO double calculation of pnl in checkMargin and then liquidationPosition
     (bool validMargin, ) = _checkMargin(
@@ -250,20 +241,17 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     if (validMargin) revert SufficientMargin();
 
     uint256 liquidationPricesLength = liquidationOrder.liquidationPrices.length;
-    CollateralPriceData memory collateralPrice = CollateralPriceData({
-      collateral: liquidationOrder.collateral,
-      price: fullPrices.collateralPrices[collateralIndex].price
-    });
     for (uint256 i = 0; i < liquidationPricesLength; ++i) {
-      uint112 liquidationPrice = uint112(liquidationOrder.liquidationPrices[i].price);
+      uint256 liquidationPrice = liquidationOrder.liquidationPrices[i].price;
       uint256 index = liquidationOrder.liquidationPrices[i].index;
       _liquidatePosition(
         index,
         liquidationOrder.accountToLiquidate,
         liquidationOrder.liquidator,
-        int112(liquidationPrice),
+        int256(liquidationPrice),
         fullPrices,
-        collateralPrice,
+        collateralIndices,
+        liquidationOrder.leverage,
         historyTimestamp,
         historySearchHint
       );
@@ -274,46 +262,33 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     uint256 index,
     address accountToLiquidate,
     address liquidator,
-    int112 liquidationPrice,
+    int256 liquidationPrice,
     FullPrices calldata fullPrices,
-    CollateralPriceData memory collateralPrice,
+    LiquidationCollaterals calldata collateralIndices,
+    uint16 liquidatorLeverage,
     uint256 historyTimestamp,
     uint256 historySearchHint
-  ) internal returns (int112 pnl, int112 fr, uint112 liquidationFee) {
-    PositionInfo storage accountToLiquidatePosition = positionInfo[index][accountToLiquidate];
-    PositionInfo storage liquidatorPosition = positionInfo[index][liquidator];
+  ) internal returns (int256 pnl, int256 fr, uint256 liquidationFee) {
+    PositionInfo storage accountToLiquidatePosition = _positionInfo[index][accountToLiquidate];
+    PositionInfo storage liquidatorPosition = _positionInfo[index][liquidator];
     if (accountToLiquidatePosition.position == 0) revert ZeroPositionLiquidation();
-    int112 positionAvgPrice = int112(uint112(accountToLiquidatePosition.positionAvgPrice));
+    int256 positionAvgPrice = accountToLiquidatePosition.positionAvgPrice;
     pnl = (accountToLiquidatePosition.position * (liquidationPrice - positionAvgPrice)) / _INT_PRECISION;
-    fr =
-      (getAccountFR(accountToLiquidate, index, historyTimestamp, historySearchHint) * liquidationPrice) /
-      _INT_PRECISION;
-
-    int112 balance = _getBalance(accountToLiquidate, collateralPrice.collateral, collateralPrice.price);
-    balance += pnl + fr;
+    (fr, ) = getAccountFR(accountToLiquidate, index, historyTimestamp, historySearchHint);
+    fr = (fr * liquidationPrice) / _INT_PRECISION;
     liquidationFee = _calculateLiquidationFee(accountToLiquidatePosition);
 
-    balance -= int112(liquidationFee);
-    int112 balanceOfLiquidator = _getBalance(liquidator, collateralPrice.collateral, collateralPrice.price);
-
-    // If it's the last instrument that user have liquidator pays for user's negative balance
-    if (_activeInstruments[accountToLiquidate].length() == 1 && balance < 0) {
-      _setBalance(accountToLiquidate, collateralPrice.collateral, 0);
-      _setBalance(liquidator, collateralPrice.collateral, balance + int112(liquidationFee));
-    } else {
-      _setBalance(accountToLiquidate, collateralPrice.collateral, balance);
-      _setBalance(liquidator, collateralPrice.collateral, balanceOfLiquidator + int112(liquidationFee));
-    }
+    _adjustBalances(accountToLiquidate, liquidator, fullPrices, collateralIndices, pnl + fr, int256(liquidationFee));
 
     _changePosition(
       index,
       liquidator,
       liquidatorPosition,
-      collateralPrice.collateral,
+      collateralIndices.liquidatorIndex,
       accountToLiquidatePosition.position,
       liquidationPrice,
-      int112(100),
-      liquidatorPosition.leverage,
+      soLevel,
+      liquidatorLeverage,
       fullPrices,
       historyTimestamp,
       historySearchHint
@@ -326,26 +301,73 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     emit PositionLiquidated(
       accountToLiquidate,
       index,
-      uint112(liquidationFee),
-      _getBalance(accountToLiquidate, collateralPrice.collateral, collateralPrice.price),
+      liquidationFee,
+      depositDex.getTotalBalance(accountToLiquidate, fullPrices.collateralPrices),
       pnl,
       fr
     );
   }
 
-  function liquidatePosition(
-    OrderLiquidation memory liquidationOrder,
+  function _adjustBalances(
+    address accountToLiquidate,
+    address liquidator,
     FullPrices calldata fullPrices,
-    uint256 collateralIndex,
+    LiquidationCollaterals calldata collateralIndices,
+    int256 sumPnlFr,
+    int256 liquidationFee
+  ) internal {
+    uint256 len = collateralIndices.indicesToLiquidate.length;
+    address collateral;
+    int256 collateralPrice;
+    int256 balance;
+    int256 balanceOfLiquidator;
+    for (uint256 i; i < len && sumPnlFr < 0; i++) {
+      uint256 index = collateralIndices.indicesToLiquidate[i];
+      collateral = fullPrices.collateralPrices[index].collateral;
+      collateralPrice = int256(fullPrices.collateralPrices[index].price);
+      balance = _getBalance(accountToLiquidate, collateral);
+      balanceOfLiquidator = _getBalance(liquidator, collateral);
+
+      int256 newBalance = balance + ((sumPnlFr - liquidationFee) * _COLLATERAL_PRECISION) / collateralPrice;
+      if (newBalance > 0) {
+        _setBalance(accountToLiquidate, collateral, newBalance);
+        _setBalance(
+          liquidator,
+          collateral,
+          balanceOfLiquidator + (liquidationFee * _COLLATERAL_PRECISION) / collateralPrice
+        );
+        sumPnlFr = 0;
+      } else {
+        _setBalance(accountToLiquidate, collateral, 0);
+        sumPnlFr = sumPnlFr + (balance * collateralPrice) / _COLLATERAL_PRECISION;
+      }
+    }
+
+    if (sumPnlFr < 0) {
+      _setBalance(
+        liquidator,
+        collateral,
+        balanceOfLiquidator + balance + (sumPnlFr * _COLLATERAL_PRECISION) / collateralPrice
+      );
+    }
+  }
+
+  /**
+   * @notice Executes an ADL (Auto-Deleveraging) liquidation for a specific account.
+   */
+  function adlLiquidation(
+    AdlOrderLiquidation memory liquidationOrder,
+    FullPrices calldata fullPrices,
     uint256 historyTimestamp,
     uint256 historySearchHint
   ) external onlyRole(MATCHER_ROLE) {
-    OrderValidationLib.checkLiquidationOrder(liquidationOrder);
-    if (liquidationOrder.prices[0].index != liquidationOrder.index) revert PriceOfLiquidatedInstrumentNotFirst();
+    uint256 index = liquidationOrder.index;
+    if (liquidationOrder.prices[0].index != index) revert PriceOfLiquidatedInstrumentNotFirst();
 
+    int256 soLevel_ = soLevel;
     (bool validMargin, ) = _checkMargin(
       liquidationOrder.accountToLiquidate,
-      soLevel,
+      soLevel_,
       liquidationOrder.prices,
       fullPrices.collateralPrices,
       true,
@@ -353,260 +375,390 @@ contract EVEDEX is BaseDEX, IEVEDEX {
       historySearchHint
     );
     if (validMargin) revert SufficientMargin();
+    PositionInfo storage positionInfoLiquidator = _positionInfo[index][liquidationOrder.liquidator];
+    PositionInfo storage positionInfoToLiquidate = _positionInfo[index][liquidationOrder.accountToLiquidate];
+    uint256 liquidatorPositionAvgPrice = uint80(positionInfoLiquidator.positionAvgPrice);
+    uint256 liquidationPrice = liquidationOrder.prices[0].price;
+    if (
+      positionInfoLiquidator.position > 0
+        ? liquidationPrice < liquidatorPositionAvgPrice
+        : liquidationPrice > liquidatorPositionAvgPrice
+    ) revert UnprofitableTrade();
 
-    CollateralPriceData memory collateralPrice = CollateralPriceData({
-      collateral: liquidationOrder.collateral,
-      price: fullPrices.collateralPrices[collateralIndex].price
-    });
-
-    _liquidatePosition(
-      liquidationOrder.index,
-      liquidationOrder.accountToLiquidate,
+    _changePosition(
+      index,
       liquidationOrder.liquidator,
-      int112(uint112(liquidationOrder.prices[0].price)),
+      positionInfoLiquidator,
+      liquidationOrder.collateralIndexLiquidator,
+      liquidationOrder.amount,
+      int256(liquidationPrice),
+      soLevel_,
+      liquidationOrder.leverageLiquidator,
       fullPrices,
-      collateralPrice,
       historyTimestamp,
       historySearchHint
     );
-  }
-
-  function _validateUserOrder(Order memory order) internal returns (address) {
-    return ISessionManager(sessionManager).validateUserOrder(order);
+    _changePosition(
+      index,
+      liquidationOrder.accountToLiquidate,
+      positionInfoToLiquidate,
+      liquidationOrder.collateralIndexToLiquidate,
+      -liquidationOrder.amount,
+      int256(liquidationPrice),
+      type(int256).min,
+      liquidationOrder.leverageToLiquidate,
+      fullPrices,
+      historyTimestamp,
+      historySearchHint
+    );
   }
 
   function fillOrders(
-    Order memory buyOrder,
-    Order memory sellOrder,
-    uint80 filledPrice,
-    uint96 filledAmount,
+    OrderExtended memory buyOrder,
+    OrderExtended memory sellOrder,
+    uint256 filledPrice,
+    uint256 filledAmount,
     FullPrices calldata fullPrices,
     uint256 historyTimestamp,
     uint256 historySearchHint
-  ) public onlyRole(MATCHER_ROLE) {
+  ) external onlyRole(MATCHER_ROLE) {
     // Orders validation
     {
-      address buyOrderSigner = buyOrder.senderAddress;
-      address sellOrderSigner = sellOrder.senderAddress;
-      if (buyOrder.userSession != address(0)) {
-        buyOrderSigner = _validateUserOrder(buyOrder);
+      address buyOrderSigner = buyOrder.order.senderAddress;
+      address sellOrderSigner = sellOrder.order.senderAddress;
+      if (buyOrder.order.userSession != address(0)) {
+        buyOrderSigner = _validateUserOrder(buyOrder.order);
         if (buyOrderSigner == address(0)) revert InvalidSession();
       }
-      if (sellOrder.userSession != address(0)) {
-        sellOrderSigner = _validateUserOrder(sellOrder);
+      if (sellOrder.order.userSession != address(0)) {
+        sellOrderSigner = _validateUserOrder(sellOrder.order);
         if (sellOrderSigner == address(0)) revert InvalidSession();
       }
       (bytes32 buyOrderDigest, bytes32 sellOrderDigest) = OrderValidationLib.checkOrdersInfo(
-        buyOrder,
-        sellOrder,
+        buyOrder.order,
+        sellOrder.order,
         buyOrderSigner,
         sellOrderSigner,
         msg.sender,
-        uint256(filledAmount),
-        uint256(filledPrice),
+        filledAmount,
+        filledPrice,
         msg.sender,
-        instrumentsLength
+        instrumentsLength,
+        historyTimestamp
       );
 
-      _fillOrder(buyOrderDigest, buyOrder.amount, filledAmount);
-      _fillOrder(sellOrderDigest, sellOrder.amount, filledAmount);
+      _fillOrder(buyOrderDigest, buyOrder.order.amount, filledAmount);
+      _fillOrder(sellOrderDigest, sellOrder.order.amount, filledAmount);
     }
     // Paying execution fee to matcher
     {
-      buyOrder.matcherFee = uint64((uint256(buyOrder.matcherFee) * filledAmount) / buyOrder.amount);
-      sellOrder.matcherFee = uint64((uint256(sellOrder.matcherFee) * filledAmount) / sellOrder.amount);
-      int112 buyOrderMatcherFee = int112(uint112(buyOrder.matcherFee));
-      int112 sellOrderMatcherFee = int112(uint112(sellOrder.matcherFee));
-      _setBalance(
-        buyOrder.senderAddress,
-        buyOrder.collateral,
-        _getBalance(
-          buyOrder.senderAddress,
-          buyOrder.collateral,
-          uint112(fullPrices.instrumentPrices[buyOrder.instrumentIndex].price)
-        ) - buyOrderMatcherFee
+      address buyOrderCollateral = fullPrices.collateralPrices[buyOrder.collateralIndex].collateral;
+      address sellOrderCollateral = fullPrices.collateralPrices[sellOrder.collateralIndex].collateral;
+      buyOrder.order.matcherFee = (buyOrder.order.matcherFee * filledAmount) / buyOrder.order.amount;
+      sellOrder.order.matcherFee = (sellOrder.order.matcherFee * filledAmount) / sellOrder.order.amount;
+      int256 buyOrderMatcherFee = int256(
+        (buyOrder.order.matcherFee * _UINT_COLLATERAL_PRECISION) /
+          fullPrices.collateralPrices[buyOrder.collateralIndex].price
+      );
+      int256 sellOrderMatcherFee = int256(
+        (sellOrder.order.matcherFee * _UINT_COLLATERAL_PRECISION) /
+          fullPrices.collateralPrices[sellOrder.collateralIndex].price
       );
       _setBalance(
-        sellOrder.senderAddress,
-        sellOrder.collateral,
-        _getBalance(
-          sellOrder.senderAddress,
-          sellOrder.collateral,
-          uint112(fullPrices.instrumentPrices[sellOrder.instrumentIndex].price)
-        ) - sellOrderMatcherFee
+        buyOrder.order.senderAddress,
+        buyOrderCollateral,
+        _getBalance(buyOrder.order.senderAddress, buyOrderCollateral) - buyOrderMatcherFee
       );
       _setBalance(
-        buyOrder.matcherAddress,
-        buyOrder.collateral,
-        _getBalance(
-          buyOrder.matcherAddress,
-          buyOrder.collateral,
-          uint112(fullPrices.instrumentPrices[buyOrder.instrumentIndex].price)
-        ) + buyOrderMatcherFee
+        sellOrder.order.senderAddress,
+        sellOrderCollateral,
+        _getBalance(sellOrder.order.senderAddress, sellOrderCollateral) - sellOrderMatcherFee
       );
       _setBalance(
-        sellOrder.matcherAddress,
-        sellOrder.collateral,
-        _getBalance(
-          sellOrder.matcherAddress,
-          sellOrder.collateral,
-          uint112(fullPrices.instrumentPrices[sellOrder.instrumentIndex].price)
-        ) + sellOrderMatcherFee
+        buyOrder.order.matcherAddress,
+        buyOrderCollateral,
+        _getBalance(buyOrder.order.matcherAddress, buyOrderCollateral) + buyOrderMatcherFee
+      );
+      _setBalance(
+        sellOrder.order.matcherAddress,
+        sellOrderCollateral,
+        _getBalance(sellOrder.order.matcherAddress, sellOrderCollateral) + sellOrderMatcherFee
       );
     }
 
-    uint256 index = buyOrder.instrumentIndex;
-    PositionInfo storage buyerUserData = positionInfo[index][buyOrder.senderAddress];
-    PositionInfo storage sellerUserData = positionInfo[index][sellOrder.senderAddress];
-    int112 amount = int112(uint112(filledAmount));
-    int112 soLevel_ = soLevel;
+    uint256 index = buyOrder.order.instrumentIndex;
+    PositionInfo storage buyerUserData = _positionInfo[index][buyOrder.order.senderAddress];
+    PositionInfo storage sellerUserData = _positionInfo[index][sellOrder.order.senderAddress];
+    int256 amount = int256(filledAmount);
+    int256 soLevel_ = soLevel;
 
     _changePosition(
       index,
-      buyOrder.senderAddress,
+      buyOrder.order.senderAddress,
       buyerUserData,
-      buyOrder.collateral,
+      buyOrder.collateralIndex,
       amount,
-      int112(uint112(filledPrice)),
+      int256(filledPrice),
       soLevel_,
-      buyOrder.leverage,
+      buyOrder.order.leverage,
       fullPrices,
       historyTimestamp,
       historySearchHint
     );
     _changePosition(
       index,
-      sellOrder.senderAddress,
+      sellOrder.order.senderAddress,
       sellerUserData,
-      sellOrder.collateral,
+      sellOrder.collateralIndex,
       -amount,
-      int112(uint112(filledPrice)),
+      int256(filledPrice),
       soLevel_,
-      sellOrder.leverage,
+      sellOrder.order.leverage,
       fullPrices,
       historyTimestamp,
       historySearchHint
     );
 
-    emit NewTrade(buyOrder.instrumentIndex, buyOrder.senderAddress, sellOrder.senderAddress, filledPrice, filledAmount);
+    emit NewTrade(index, buyOrder.order.senderAddress, sellOrder.order.senderAddress, filledPrice, filledAmount);
   }
 
-  function _fillOrder(bytes32 orderDigest, uint256 orderAmount, uint96 filledAmount) internal {
-    uint96 newFilledAmount = filledAmounts[orderDigest] + filledAmount;
+  function _fillOrder(bytes32 orderDigest, uint256 orderAmount, uint256 filledAmount) internal {
+    uint256 newFilledAmount = filledAmounts[orderDigest] + filledAmount;
     if (newFilledAmount > orderAmount) revert OrderIsAlreadyFilled();
     filledAmounts[orderDigest] = newFilledAmount;
+  }
+
+  function collectFr(
+    address account,
+    FullPrices calldata fullPrices,
+    uint256 collateralIndex,
+    uint256 historyTimestamp,
+    uint256 historySearchHint
+  ) external onlyRole(MATCHER_ROLE) {
+    uint256[] memory indices = _activeInstruments[account].values();
+    uint256 len = indices.length;
+    for (uint256 i = 0; i < len; ++i) {
+      _collectFr(indices[i], account, fullPrices, collateralIndex, historyTimestamp, historySearchHint);
+    }
+  }
+
+  function _collectFr(
+    uint256 index,
+    address account,
+    FullPrices calldata fullPrices,
+    uint256 collateralIndex,
+    uint256 historyTimestamp,
+    uint256 historySearchHint
+  ) internal {
+    PositionInfo storage positionInfo = _positionInfo[index][account];
+    (int256 frCurrent, int256 staticFee) = getAccountFR(account, index, historyTimestamp, historySearchHint);
+    if (frCurrent == 0) return;
+    address collateral = fullPrices.collateralPrices[collateralIndex].collateral;
+    int256 collateralPrice = int256(fullPrices.collateralPrices[collateralIndex].price);
+    int256 posAvgPrice = positionInfo.positionAvgPrice;
+    int256 collateralFee = (frCurrent * posAvgPrice * _COLLATERAL_PRECISION) / collateralPrice / _INT_PRECISION;
+    int256 staticCollateralFee;
+    if (staticFee != 0) {
+      address staticFrAccount = staticFundingRateAccount;
+      staticCollateralFee = (staticFee * posAvgPrice * _COLLATERAL_PRECISION) / collateralPrice / _INT_PRECISION;
+      _setBalance(staticFrAccount, collateral, _getBalance(staticFrAccount, collateral) + staticCollateralFee);
+    }
+    address frAccount = fundingRateAccount;
+    _setBalance(frAccount, collateral, _getBalance(frAccount, collateral) - collateralFee - staticCollateralFee);
+    int256 newBalance = _getBalance(account, collateral) + collateralFee;
+    _setBalance(account, collateral, newBalance);
+    positionInfo.frAccumulated = 0;
+    (positionInfo.positionLongFRStored, positionInfo.positionShortFRStored) = getTotalFR(
+      index,
+      historyTimestamp,
+      historySearchHint
+    );
+    positionInfo.positionLastUpdate = uint32(historyTimestamp);
+    emit FrCollected(index, account, collateral, newBalance, staticCollateralFee);
   }
 
   function _changePosition(
     uint256 index,
     address positionOwner,
     PositionInfo storage posData,
-    address collateral,
-    int112 amount,
-    int112 price,
-    int112 marginLevel,
+    uint256 collateralIndex,
+    int256 amount,
+    int256 price,
+    int256 marginLevel,
     uint16 leverage,
     FullPrices calldata fullPrices,
     uint256 historyTimestamp,
     uint256 historySearchHint
   ) internal {
-    int112 newPosition = amount + posData.position;
-
-    bool changePositionSide = (posData.position > 0 && newPosition <= 0) || (posData.position < 0 && newPosition >= 0);
-    bool increase_position = (newPosition > 0 && amount > 0) || (newPosition < 0 && amount < 0);
-    int112 realizedFRCollateral;
-    int112 realizedPNL;
-    if (changePositionSide) {
-      realizedFRCollateral =
-        (getAccountFR(positionOwner, index, historyTimestamp, historySearchHint) *
-          int112(uint112(posData.positionAvgPrice))) /
-        _INT_PRECISION;
-      realizedPNL = getPNL(positionOwner, index, price);
-      _setBalance(
+    int256 oldPosition = posData.position;
+    int256 newPosition = amount + oldPosition;
+    int256 realizedFRCollateral;
+    int256 realizedPNL;
+    address collateral = fullPrices.collateralPrices[collateralIndex].collateral;
+    int256 collateralPrice = int256(fullPrices.collateralPrices[collateralIndex].price);
+    if ((oldPosition > 0 && newPosition <= 0) || (oldPosition < 0 && newPosition >= 0)) {
+      (realizedFRCollateral, realizedPNL) = _changePositionSide(
+        index,
         positionOwner,
+        posData,
+        price,
         collateral,
-        _getBalance(positionOwner, collateral, uint112(fullPrices.instrumentPrices[index].price)) +
-          realizedFRCollateral +
-          realizedPNL
-      );
-      _setBalance(
-        fundingRateAccount,
-        collateral,
-        _getBalance(fundingRateAccount, collateral, uint112(fullPrices.instrumentPrices[index].price)) -
-          realizedFRCollateral
-      );
-      posData.frAccumulated = 0;
-      posData.positionAvgPrice = uint80(uint112(price));
-    } else if (increase_position) {
-      posData.positionAvgPrice = uint80(
-        uint112((amount * price + posData.position * int112(uint112(posData.positionAvgPrice))) / newPosition)
-      );
-      posData.frAccumulated = getAccountFR(positionOwner, index, historyTimestamp, historySearchHint);
-    } else {
-      //  Partially close.
-      int112 frCurrent = getAccountFR(positionOwner, index, historyTimestamp, historySearchHint);
-
-      //  In this case, amount and posData.position would have different signs
-      realizedFRCollateral =
-        (frCurrent * int112(uint112(posData.positionAvgPrice)) * -1 * amount) /
-        posData.position /
-        _INT_PRECISION;
-      realizedPNL = (getPNL(positionOwner, index, price) * amount * -1) / posData.position;
-
-      _setBalance(
-        positionOwner,
-        collateral,
-        _getBalance(positionOwner, collateral, uint112(fullPrices.instrumentPrices[index].price)) +
-          realizedFRCollateral +
-          realizedPNL
-      );
-      _setBalance(
-        fundingRateAccount,
-        collateral,
-        _getBalance(fundingRateAccount, collateral, uint112(fullPrices.instrumentPrices[index].price)) -
-          realizedFRCollateral
-      );
-      posData.frAccumulated = (frCurrent * newPosition) / posData.position;
-    }
-
-    posData.position = newPosition;
-    posData.leverage = leverage;
-    posData.positionLongFRStored = getTotalLongFR(index, historyTimestamp, historySearchHint);
-    posData.positionShortFRStored = getTotalShortFR(index, historyTimestamp, historySearchHint);
-    posData.positionLastUpdate = uint32(historyTimestamp);
-
-    _updateActivePositions(positionOwner, index, posData.position);
-    {
-      (bool validMargin, ) = checkMarginWithPrices(
-        positionOwner,
-        marginLevel,
-        fullPrices,
+        collateralPrice,
         historyTimestamp,
         historySearchHint
       );
-      if (!validMargin) revert InsufficientMargin();
+    } else if ((newPosition > 0 && amount > 0) || (newPosition < 0 && amount < 0)) {
+      _increasePosition(
+        index,
+        positionOwner,
+        posData,
+        amount,
+        price,
+        newPosition,
+        oldPosition,
+        historyTimestamp,
+        historySearchHint
+      );
+    } else {
+      (realizedFRCollateral, realizedPNL) = _partiallyClosePosition(
+        index,
+        positionOwner,
+        posData,
+        amount,
+        price,
+        newPosition,
+        oldPosition,
+        collateral,
+        collateralPrice,
+        historyTimestamp,
+        historySearchHint
+      );
     }
+
+    posData.position = int112(newPosition);
+    posData.leverage = leverage;
+    (posData.positionLongFRStored, posData.positionShortFRStored) = getTotalFR(
+      index,
+      historyTimestamp,
+      historySearchHint
+    );
+    posData.positionLastUpdate = uint32(historyTimestamp);
+
+    _updateActivePositions(positionOwner, index, posData.position);
+    (bool validMargin, ) = checkMarginWithPrices(
+      positionOwner,
+      marginLevel,
+      fullPrices,
+      historyTimestamp,
+      historySearchHint
+    );
+    if (!validMargin) revert InsufficientMargin();
 
     emit PositionUpdate(
       index,
       positionOwner,
-      _getBalance(positionOwner, collateral, uint112(fullPrices.instrumentPrices[index].price)),
+      _getBalance(positionOwner, collateral),
       posData,
       realizedPNL,
       realizedFRCollateral
     );
   }
 
+  function _changePositionSide(
+    uint256 index,
+    address positionOwner,
+    PositionInfo storage posData,
+    int256 price,
+    address collateral,
+    int256 collateralPrice,
+    uint256 historyTimestamp,
+    uint256 historySearchHint
+  ) internal returns (int256 realizedFRCollateral, int256 realizedPNL) {
+    (realizedFRCollateral, ) = getAccountFR(positionOwner, index, historyTimestamp, historySearchHint);
+    realizedFRCollateral = (realizedFRCollateral * posData.positionAvgPrice) / _INT_PRECISION;
+    realizedPNL = getPNL(positionOwner, index, price);
+    _setBalance(
+      positionOwner,
+      collateral,
+      _getBalance(positionOwner, collateral) +
+        ((realizedFRCollateral + realizedPNL) * _COLLATERAL_PRECISION) /
+        collateralPrice
+    );
+    address frAccount = fundingRateAccount;
+    _setBalance(
+      frAccount,
+      collateral,
+      _getBalance(frAccount, collateral) - (realizedFRCollateral * _COLLATERAL_PRECISION) / collateralPrice
+    );
+    posData.frAccumulated = 0;
+    posData.positionAvgPrice = int80(price);
+  }
+
+  function _increasePosition(
+    uint256 index,
+    address positionOwner,
+    PositionInfo storage posData,
+    int256 amount,
+    int256 price,
+    int256 newPosition,
+    int256 oldPosition,
+    uint256 historyTimestamp,
+    uint256 historySearchHint
+  ) internal {
+    posData.positionAvgPrice = int80((amount * price + oldPosition * posData.positionAvgPrice) / newPosition);
+    (int256 frAccumulated, ) = getAccountFR(positionOwner, index, historyTimestamp, historySearchHint);
+    posData.frAccumulated = int112(frAccumulated);
+  }
+
+  function _partiallyClosePosition(
+    uint256 index,
+    address positionOwner,
+    PositionInfo storage posData,
+    int256 amount,
+    int256 price,
+    int256 newPosition,
+    int256 oldPosition,
+    address collateral,
+    int256 collateralPrice,
+    uint256 historyTimestamp,
+    uint256 historySearchHint
+  ) internal returns (int256 realizedFRCollateral, int256 realizedPNL) {
+    (int256 frCurrent, ) = getAccountFR(positionOwner, index, historyTimestamp, historySearchHint);
+
+    //  In this case, amount and oldPosition would have different signs
+    realizedFRCollateral = (frCurrent * posData.positionAvgPrice * -1 * amount) / oldPosition / _INT_PRECISION;
+    realizedPNL = (getPNL(positionOwner, index, price) * amount * -1) / oldPosition;
+
+    _setBalance(
+      positionOwner,
+      collateral,
+      _getBalance(positionOwner, collateral) +
+        ((realizedFRCollateral + realizedPNL) * _COLLATERAL_PRECISION) /
+        collateralPrice
+    );
+    address frAccount = fundingRateAccount;
+    _setBalance(
+      frAccount,
+      collateral,
+      _getBalance(frAccount, collateral) - (realizedFRCollateral * _COLLATERAL_PRECISION) / collateralPrice
+    );
+    posData.frAccumulated = int112((frCurrent * newPosition) / oldPosition);
+  }
+
+  function _validateUserOrder(Order memory order) internal returns (address) {
+    return sessionManager.validateUserOrder(order);
+  }
+
   function _updateActivePositions(address account, uint256 index, int256 position) internal {
-    if (position != 0) {
-      if (_activeInstruments[account].length() >= maxOpenPositions) revert MaxOpenPositionsExceeded();
-      _activeInstruments[account].add(index);
-      _accountsWithOpenPositions.add(account);
-    } else {
+    if (position == 0) {
       _activeInstruments[account].remove(index);
       if (_activeInstruments[account].length() == 0) {
         _accountsWithOpenPositions.remove(account);
       }
+    } else {
+      if (_activeInstruments[account].length() >= maxOpenPositions) revert MaxOpenPositionsExceeded();
+      _activeInstruments[account].add(index);
+      _accountsWithOpenPositions.add(account);
     }
     settledOrders[account]++;
   }

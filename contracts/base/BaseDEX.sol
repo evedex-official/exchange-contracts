@@ -7,7 +7,7 @@ import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/ut
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {StorageDEX} from "./StorageDEX.sol";
-import {OrderValidationLib, OrderWithdrawal} from "../lib/OrderValidationLib.sol";
+import "../lib/OrderValidationLib.sol";
 import "../interfaces/IBaseDEX.sol";
 
 abstract contract BaseDEX is
@@ -23,9 +23,11 @@ abstract contract BaseDEX is
 
   function __BaseDEX_init(
     address initialOwner_,
-    address depositDex_,
-    address sessionManager_,
+    IDepositDEX depositDex_,
+    ISessionManager sessionManager_,
+    IMarginCalc marginCalculator_,
     address fundingRateAccount_,
+    address staticFundingRateAccount_,
     uint256 maxOpenPositions_,
     int112 soLevel_,
     int112 withdrawMarginLevel_,
@@ -34,7 +36,9 @@ abstract contract BaseDEX is
     _setBasicParams(
       depositDex_,
       sessionManager_,
+      marginCalculator_,
       fundingRateAccount_,
+      staticFundingRateAccount_,
       soLevel_,
       withdrawMarginLevel_,
       maxOpenPositions_,
@@ -55,11 +59,10 @@ abstract contract BaseDEX is
     uint256 length
   ) external view returns (FundingRateInfo[] memory) {
     InstrumentInfo storage instrument = _instrumentInfo[index];
-    // return GetterLib.getFundingRateData(instrument, start, length);
-    uint256 finish = start + length;
     uint256 max = instrument.fundingRateData.length;
     if (start >= max) revert InvalidPositionsRequest(max);
-    length = finish < max ? length : max - start;
+    length = start + length < max ? length : max - start;
+    uint256 finish = start + length;
     FundingRateInfo[] memory fundingRates = new FundingRateInfo[](length);
     for (uint256 i = start; i < finish; i++) {
       fundingRates[i] = instrument.fundingRateData[i];
@@ -72,9 +75,11 @@ abstract contract BaseDEX is
   }
 
   function setBasicParams(
-    address depositDex_,
-    address sessionManager_,
+    IDepositDEX depositDex_,
+    ISessionManager sessionManager_,
+    IMarginCalc marginCalculator_,
     address fundingRateAccount_,
+    address staticFundingRateAccount_,
     int112 soLevel_,
     int112 withdrawMarginLevel_,
     uint256 maxOpenPositions_,
@@ -83,7 +88,9 @@ abstract contract BaseDEX is
     _setBasicParams(
       depositDex_,
       sessionManager_,
+      marginCalculator_,
       fundingRateAccount_,
+      staticFundingRateAccount_,
       soLevel_,
       withdrawMarginLevel_,
       maxOpenPositions_,
@@ -92,9 +99,11 @@ abstract contract BaseDEX is
   }
 
   function _setBasicParams(
-    address depositDex_,
-    address sessionManager_,
+    IDepositDEX depositDex_,
+    ISessionManager sessionManager_,
+    IMarginCalc marginCalculator_,
     address fundingRateAccount_,
+    address staticFundingRateAccount_,
     int112 soLevel_,
     int112 withdrawMarginLevel_,
     uint256 maxOpenPositions_,
@@ -102,7 +111,9 @@ abstract contract BaseDEX is
   ) internal {
     depositDex = depositDex_;
     sessionManager = sessionManager_;
+    marginCalculator = marginCalculator_;
     fundingRateAccount = fundingRateAccount_;
+    staticFundingRateAccount = staticFundingRateAccount_;
     withdrawMarginLevel = withdrawMarginLevel_;
     soLevel = soLevel_;
     maxOpenPositions = maxOpenPositions_;
@@ -110,22 +121,14 @@ abstract contract BaseDEX is
     emit BasicParamsUpdate(
       depositDex_,
       sessionManager_,
+      marginCalculator_,
       fundingRateAccount_,
+      staticFundingRateAccount_,
       soLevel_,
       withdrawMarginLevel_,
       maxOpenPositions_,
       liquidationFeePercent_
     );
-  }
-
-  function addInstrument(
-    string calldata ticker,
-    uint8 leverage,
-    int256 dailyFRLong,
-    int256 dailyFRShort,
-    uint32 timestamp
-  ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-    _changeInstrument(instrumentsLength++, ticker, leverage, dailyFRLong, dailyFRShort, timestamp);
   }
 
   function deleteInstrument() external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -138,68 +141,56 @@ abstract contract BaseDEX is
     uint256 index,
     string calldata ticker,
     uint8 leverage,
-    int256 dailyFRLong,
-    int256 dailyFRShort,
-    uint32 timestamp
+    int72 newFRLong,
+    int72 newFRShort,
+    uint72 newStaticFR,
+    uint40 timestamp
   ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-    _changeInstrument(index, ticker, leverage, dailyFRLong, dailyFRShort, timestamp);
+    uint256 len = instrumentsLength;
+    if (len < index) revert InvalidIndex();
+    if (len == index) instrumentsLength = len + 1;
+    _changeInstrument(index, ticker, leverage, newFRLong, newFRShort, newStaticFR, timestamp);
   }
 
   function _changeInstrument(
     uint256 index,
     string memory ticker,
     uint8 leverage,
-    int256 dailyFRLong,
-    int256 dailyFRShort,
-    uint32 timestamp
+    int72 newFRLong,
+    int72 newFRShort,
+    uint72 newStaticFR,
+    uint40 timestamp
   ) internal {
-    if (instrumentsLength <= index) revert InstrumentDoesNotExist();
-
     InstrumentInfo storage instrumentInfo_ = _instrumentInfo[index];
     instrumentInfo_.instrumentData.ticker = ticker;
     instrumentInfo_.instrumentData.leverage = leverage;
-    _setFR(index, dailyFRLong, dailyFRShort, timestamp);
+    _setFR(index, newFRLong, newFRShort, newStaticFR, timestamp);
     emit InstrumentUpdate(index, ticker, leverage);
   }
 
-  //  Daily percent
   //  100% = 10^11
-  //	10000000
-  //
-  //  Min = 0.000000864 (86400)
   function setFR(
     uint256 index,
-    int256 dailyFRLong,
-    int256 dailyFRShort,
-    uint32 timestamp
+    int72 newFRLong,
+    int72 newFRShort,
+    uint72 newStaticFR,
+    uint40 timestamp
   ) external onlyRole(MATCHER_ROLE) {
-    _setFR(index, dailyFRLong, dailyFRShort, timestamp);
+    _setFR(index, newFRLong, newFRShort, newStaticFR, timestamp);
   }
 
-  function _setFR(uint256 index, int256 dailyFRLong, int256 dailyFRShort, uint32 timestamp) internal {
+  function _setFR(uint256 index, int72 newFRLong, int72 newFRShort, uint72 newStaticFR, uint40 timestamp) internal {
     uint256 len = _instrumentInfo[index].fundingRateData.length;
-    FundingRateInfo memory newFundingRateInfo;
     if (len > 0) {
-      uint256 lastIndex;
-      unchecked {
-        lastIndex = len - 1;
-      }
-      newFundingRateInfo.longFRStored = getTotalLongFR(index, block.timestamp, lastIndex);
-      newFundingRateInfo.shortFRStored = getTotalShortFR(index, block.timestamp, lastIndex);
-      if (timestamp <= _instrumentInfo[index].fundingRateData[lastIndex].lastFRUpdateTime) revert InvalidFRTimestamp();
+      if (timestamp <= _instrumentInfo[index].fundingRateData[len - 1].lastFRUpdateTime) revert InvalidFRTimestamp();
     }
+    FundingRateInfo memory newFundingRateInfo;
     newFundingRateInfo.lastFRUpdateTime = timestamp;
-    newFundingRateInfo.frLong = int40(dailyFRLong / _INT_1DAY);
-    newFundingRateInfo.frShort = int40(dailyFRShort / _INT_1DAY);
+    newFundingRateInfo.longFRStored = newFRLong;
+    newFundingRateInfo.shortFRStored = newFRShort;
+    newFundingRateInfo.staticFr = int72(newStaticFR);
     _instrumentInfo[index].fundingRateData.push(newFundingRateInfo);
-    emit NewFundingRate(
-      index,
-      newFundingRateInfo.frLong,
-      newFundingRateInfo.frShort,
-      newFundingRateInfo.longFRStored,
-      newFundingRateInfo.shortFRStored,
-      len
-    );
+    emit NewFundingRate(index, newFRLong, newFRShort, newStaticFR, len);
   }
 
   function _getFundingRateInfo(
@@ -209,7 +200,7 @@ abstract contract BaseDEX is
   ) internal view returns (FundingRateInfo memory) {
     uint256 len = _instrumentInfo[index].fundingRateData.length;
     if (len == 0) revert EmptyArrayToSearch();
-    if (_instrumentInfo[index].fundingRateData[searchHint].lastFRUpdateTime < timestamp)
+    if (_instrumentInfo[index].fundingRateData[searchHint].lastFRUpdateTime > timestamp)
       revert SearchWithHintFailed(searchHint);
 
     uint256 low = searchHint;
@@ -219,28 +210,21 @@ abstract contract BaseDEX is
       if (_instrumentInfo[index].fundingRateData[mid].lastFRUpdateTime > timestamp) {
         high = mid;
       } else {
-        low = mid + 1;
+        unchecked {
+          low = mid + 1;
+        }
       }
     }
-
-    if (low > 0 && _instrumentInfo[index].fundingRateData[low - 1].lastFRUpdateTime == timestamp) {
-      low--;
-    }
-    if (low == len) revert SearchWithHintFailed(searchHint);
-    return _instrumentInfo[index].fundingRateData[low];
+    return _instrumentInfo[index].fundingRateData[--low];
   }
 
-  function _getBalance(address account_, address collateral_, uint112 price_) internal view returns (int112 balance) {
-    balance = IDepositDEX(depositDex).getBalance(account_, collateral_, price_);
+  function _getBalance(address account_, address collateral_) internal view returns (int256 balance) {
+    balance = IDepositDEX(depositDex).getBalance(account_, collateral_);
   }
 
-  function _setBalance(address account_, address collateral_, int112 balance_) internal {
+  function _setBalance(address account_, address collateral_, int256 balance_) internal {
     IDepositDEX(depositDex).setBalance(account_, collateral_, balance_);
   }
-
-  function getTotalLongFR(uint256 index, uint256 timestamp, uint256 searchHint) public view virtual returns (int72) {}
-
-  function getTotalShortFR(uint256 index, uint256 timestamp, uint256 searchHint) public view virtual returns (int72) {}
 
   function _authorizeUpgrade(address newImplementation) internal override onlyRole(DEFAULT_ADMIN_ROLE) {}
 }
