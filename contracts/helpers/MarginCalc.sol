@@ -4,16 +4,10 @@ pragma solidity ^0.8.21;
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import {SlotDerivation} from "@openzeppelin/contracts/utils/SlotDerivation.sol";
-import {StorageSlot} from "@openzeppelin/contracts/utils/StorageSlot.sol";
 import "../interfaces/IMarginCalc.sol";
 
 contract MarginCalc is OwnableUpgradeable, UUPSUpgradeable, IMarginCalc {
-  using SlotDerivation for bytes32;
-  using StorageSlot for bytes32;
-
   uint256 public constant PRECISION = 1e4;
-
   MarginLimit public MARGIN_LIMIT;
 
   mapping(uint256 instrumentIndex => MarginLevel[] levels) public marginLevels;
