@@ -11,7 +11,7 @@
     "npm": ">=7"
   },
   "scripts": {
-    "test": "hardhat test",
+    "test": "node .create-config.js && hardhat test",
     "lint:sol": "solhint 'contracts/**/*.sol' && prettier -c 'contracts/**/*.sol'",
     "lint:sol:fix": "prettier --write 'contracts/**/*.sol'",
     "lint": "prettier --write './**/*.{js,sol,md}'",
