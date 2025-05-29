@@ -434,12 +434,32 @@ describe('fr tests', async () => {
     const distributorCollateralBefore = await depositDex.read.getBalance([distributorFrAddress, usdtToken.address]);
     const receiverCollateralBefore = await depositDex.read.getBalance([recieverFrAddress, usdtToken.address]);
     await writeContract(matcher, {
-      functionName: 'fillOrders',
+      functionName: 'fillOrder',
       address: eveDex.address,
       abi: eveDex.abi,
       args: [
         longOrderExt,
         shortOrderExt,
+        longOrderExt.order.price,
+        longOrderExt.order.amount,
+        getFullPricesBtcUsdt(
+          config.BTC_PRICE_INSTRUMENT_USERS_TRADE,
+          config.BTC_PRICE_COLLATERAL,
+          config.USDT_PRICE_COLLATERAL,
+          btcToken.address,
+          usdtToken.address,
+        ),
+        timestamp,
+        0n,
+      ],
+    });
+    await writeContract(matcher, {
+      functionName: 'fillOrder',
+      address: eveDex.address,
+      abi: eveDex.abi,
+      args: [
+        shortOrderExt,
+        longOrderExt,
         longOrderExt.order.price,
         longOrderExt.order.amount,
         getFullPricesBtcUsdt(

@@ -183,7 +183,7 @@ const matchOrders = async ({ matcher, usdtToken, btcToken, eveDex, orders, confi
   const historySearchHint = 0n; // element index in funding rate array. Hint from backend to reduce tx gas cost
 
   await writeContract(matcher, {
-    functionName: 'fillOrders',
+    functionName: 'fillOrder',
     address: eveDex.address,
     abi: eveDex.abi,
     args: [
@@ -204,7 +204,28 @@ const matchOrders = async ({ matcher, usdtToken, btcToken, eveDex, orders, confi
   });
 
   await writeContract(matcher, {
-    functionName: 'fillOrders',
+    functionName: 'fillOrder',
+    address: eveDex.address,
+    abi: eveDex.abi,
+    args: [
+      orders.shortOrderExt,
+      orders.longOrderExt,
+      config.BTC_PRICE_USERS_TRADE,
+      orders.longOrderExt.order.amount,
+      getFullPricesBtcUsdt(
+        config.BTC_PRICE_USERS_TRADE,
+        config.BTC_PRICE_COLLATERAL,
+        config.USDT_PRICE_COLLATERAL,
+        btcToken.address,
+        usdtToken.address,
+      ),
+      historyTimestamp,
+      historySearchHint,
+    ],
+  });
+
+  await writeContract(matcher, {
+    functionName: 'fillOrder',
     address: eveDex.address,
     abi: eveDex.abi,
     args:
@@ -227,6 +248,44 @@ const matchOrders = async ({ matcher, usdtToken, btcToken, eveDex, orders, confi
         : [
             orders.carolOrderExt,
             orders.liquidatorOrderExt,
+            config.BTC_PRICE_LIQUIDATOR_TRADE,
+            orders.carolOrderExt.order.amount,
+            getFullPricesBtcUsdt(
+              config.BTC_PRICE_LIQUIDATOR_TRADE,
+              config.BTC_PRICE_COLLATERAL,
+              config.USDT_PRICE_COLLATERAL,
+              btcToken.address,
+              usdtToken.address,
+            ),
+            historyTimestamp,
+            historySearchHint,
+          ],
+  });
+
+  await writeContract(matcher, {
+    functionName: 'fillOrder',
+    address: eveDex.address,
+    abi: eveDex.abi,
+    args:
+      config.LIQUIDATOR_ORDER_SIDE === BUY_SIDE
+        ? [
+            orders.carolOrderExt,
+            orders.liquidatorOrderExt,
+            config.BTC_PRICE_LIQUIDATOR_TRADE,
+            orders.liquidatorOrderExt.order.amount,
+            getFullPricesBtcUsdt(
+              config.BTC_PRICE_LIQUIDATOR_TRADE,
+              config.BTC_PRICE_COLLATERAL,
+              config.USDT_PRICE_COLLATERAL,
+              btcToken.address,
+              usdtToken.address,
+            ),
+            historyTimestamp,
+            historySearchHint,
+          ]
+        : [
+            orders.liquidatorOrderExt,
+            orders.carolOrderExt,
             config.BTC_PRICE_LIQUIDATOR_TRADE,
             orders.carolOrderExt.order.amount,
             getFullPricesBtcUsdt(

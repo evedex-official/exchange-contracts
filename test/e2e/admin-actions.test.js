@@ -12,7 +12,7 @@ const {
   ORDER_LEVERAGE,
 } = require('./admin-actions.config');
 const { expect } = require('chai');
-const { BTC_USD_INDEX, USDT_COLLATERAL_INDEX, BUY_SIDE, FR_PRECISION } = require('../helpers/constants');
+const { BTC_USD_INDEX, USDT_COLLATERAL_INDEX, BUY_SIDE, SELL_SIDE, FR_PRECISION } = require('../helpers/constants');
 const { createSession, createOrderExtended, signOrder } = require('../helpers/utils');
 const { BTC_INSTRUMENT_PRICE, USDT_COLLATERAL_PRICE, BTC_COLLATERAL_PRICE } = require('./order-buy-sell.config');
 
@@ -183,7 +183,7 @@ describe(flow, () => {
     };
     const [aliceOrderExt, bobOrderExt] = await Promise.all([
       createOrder({ userWallet: alice, userSessionWallet: aliceSessionWallet, side: BUY_SIDE }),
-      createOrder({ userWallet: bob, userSessionWallet: bobSessionWallet, side: BUY_SIDE }),
+      createOrder({ userWallet: bob, userSessionWallet: bobSessionWallet, side: SELL_SIDE }),
     ]);
     aliceBuyOrderExt = aliceOrderExt;
     bobSellOrderExt = bobOrderExt;
@@ -212,12 +212,26 @@ describe(flow, () => {
     };
     const historySearchHint = 0n; // element index in funding rate array. Hint from backend to reduce tx gas cost
     await writeContract(matcher, {
-      functionName: 'fillOrders',
+      functionName: 'fillOrder',
       address: eveDex.address,
       abi: eveDex.abi,
       args: [
         aliceBuyOrderExt,
         bobSellOrderExt,
+        aliceBuyOrderExt.order.price,
+        aliceBuyOrderExt.order.amount,
+        fullPrices,
+        orderExecutionTimestamp,
+        historySearchHint,
+      ],
+    });
+    await writeContract(matcher, {
+      functionName: 'fillOrder',
+      address: eveDex.address,
+      abi: eveDex.abi,
+      args: [
+        bobSellOrderExt,
+        aliceBuyOrderExt,
         aliceBuyOrderExt.order.price,
         aliceBuyOrderExt.order.amount,
         fullPrices,

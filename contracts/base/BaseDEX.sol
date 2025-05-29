@@ -21,29 +21,8 @@ abstract contract BaseDEX is
     _disableInitializers();
   }
 
-  function __BaseDEX_init(
-    address initialOwner_,
-    IDepositDEX depositDex_,
-    ISessionManager sessionManager_,
-    IMarginCalc marginCalculator_,
-    address fundingRateAccount_,
-    address staticFundingRateAccount_,
-    uint256 maxOpenPositions_,
-    int112 soLevel_,
-    int112 withdrawMarginLevel_,
-    uint112 liquidationFeePercent_
-  ) internal onlyInitializing {
-    _setBasicParams(
-      depositDex_,
-      sessionManager_,
-      marginCalculator_,
-      fundingRateAccount_,
-      staticFundingRateAccount_,
-      soLevel_,
-      withdrawMarginLevel_,
-      maxOpenPositions_,
-      liquidationFeePercent_
-    );
+  function __BaseDEX_init(address initialOwner_, BasicParams calldata params_) internal onlyInitializing {
+    _setBasicParams(params_);
     __ReentrancyGuard_init();
     __AccessControlEnumerable_init();
     _grantRole(DEFAULT_ADMIN_ROLE, initialOwner_);
@@ -74,61 +53,21 @@ abstract contract BaseDEX is
     return _instrumentInfo[index].instrumentData.leverage;
   }
 
-  function setBasicParams(
-    IDepositDEX depositDex_,
-    ISessionManager sessionManager_,
-    IMarginCalc marginCalculator_,
-    address fundingRateAccount_,
-    address staticFundingRateAccount_,
-    int112 soLevel_,
-    int112 withdrawMarginLevel_,
-    uint256 maxOpenPositions_,
-    uint256 liquidationFeePercent_
-  ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-    _setBasicParams(
-      depositDex_,
-      sessionManager_,
-      marginCalculator_,
-      fundingRateAccount_,
-      staticFundingRateAccount_,
-      soLevel_,
-      withdrawMarginLevel_,
-      maxOpenPositions_,
-      liquidationFeePercent_
-    );
+  function setBasicParams(BasicParams calldata params_) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    _setBasicParams(params_);
   }
 
-  function _setBasicParams(
-    IDepositDEX depositDex_,
-    ISessionManager sessionManager_,
-    IMarginCalc marginCalculator_,
-    address fundingRateAccount_,
-    address staticFundingRateAccount_,
-    int112 soLevel_,
-    int112 withdrawMarginLevel_,
-    uint256 maxOpenPositions_,
-    uint256 liquidationFeePercent_
-  ) internal {
-    depositDex = depositDex_;
-    sessionManager = sessionManager_;
-    marginCalculator = marginCalculator_;
-    fundingRateAccount = fundingRateAccount_;
-    staticFundingRateAccount = staticFundingRateAccount_;
-    withdrawMarginLevel = withdrawMarginLevel_;
-    soLevel = soLevel_;
-    maxOpenPositions = maxOpenPositions_;
-    liquidationFeePercent = liquidationFeePercent_;
-    emit BasicParamsUpdate(
-      depositDex_,
-      sessionManager_,
-      marginCalculator_,
-      fundingRateAccount_,
-      staticFundingRateAccount_,
-      soLevel_,
-      withdrawMarginLevel_,
-      maxOpenPositions_,
-      liquidationFeePercent_
-    );
+  function _setBasicParams(BasicParams calldata params_) internal {
+    depositDex = params_.depositDex;
+    sessionManager = params_.sessionManager;
+    marginCalculator = params_.marginCalculator;
+    fundingRateAccount = params_.fundingRateAccount;
+    staticFundingRateAccount = params_.staticFundingRateAccount;
+    withdrawMarginLevel = params_.withdrawMarginLevel;
+    soLevel = params_.soLevel;
+    maxOpenPositions = params_.maxOpenPositions;
+    liquidationFeePercent = params_.liquidationFeePercent;
+    emit BasicParamsUpdate(params_);
   }
 
   function deleteInstrument() external onlyRole(DEFAULT_ADMIN_ROLE) {

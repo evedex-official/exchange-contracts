@@ -76,6 +76,13 @@ interface IEVEDEX {
     int256 staticCollateralFee
   );
 
+  event OrderSettled(
+    bytes32 settlementId,
+    uint256 indexed orderId,
+    uint256 indexed matchedOrderId,
+    bool settledBothSides
+  );
+
   error InvalidSession();
   error ZeroPositionLiquidation();
   error InsufficientMargin();
@@ -86,6 +93,7 @@ interface IEVEDEX {
   error OrderIsAlreadyFilled();
   error PriceArrayLengthError();
   error UnprofitableTrade();
+  error SettlementMismatch();
 
   function getActiveInstrumentsIndexes(address account) external view returns (uint256[] memory);
 
@@ -139,20 +147,27 @@ interface IEVEDEX {
     uint256 historySearchHint
   ) external;
 
-  // function liquidatePosition(
-  //   OrderLiquidation memory liquidationOrder,
-  //   FullPrices calldata fullPrices,
-  //   LiquidationCollaterals calldata collateralIndices,
-  //   uint256 historyTimestamp,
-  //   uint256 historySearchHint
-  // ) external;
+  function adlLiquidation(
+    AdlOrderLiquidation memory liquidationOrder,
+    FullPrices calldata fullPrices,
+    uint256 historyTimestamp,
+    uint256 historySearchHint
+  ) external;
 
-  function fillOrders(
+  function fillOrder(
     OrderExtended memory buyOrder,
     OrderExtended memory sellOrder,
     uint256 filledPrice,
     uint256 filledAmount,
     FullPrices calldata fullPrices,
+    uint256 historyTimestamp,
+    uint256 historySearchHint
+  ) external;
+
+  function collectFr(
+    address account,
+    FullPrices calldata fullPrices,
+    uint256 collateralIndex,
     uint256 historyTimestamp,
     uint256 historySearchHint
   ) external;

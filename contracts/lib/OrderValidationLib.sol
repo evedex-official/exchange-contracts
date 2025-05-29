@@ -86,7 +86,7 @@ library OrderValidationLib {
   bytes32 public constant HASHED_VERSION = keccak256(bytes("1"));
 
   bytes32 public constant EIP712_DOMAIN_TYPEHASH =
-    keccak256(abi.encodePacked("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"));
+    keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
 
   function buildDomainSeparator() public view returns (bytes32) {
     return keccak256(abi.encode(EIP712_DOMAIN_TYPEHASH, HASHED_NAME, HASHED_VERSION, block.chainid, address(this)));
@@ -94,35 +94,25 @@ library OrderValidationLib {
 
   bytes32 public constant ORDER_TYPEHASH =
     keccak256(
-      abi.encodePacked(
-        "Order(uint256 orderId,address senderAddress,address matcherAddress,uint256 instrumentIndex,uint256 amount,uint256 price,uint16 leverage,uint256 matcherFee,uint256 creationTime,uint8 side)"
-      )
+      "Order(uint256 orderId,address senderAddress,address matcherAddress,uint256 instrumentIndex,uint256 amount,uint256 price,uint16 leverage,uint256 matcherFee,uint256 creationTime,uint8 side)"
     );
 
-  bytes32 public constant MULTI_ORDER_TYPEHASH = keccak256(abi.encodePacked("MultiOrder(bytes32 merkleRoot)"));
+  bytes32 public constant MULTI_ORDER_TYPEHASH = keccak256("MultiOrder(bytes32 merkleRoot)");
 
-  bytes32 public constant PRICE_INFO_TYPEHASH = keccak256(abi.encodePacked("PriceData(uint256 index,uint256 price)"));
+  bytes32 public constant PRICE_INFO_TYPEHASH = keccak256("PriceData(uint256 index,uint256 price)");
 
   bytes32 public constant MULTI_ORDER_LIQUIDATION_TYPEHASH =
     keccak256(
-      abi.encodePacked(
-        "MultiOrderLiquidation(address accountToLiquidate,address liquidator,PriceData[] liquidationPrices,PriceData[] prices,uint16 leverage,uint256 liquidationTimestamp,uint256 expiration)PriceData(uint256 index,uint256 price)"
-      )
+      "MultiOrderLiquidation(address accountToLiquidate,address liquidator,PriceData[] liquidationPrices,PriceData[] prices,uint16 leverage,uint256 liquidationTimestamp,uint256 expiration)PriceData(uint256 index,uint256 price)"
     );
 
   bytes32 public constant LIQUIDATION_ORDER_TYPEHASH =
     keccak256(
-      abi.encodePacked(
-        "OrderLiquidation(address accountToLiquidate,address liquidator,uint256 index,PriceData[] prices,uint16 leverage,uint256 liquidationTimestamp,uint256 expiration)PriceData(uint256 index,uint256 price)"
-      )
+      "OrderLiquidation(address accountToLiquidate,address liquidator,uint256 index,PriceData[] prices,uint16 leverage,uint256 liquidationTimestamp,uint256 expiration)PriceData(uint256 index,uint256 price)"
     );
 
   bytes32 public constant WITHDRAWAL_ORDER_TYPEHASH =
-    keccak256(
-      abi.encodePacked(
-        "OrderWithdrawal(address collateral,address account,uint256 amount,address session,uint256 expiration)"
-      )
-    );
+    keccak256("OrderWithdrawal(address collateral,address account,uint256 amount,address session,uint256 expiration)");
 
   function _getOrderTypeValueHash(Order memory _order) internal pure returns (bytes32) {
     return
@@ -159,6 +149,18 @@ library OrderValidationLib {
           _order.side
         )
       );
+  }
+
+  function _getSettlementHash(
+    bytes32 orderA,
+    bytes32 orderB,
+    uint8 side,
+    uint256 amount,
+    uint256 price,
+    uint256 timestamp
+  ) internal pure returns (bytes32) {
+    (orderA, orderB) = side == 0 ? (orderA, orderB) : (orderB, orderA);
+    return keccak256(abi.encode(orderA, orderB, amount, price, timestamp));
   }
 
   function _getMultiOrderTypeValueHash(Order memory _order) internal pure returns (bytes32) {
@@ -329,5 +331,63 @@ library OrderValidationLib {
     if (buyOrder.leverage == 0 || sellOrder.leverage == 0) revert InvalidLeverage();
     buyOrderDigest = _getOrderHash(buyOrder);
     sellOrderDigest = _getOrderHash(sellOrder);
+  }
+
+  function checkOrderInfo(
+    Order memory fillingOrder,
+    Order memory complimentaryOrder,
+    address fillingOrderSigner,
+    address complimentaryOrderSigner,
+    address sender,
+    uint256 filledAmount,
+    uint256 filledPrice,
+    address allowedMatcher,
+    uint256 instrumentsLength,
+    uint256 historyTimestamp
+  ) external view returns (bytes32 fillingOrderDigest, bytes32 complimentaryOrderDigest, bytes32 settlementDigest) {
+    _checkTimeline(fillingOrder.creationTime, historyTimestamp);
+    _checkTimeline(complimentaryOrder.creationTime, historyTimestamp);
+
+    if (fillingOrder.merkleRoot != 0x00) {
+      bytes32 fillingOrderLeaf;
+      (fillingOrderDigest, fillingOrderLeaf) = getMultiOrderDigest(fillingOrder);
+      _checkMerkleTree(fillingOrder.merkleProof, fillingOrder.merkleRoot, fillingOrderLeaf);
+    } else {
+      fillingOrderDigest = getOrderDigest(fillingOrder);
+    }
+
+    if (complimentaryOrder.merkleRoot != 0x00) {
+      bytes32 complimentaryOrderLeaf;
+      (complimentaryOrderDigest, complimentaryOrderLeaf) = getMultiOrderDigest(complimentaryOrder);
+      _checkMerkleTree(complimentaryOrder.merkleProof, complimentaryOrder.merkleRoot, complimentaryOrderLeaf);
+    } else {
+      complimentaryOrderDigest = getOrderDigest(complimentaryOrder);
+    }
+
+    _checkSignature(fillingOrderSigner, fillingOrderDigest, fillingOrder.signature);
+    _checkSignature(complimentaryOrderSigner, complimentaryOrderDigest, complimentaryOrder.signature);
+
+    if (fillingOrder.instrumentIndex != complimentaryOrder.instrumentIndex) revert DifferentInstruments();
+    if (instrumentsLength <= fillingOrder.instrumentIndex) revert InstrumentOutOfIndex();
+    if (!(fillingOrder.matcherAddress == sender && complimentaryOrder.matcherAddress == sender))
+      revert DifferentMatchers();
+    if (fillingOrder.matcherAddress != allowedMatcher) revert InvalidMatcher();
+    if (filledAmount > fillingOrder.amount || filledAmount > complimentaryOrder.amount) revert InvalidAmount();
+    (uint256 buyLimitPrice, uint256 sellLimitPrice) = fillingOrder.side == 1
+      ? (fillingOrder.price, complimentaryOrder.price)
+      : (complimentaryOrder.price, fillingOrder.price);
+    if (filledPrice > buyLimitPrice || filledPrice < sellLimitPrice) revert InvalidPrice();
+    if (fillingOrder.side == complimentaryOrder.side) revert InvalidDealSide();
+    if (fillingOrder.leverage == 0 || complimentaryOrder.leverage == 0) revert InvalidLeverage();
+    fillingOrderDigest = _getOrderHash(fillingOrder);
+    complimentaryOrderDigest = _getOrderHash(complimentaryOrder);
+    settlementDigest = _getSettlementHash(
+      fillingOrderDigest,
+      complimentaryOrderDigest,
+      fillingOrder.side,
+      filledAmount,
+      filledPrice,
+      historyTimestamp
+    );
   }
 }

@@ -56,9 +56,61 @@ interface IDepositDEX {
     uint256 priceTo
   );
 
+  function WITHDRAW_GUARDIAN_ROLE() external view returns (bytes32);
+
+  function CONVERTER_ROLE() external view returns (bytes32);
+
+  function MATCHER_ROLE() external view returns (bytes32);
+
+  function baseDex() external view returns (address);
+
+  function vault() external view returns (address);
+
+  function oracle() external view returns (address);
+
+  function allowedSlippage() external view returns (uint256);
+
+  function getCollaterals() external view returns (address[] memory);
+
+  function getCollateralsAt(uint256 index) external view returns (address);
+
+  function getCollateralsLength() external view returns (uint256);
+
+  function getWithdrawRequest(bytes32 orderHash) external view returns (WithdrawRequest memory);
+
+  function getWithdrawOrderHash(OrderWithdrawal calldata order) external pure returns (bytes32);
+
+  function depositCollateral(address collateral, uint112 amount) external;
+
+  function depositCollateralTo(address collateral, uint112 amount, address to) external;
+
+  function withdrawRequest(OrderWithdrawal calldata order) external;
+
+  function withdrawRequestCancel(OrderWithdrawal calldata order) external;
+
+  function withdrawComplete(
+    OrderWithdrawal calldata order,
+    FullPrices calldata fullPrices,
+    uint256 historyTimestamp,
+    uint256 historySearchHint
+  ) external;
+
+  function convertBalance(
+    address account,
+    uint256 amount,
+    address collateralFrom,
+    address collateralTo,
+    CollateralPriceData calldata priceFrom,
+    CollateralPriceData calldata priceTo
+  ) external;
+
   function setBalance(address account, address collateral, int256 balance) external;
 
   function getBalance(address account, address collateral) external view returns (int256 balance);
 
   function getTotalBalance(address account, CollateralPriceData[] memory prices) external view returns (int112 balance);
+
+  function setBasicParams(address baseDex_, address vault_, address oracle_, uint256 allowedSlippage_) external;
+
+  function setCollateralConfigs(address[] calldata collaterals_, bool[] calldata statuses_) external;
 }

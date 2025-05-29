@@ -74,15 +74,17 @@ describe('EVEDEX contract', function () {
       'EVEDEX',
       [
         owner.address,
-        await depositDex.getAddress(),
-        await sessions.getAddress(),
-        await marginCalculator.getAddress(),
-        fundingRateAccount.address,
-        staticFundingRateAccount.address,
-        128,
-        0.8 * EVEDEX_MARGIN_PRECISION,
-        1 * EVEDEX_MARGIN_PRECISION,
-        10000000,
+        {
+          depositDex: await depositDex.getAddress(),
+          sessionManager: await sessions.getAddress(),
+          marginCalculator: await marginCalculator.getAddress(),
+          fundingRateAccount: fundingRateAccount.address,
+          staticFundingRateAccount: staticFundingRateAccount.address,
+          maxOpenPositions: 128,
+          soLevel: 0.8 * EVEDEX_MARGIN_PRECISION,
+          withdrawMarginLevel: 1 * EVEDEX_MARGIN_PRECISION,
+          liquidationFeePercent: 10000000,
+        },
       ],
       libraries,
       true,
@@ -132,7 +134,7 @@ describe('EVEDEX contract', function () {
     expect(sessionsAddress).to.equal(await sessions.getAddress(), 'wrong vault address');
   });
 
-  it('should fill order', async function () {
+  it('should fill order partially', async function () {
     const amount = await ethers.parseEther('100');
     await token.mint(alice.address, amount);
     await token.mint(bob.address, amount);
@@ -196,13 +198,230 @@ describe('EVEDEX contract', function () {
         price: 1000000000000,
       },
     ];
-    await eveDex.connect(matcher).fillOrders(
+    const historyTimestamp = time.latest();
+    await eveDex.connect(matcher).fillOrder(
       buyOrderExt,
       sellOrderExt,
       orderPrice,
       orderAmount,
       { collateralPrices, instrumentPrices }, // fullPrices
-      time.latest(), // historyTimestamp
+      historyTimestamp,
+      0, // historySearchHint
+    );
+
+    const alicePositions = await eveDex.getActiveInstrumentsPositions(alice.address);
+    expect(alicePositions[1][0][0]).to.equal(orderAmount, 'wrong buyer position');
+    const usersWithPosition = await eveDex.getAccountsWithOpenPositionLength();
+    expect(usersWithPosition).to.equal(1, 'wrong seller position');
+    const totalOpened = await eveDex.totalOpenedOrders();
+    expect(totalOpened).to.equal(1, 'wrong total opened counter');
+    const totalSettledOrders = await eveDex.totalSettledOrders();
+    expect(totalSettledOrders).to.equal(0, 'wrong total settled counter');
+  });
+
+  it('should fill order partially and deny wrong second side', async function () {
+    const amount = await ethers.parseEther('100');
+    await token.mint(alice.address, amount);
+    await token.mint(bob.address, amount);
+
+    await token.connect(alice).approve(await depositDex.getAddress(), amount);
+    await token.connect(bob).approve(await depositDex.getAddress(), amount);
+    await depositDex.connect(alice).depositCollateral(tokenAddress, amount);
+    await depositDex.connect(bob).depositCollateral(tokenAddress, amount);
+
+    const creationTime = Math.floor(Date.now() / 1000);
+    const orderAmount = await ethers.parseEther('4.166'); // 4.167 * 3000 (price) / 100 (leverage) * 80 (soLevel) = 100 (balance) * 1.0 (collateralPrice) * 100 (100%)
+    const orderPrice = 300000000000;
+
+    const aliceOrder = {
+      orderId: 42,
+      senderAddress: alice.address,
+      matcherAddress: matcher.address,
+      instrumentIndex: 0,
+      amount: orderAmount,
+      price: orderPrice + 100,
+      leverage: 100,
+      matcherFee: 0,
+      creationTime: creationTime,
+      side: 1,
+      userSession: ethers.ZeroAddress,
+      merkleRoot: ethers.ZeroHash,
+      merkleProof: [],
+    };
+    const bobOrder = {
+      orderId: 142,
+      senderAddress: bob.address,
+      matcherAddress: matcher.address,
+      instrumentIndex: 0,
+      amount: orderAmount,
+      price: orderPrice - 100,
+      leverage: 100,
+      matcherFee: 0,
+      creationTime: creationTime - 1000,
+      side: 0,
+      userSession: ethers.ZeroAddress,
+      merkleRoot: ethers.ZeroHash,
+      merkleProof: [],
+    };
+    const domainBase = await domain(await eveDex.getAddress());
+    const aliceSignature = await alice.signTypedData(domainBase, orderTypes, aliceOrder);
+    const bobSignature = await bob.signTypedData(domainBase, orderTypes, bobOrder);
+    const buyOrder = { ...aliceOrder, signature: aliceSignature };
+    const sellOrder = { ...bobOrder, signature: bobSignature };
+    const buyOrderExt = { collateralIndex: 0, order: buyOrder };
+    const sellOrderExt = { collateralIndex: 0, order: sellOrder };
+
+    const instrumentPrices = [
+      {
+        index: 0,
+        price: orderPrice,
+      },
+    ];
+    const collateralPrices = [
+      {
+        collateral: tokenAddress,
+        price: 1000000000000,
+      },
+    ];
+
+    const historyTimestamp = await time.latest();
+    const partAmount = orderAmount / 10n;
+
+    await eveDex.connect(matcher).fillOrder(
+      buyOrderExt,
+      sellOrderExt,
+      orderPrice,
+      partAmount,
+      { collateralPrices, instrumentPrices }, // fullPrices
+      historyTimestamp,
+      0, // historySearchHint
+    );
+
+    await expect(
+      eveDex.connect(matcher).fillOrder(
+        sellOrderExt,
+        buyOrderExt,
+        orderPrice,
+        partAmount,
+        { collateralPrices, instrumentPrices }, // fullPrices
+        historyTimestamp - 100,
+        0, // historySearchHint
+      ),
+    ).to.be.revertedWithCustomError(orderLib, 'InvalidTimeline');
+
+    await expect(
+      eveDex.connect(matcher).fillOrder(
+        sellOrderExt,
+        buyOrderExt,
+        orderPrice + 200,
+        partAmount,
+        { collateralPrices, instrumentPrices }, // fullPrices
+        historyTimestamp,
+        0, // historySearchHint
+      ),
+    ).to.be.revertedWithCustomError(orderLib, 'InvalidPrice');
+
+    await eveDex.connect(matcher).fillOrder(
+      sellOrderExt,
+      buyOrderExt,
+      orderPrice,
+      partAmount * 2n,
+      { collateralPrices, instrumentPrices }, // fullPrices
+      historyTimestamp,
+      0, // historySearchHint
+    );
+
+    const alicePositions = await eveDex.getActiveInstrumentsPositions(alice.address);
+    expect(alicePositions[1][0][0]).to.equal(partAmount, 'wrong buyer position');
+    const bobPositions = await eveDex.getActiveInstrumentsPositions(bob.address);
+    expect(bobPositions[1][0][0]).to.equal(-partAmount * 2n, 'wrong seller position');
+    const totalOpened = await eveDex.totalOpenedOrders();
+    expect(totalOpened).to.equal(2, 'wrong total opened counter');
+    const totalSettledOrders = await eveDex.totalSettledOrders();
+    expect(totalSettledOrders).to.equal(0, 'wrong total settled counter');
+  });
+
+  it('should fill order and settlement', async function () {
+    const amount = await ethers.parseEther('100');
+    await token.mint(alice.address, amount);
+    await token.mint(bob.address, amount);
+
+    await token.connect(alice).approve(await depositDex.getAddress(), amount);
+    await token.connect(bob).approve(await depositDex.getAddress(), amount);
+    await depositDex.connect(alice).depositCollateral(tokenAddress, amount);
+    await depositDex.connect(bob).depositCollateral(tokenAddress, amount);
+
+    const creationTime = Math.floor(Date.now() / 1000);
+    const orderAmount = await ethers.parseEther('4.166'); // 4.167 * 3000 (price) / 100 (leverage) * 80 (soLevel) = 100 (balance) * 1.0 (collateralPrice) * 100 (100%)
+    const orderPrice = 300000000000;
+
+    const aliceOrder = {
+      orderId: 42,
+      senderAddress: alice.address,
+      matcherAddress: matcher.address,
+      instrumentIndex: 0,
+      amount: orderAmount,
+      price: orderPrice,
+      leverage: 100,
+      matcherFee: 0,
+      creationTime: creationTime,
+      side: 1,
+      userSession: ethers.ZeroAddress,
+      merkleRoot: ethers.ZeroHash,
+      merkleProof: [],
+    };
+    const bobOrder = {
+      orderId: 142,
+      senderAddress: bob.address,
+      matcherAddress: matcher.address,
+      instrumentIndex: 0,
+      amount: orderAmount,
+      price: orderPrice,
+      leverage: 100,
+      matcherFee: 0,
+      creationTime: creationTime,
+      side: 0,
+      userSession: ethers.ZeroAddress,
+      merkleRoot: ethers.ZeroHash,
+      merkleProof: [],
+    };
+    const domainBase = await domain(await eveDex.getAddress());
+    const aliceSignature = await alice.signTypedData(domainBase, orderTypes, aliceOrder);
+    const bobSignature = await bob.signTypedData(domainBase, orderTypes, bobOrder);
+    const buyOrder = { ...aliceOrder, signature: aliceSignature };
+    const sellOrder = { ...bobOrder, signature: bobSignature };
+    const buyOrderExt = { collateralIndex: 0, order: buyOrder };
+    const sellOrderExt = { collateralIndex: 0, order: sellOrder };
+
+    const instrumentPrices = [
+      {
+        index: 0,
+        price: orderPrice,
+      },
+    ];
+    const collateralPrices = [
+      {
+        collateral: tokenAddress,
+        price: 1000000000000,
+      },
+    ];
+    const historyTimestamp = time.latest();
+    await eveDex.connect(matcher).fillOrder(
+      buyOrderExt,
+      sellOrderExt,
+      orderPrice,
+      orderAmount,
+      { collateralPrices, instrumentPrices }, // fullPrices
+      historyTimestamp,
+      0, // historySearchHint
+    );
+    await eveDex.connect(matcher).fillOrder(
+      sellOrderExt,
+      buyOrderExt,
+      orderPrice,
+      orderAmount,
+      { collateralPrices, instrumentPrices }, // fullPrices
+      historyTimestamp,
       0, // historySearchHint
     );
 
@@ -210,6 +429,10 @@ describe('EVEDEX contract', function () {
     expect(alicePositions[1][0][0]).to.equal(orderAmount, 'wrong buyer position');
     const bobPositions = await eveDex.getActiveInstrumentsPositions(bob.address);
     expect(bobPositions[1][0][0]).to.equal(-orderAmount, 'wrong seller position');
+    const totalOpened = await eveDex.totalOpenedOrders();
+    expect(totalOpened).to.equal(1, 'wrong total opened counter');
+    const totalSettledOrders = await eveDex.totalSettledOrders();
+    expect(totalSettledOrders).to.equal(1, 'wrong total settled counter');
   });
 
   it('should fill multiOrder', async function () {
@@ -350,13 +573,23 @@ describe('EVEDEX contract', function () {
       },
     ];
 
-    await eveDex.connect(matcher).fillOrders(
+    const historyTimestamp = time.latest();
+    await eveDex.connect(matcher).fillOrder(
       buyOrderExt1,
       sellOrderExt,
       orderPrice,
       orderAmount1,
       { collateralPrices, instrumentPrices }, // fullPrices
-      time.latest(), // historyTimestamp
+      historyTimestamp,
+      0, // historySearchHint
+    );
+    await eveDex.connect(matcher).fillOrder(
+      sellOrderExt,
+      buyOrderExt1,
+      orderPrice,
+      orderAmount1,
+      { collateralPrices, instrumentPrices }, // fullPrices
+      historyTimestamp,
       0, // historySearchHint
     );
 
@@ -365,13 +598,23 @@ describe('EVEDEX contract', function () {
     const bobPositions1 = await eveDex.getActiveInstrumentsPositions(bob.address);
     expect(bobPositions1[1][0][0]).to.equal(-orderAmount1, 'wrong seller position');
 
-    await eveDex.connect(matcher).fillOrders(
+    const historyTimestamp2 = time.latest();
+    await eveDex.connect(matcher).fillOrder(
       buyOrderExt2,
       sellOrderExt,
       orderPrice,
       orderAmount2,
       { collateralPrices, instrumentPrices }, // fullPrices
-      time.latest(), // historyTimestamp
+      historyTimestamp2,
+      0, // historySearchHint
+    );
+    await eveDex.connect(matcher).fillOrder(
+      sellOrderExt,
+      buyOrderExt2,
+      orderPrice,
+      orderAmount2,
+      { collateralPrices, instrumentPrices }, // fullPrices
+      historyTimestamp2,
       0, // historySearchHint
     );
 
@@ -447,13 +690,23 @@ describe('EVEDEX contract', function () {
       },
     ];
 
-    await eveDex.connect(matcher).fillOrders(
+    const historyTimestamp = time.latest();
+    await eveDex.connect(matcher).fillOrder(
       buyOrderExt,
       sellOrderExt,
       orderPrice,
       orderAmount,
       { collateralPrices, instrumentPrices }, // fullPrices
-      time.latest(), // historyTimestamp
+      historyTimestamp,
+      0, // historySearchHint
+    );
+    await eveDex.connect(matcher).fillOrder(
+      sellOrderExt,
+      buyOrderExt,
+      orderPrice,
+      orderAmount,
+      { collateralPrices, instrumentPrices }, // fullPrices
+      historyTimestamp,
       0, // historySearchHint
     );
 
@@ -565,13 +818,23 @@ describe('EVEDEX contract', function () {
       },
     ];
 
-    await eveDex.connect(matcher).fillOrders(
+    const historyTimestamp = time.latest();
+    await eveDex.connect(matcher).fillOrder(
       buyOrderExt,
       sellOrderExt,
       orderPrice,
       orderAmount,
       { collateralPrices, instrumentPrices }, // fullPrices
-      time.latest(), // historyTimestamp
+      historyTimestamp,
+      0, // historySearchHint
+    );
+    await eveDex.connect(matcher).fillOrder(
+      sellOrderExt,
+      buyOrderExt,
+      orderPrice,
+      orderAmount,
+      { collateralPrices, instrumentPrices }, // fullPrices
+      historyTimestamp,
       0, // historySearchHint
     );
 
@@ -704,13 +967,23 @@ describe('EVEDEX contract', function () {
       },
     ];
 
-    await eveDex.connect(matcher).fillOrders(
+    const historyTimestamp = time.latest();
+    await eveDex.connect(matcher).fillOrder(
       buyOrderExt,
       sellOrderExt,
       orderPrice,
       orderAmount,
       { collateralPrices, instrumentPrices }, // fullPrices
-      time.latest(), // historyTimestamp
+      historyTimestamp,
+      0, // historySearchHint
+    );
+    await eveDex.connect(matcher).fillOrder(
+      sellOrderExt,
+      buyOrderExt,
+      orderPrice,
+      orderAmount,
+      { collateralPrices, instrumentPrices }, // fullPrices
+      historyTimestamp,
       0, // historySearchHint
     );
 

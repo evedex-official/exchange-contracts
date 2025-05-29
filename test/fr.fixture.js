@@ -134,12 +134,33 @@ const matchOrders = async ({ matcher, usdtToken, btcToken, eveDex, orders, confi
   const historySearchHint = 0n; // element index in funding rate array. Hint from backend to reduce tx gas cost
 
   await writeContract(matcher, {
-    functionName: 'fillOrders',
+    functionName: 'fillOrder',
     address: eveDex.address,
     abi: eveDex.abi,
     args: [
       orders.longOrderExt,
       orders.shortOrderExt,
+      orders.longOrderExt.order.price,
+      orders.longOrderExt.order.amount,
+      getFullPricesBtcUsdt(
+        config.BTC_PRICE_INSTRUMENT_USERS_TRADE,
+        config.BTC_PRICE_COLLATERAL,
+        config.USDT_PRICE_COLLATERAL,
+        btcToken.address,
+        usdtToken.address,
+      ),
+      historyTimestamp,
+      historySearchHint,
+    ],
+  });
+
+  await writeContract(matcher, {
+    functionName: 'fillOrder',
+    address: eveDex.address,
+    abi: eveDex.abi,
+    args: [
+      orders.shortOrderExt,
+      orders.longOrderExt,
       orders.longOrderExt.order.price,
       orders.longOrderExt.order.amount,
       getFullPricesBtcUsdt(

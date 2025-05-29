@@ -30,15 +30,18 @@ abstract contract StorageDEX is IStorageDEX {
   uint256 public liquidationFeePercent; // Percent of margin for position which is taken as liquidation fee. 10**8 = 100%
   uint256 public instrumentsLength;
   uint256 public maxOpenPositions;
+  uint256 public totalOpenedOrders;
+  uint256 public totalSettledOrders;
 
   mapping(uint256 index => InstrumentInfo config) internal _instrumentInfo;
-  mapping(address account => uint256 settledOrdersFortAccount) public settledOrders;
+  mapping(address account => uint256 settledOrdersForAccount) public settledOrders;
 
   mapping(address account => EnumerableSet.UintSet instruments) internal _activeInstruments;
 
   EnumerableSet.AddressSet internal _accountsWithOpenPositions;
   mapping(uint256 instrumentIndex => mapping(address account => PositionInfo position)) internal _positionInfo;
   mapping(bytes32 orderHash => uint256 orderAmount) public filledAmounts;
+  mapping(bytes32 settlementHash => bytes32 orderHash) public filledSettlements;
 
   uint256[50] private __gap;
 }
@@ -55,11 +58,10 @@ abstract contract StorageDEX is IStorageDEX {
  *  }
  *
  *  struct FundingRateInfo {
- *    int40 frLong; // Funding rate for long position - percentage of position per second. frLong = 10**11 => 100% per second
- *    int40 frShort; // Funding rate for short position - percentage of position per second. frShort = 10**11 => 100% per second
  *    int72 longFRStored; // Accumulator for frLong
  *    int72 shortFRStored; // Accumulator for frShort
- *    uint32 lastFRUpdateTime; // Last funding rate update time
+ *    int72 staticFr; // Static percentage of funding rate
+ *    uint40 lastFRUpdateTime; // Last funding rate update time
  *  }
 
  *  struct InstrumentInfo {
@@ -69,11 +71,6 @@ abstract contract StorageDEX is IStorageDEX {
  *
  *  struct InstrumentData {
  *    uint8 leverage; // Max available leverage
- *    string[12] ticker; // Ticker of underlying asset
- *  }
- *
- *  struct WithdrawRequest {
- *    uint64 timestamp;
- *    RequestStatus status;
+ *    string ticker; // Ticker of underlying asset
  *  }
  */

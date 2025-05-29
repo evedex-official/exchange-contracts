@@ -8,9 +8,9 @@ import "../interfaces/IMarginCalc.sol";
 
 contract MarginCalc is OwnableUpgradeable, UUPSUpgradeable, IMarginCalc {
   uint256 public constant PRECISION = 1e4;
-  MarginLimit public MARGIN_LIMIT;
+  MarginLimit internal _MARGIN_LIMIT;
 
-  mapping(uint256 instrumentIndex => MarginLevel[] levels) public marginLevels;
+  mapping(uint256 instrumentIndex => MarginLevel[] levels) internal _marginLevels;
 
   constructor() {
     _disableInitializers();
@@ -18,13 +18,25 @@ contract MarginCalc is OwnableUpgradeable, UUPSUpgradeable, IMarginCalc {
 
   function initialize(address initialOwner_, uint128 maxMargin_, uint128 minMargin_) external initializer {
     __Ownable_init(initialOwner_);
-    MARGIN_LIMIT.maxMargin = maxMargin_;
-    MARGIN_LIMIT.minMargin = minMargin_;
+    _MARGIN_LIMIT.maxMargin = maxMargin_;
+    _MARGIN_LIMIT.minMargin = minMargin_;
+  }
+
+  function MARGIN_LIMIT() external view returns (MarginLimit memory) {
+    return _MARGIN_LIMIT;
+  }
+
+  function getMarginLevels(uint256 index) external view returns (MarginLevel[] memory) {
+    uint256 len = _marginLevels[index].length;
+    if (len == 0) revert InvalidIndex();
+    MarginLevel[] memory levels = new MarginLevel[](len);
+    levels = _marginLevels[index];
+    return levels;
   }
 
   function getMargin(uint256 instrumentIndex, uint256 positionVolume) external view returns (uint256) {
     uint256 low = 0;
-    uint256 high = marginLevels[instrumentIndex].length;
+    uint256 high = _marginLevels[instrumentIndex].length;
 
     if (high == 0) {
       return 0;
@@ -35,7 +47,7 @@ contract MarginCalc is OwnableUpgradeable, UUPSUpgradeable, IMarginCalc {
 
       // Note that mid will always be strictly less than high (i.e. it will be a valid array index)
       // because Math.average rounds towards zero (it does integer division with truncation).
-      if (marginLevels[instrumentIndex][mid].positionVolumeLowerBound < positionVolume) {
+      if (_marginLevels[instrumentIndex][mid].positionVolumeLowerBound < positionVolume) {
         // this cannot overflow because mid < high
         unchecked {
           low = mid + 1;
@@ -46,7 +58,7 @@ contract MarginCalc is OwnableUpgradeable, UUPSUpgradeable, IMarginCalc {
     }
 
     if (low == 0) return 0;
-    MarginLevel memory lev = marginLevels[instrumentIndex][low - 1];
+    MarginLevel memory lev = _marginLevels[instrumentIndex][low - 1];
     return
       lev.accumulatedMarginLowerLevels +
       (lev.marginCoefficient * (positionVolume - lev.positionVolumeLowerBound)) /
@@ -70,10 +82,10 @@ contract MarginCalc is OwnableUpgradeable, UUPSUpgradeable, IMarginCalc {
       ) revert NonSmoothMargin();
       pos = currentLowerBound;
     }
-    MarginLimit memory lim = MARGIN_LIMIT;
+    MarginLimit memory lim = _MARGIN_LIMIT;
     if (levels[0].marginCoefficient > lim.maxMargin || levels[len - 1].marginCoefficient < lim.minMargin)
       revert MarginLimitExceeded();
-    marginLevels[instrumentIndex] = levels;
+    _marginLevels[instrumentIndex] = levels;
 
     emit MarginLevelUpdated(instrumentIndex, levels);
   }

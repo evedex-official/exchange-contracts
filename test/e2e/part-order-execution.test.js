@@ -153,13 +153,19 @@ describe(flow, () => {
     };
     const fillAmount =
       aliceOrderExt.order.amount < bobOrderExt.order.amount ? aliceOrderExt.order.amount : bobOrderExt.order.amount;
-    const historyTimestamp = Math.trunc(Date.now() / 1000);
+    const historyTimestamp = await Math.trunc(Date.now() / 1000);
     const historySearchHint = 0n; // element index in funding rate array. Hint from backend to reduce tx gas cost
     await writeContract(matcher, {
-      functionName: 'fillOrders',
+      functionName: 'fillOrder',
       address: eveDex.address,
       abi: eveDex.abi,
       args: [longOrder, shortOrder, instrumentPrice, fillAmount, fullPrices, historyTimestamp, historySearchHint],
+    });
+    await writeContract(matcher, {
+      functionName: 'fillOrder',
+      address: eveDex.address,
+      abi: eveDex.abi,
+      args: [shortOrder, longOrder, instrumentPrice, fillAmount, fullPrices, historyTimestamp, historySearchHint],
     });
   });
 

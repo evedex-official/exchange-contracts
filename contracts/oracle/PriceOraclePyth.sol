@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.26;
 
-import "@pythnetwork/pyth-sdk-solidity/IPyth.sol";
 import "@pythnetwork/pyth-sdk-solidity/PythStructs.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
@@ -15,17 +14,18 @@ contract PriceOraclePyth is Ownable, IPriceOracle {
   uint8 internal constant _USD_DECIMALS = 8;
   uint8 internal constant _DEFAULT_DECIMALS = 18;
 
+  /// @inheritdoc IPriceOracle
   IPyth public immutable PYTH;
+  /// @inheritdoc IPriceOracle
   address public immutable BASE_ASSET;
+  /// @inheritdoc IPriceOracle
   uint256 public immutable MAX_WINDOW;
 
-  // Stores timeframes for price requests by PythId
+  /// @inheritdoc IPriceOracle
   mapping(bytes32 pythId => uint256 window) public confidenceWindows;
-
-  // Stores pyth oracle price Id of the particular token
+  /// @inheritdoc IPriceOracle
   mapping(address asset => bytes32 pythId) public assetToId;
-
-  // Mapping of asset addresses by instrument index
+  /// @inheritdoc IPriceOracle
   mapping(uint256 index => address asset) public indexToAsset;
 
   constructor(
@@ -41,22 +41,14 @@ contract PriceOraclePyth is Ownable, IPriceOracle {
     _setPythId(baseAsset_, basePythId_);
   }
 
-  /**
-   * @notice returns price of an instrument in BASE_ASSET
-   * @param index of the instrument to query price of
-   * @return price scaled with _USD_DECIMALS precision
-   */
+  /// @inheritdoc IPriceOracle
   function getPrice(uint256 index) public view returns (uint80 price) {
     address asset = indexToAsset[index];
     if (asset == address(0)) revert IndexNotFound();
     price = getPrice(asset);
   }
 
-  /**
-   * @notice returns price of an asset in BASE_ASSET
-   * @param asset address to query price of
-   * @return price scaled with _USD_DECIMALS precision
-   */
+  /// @inheritdoc IPriceOracle
   function getPrice(address asset) public view returns (uint80 price) {
     uint256 assetPrice256 = getOraclePriceSafe(asset);
     uint256 basePrice256 = getOraclePriceSafe(BASE_ASSET);
@@ -65,12 +57,7 @@ contract PriceOraclePyth is Ownable, IPriceOracle {
     price = assetPrice256.toUint80();
   }
 
-  /**
-   * @notice returns price of an asset
-   * @dev reverts in case of stale price
-   * @param asset address to query price of
-   * @return price of underlying with 18 decimal places
-   */
+  /// @inheritdoc IPriceOracle
   function getOraclePriceSafe(address asset) public view returns (uint256 price) {
     bytes32 id = assetToId[asset];
     if (id == bytes32(0)) revert AssetNotSetUp();
@@ -78,12 +65,6 @@ contract PriceOraclePyth is Ownable, IPriceOracle {
     price = _priceToUint256(assetPrice.price, assetPrice.expo, _DEFAULT_DECIMALS);
   }
 
-  /**
-   * @param price int price mantissa from Pyth, reverted on negative values
-   * @param expo int exponent of the price
-   * @param decimals precision of return value
-   * @return price256 in uint256 format with selected precision
-   */
   function _priceToUint256(int64 price, int32 expo, uint8 decimals) internal pure returns (uint256 price256) {
     price256 = int256(price).toUint256();
     int256 expDelta = int256(uint256(decimals)) + expo;
@@ -92,11 +73,7 @@ contract PriceOraclePyth is Ownable, IPriceOracle {
       : price256 / (10 ** uint256(int256(-expDelta)));
   }
 
-  /**
-   * @notice updates instrument ID to asset address
-   * @param indices array to update
-   * @param assets array of assets
-   */
+  /// @inheritdoc IPriceOracle
   function updateInstrumentIndices(uint256[] calldata indices, address[] calldata assets) external onlyOwner {
     uint256 len = indices.length;
     if (len != assets.length) revert InvalidLengths();
@@ -105,11 +82,7 @@ contract PriceOraclePyth is Ownable, IPriceOracle {
     }
   }
 
-  /**
-   * @notice updates Pyth feeds for given addresses
-   * @param assets array to update
-   * @param ids array of Pyth IDs of price feeds
-   */
+  /// @inheritdoc IPriceOracle
   function updatePythPriceIds(address[] calldata assets, bytes32[] calldata ids) external onlyOwner {
     uint256 len = assets.length;
     if (len != ids.length) revert InvalidLengths();
@@ -118,11 +91,7 @@ contract PriceOraclePyth is Ownable, IPriceOracle {
     }
   }
 
-  /**
-   * @notice updates timeframes for given Pyth IDs
-   * @param ids array to update
-   * @param windows array of timeframes for price requests
-   */
+  /// @inheritdoc IPriceOracle
   function updateTimeWindows(bytes32[] calldata ids, uint256[] calldata windows) external onlyOwner {
     uint256 len = ids.length;
     if (len != windows.length) revert InvalidLengths();

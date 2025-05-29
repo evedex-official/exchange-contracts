@@ -13,6 +13,7 @@ struct MarginLimit {
 }
 
 interface IMarginCalc {
+  error InvalidIndex();
   error InvalidLength();
   error MarginLimitExceeded();
   error NonSmoothMargin();
@@ -22,7 +23,11 @@ interface IMarginCalc {
 
   function PRECISION() external view returns (uint256);
 
+  function MARGIN_LIMIT() external view returns (MarginLimit calldata);
+
+  function getMarginLevels(uint256 instrumentIndex) external view returns (MarginLevel[] memory levels);
+
   function getMargin(uint256 instrumentIndex, uint256 positionVolume) external view returns (uint256 marginLevel);
 
-  function setLevels(uint256 instrumentIndex, MarginLevel[] calldata levels) external;
+  function setLevels(uint256 instrumentIndex, MarginLevel[] memory levels) external;
 }

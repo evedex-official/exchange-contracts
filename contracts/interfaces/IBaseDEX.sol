@@ -22,6 +22,18 @@ struct InstrumentData {
   string ticker; // Ticker of underlying asset
 }
 
+struct BasicParams {
+  IDepositDEX depositDex;
+  ISessionManager sessionManager;
+  IMarginCalc marginCalculator;
+  address fundingRateAccount;
+  address staticFundingRateAccount;
+  uint256 maxOpenPositions;
+  int112 soLevel;
+  int112 withdrawMarginLevel;
+  uint112 liquidationFeePercent;
+}
+
 interface IBaseDEX {
   event InstrumentUpdate(uint256 indexed index, string ticker, uint8 leverage);
   event NewFundingRate(
@@ -32,17 +44,7 @@ interface IBaseDEX {
     uint256 position
   );
   event InstrumentDeleted(uint256 indexed index);
-  event BasicParamsUpdate(
-    IDepositDEX depositDex,
-    ISessionManager sessionManager,
-    IMarginCalc marginCalculator,
-    address fundingRateAccount,
-    address staticFundingRateAccount,
-    int112 soLevel,
-    int112 withdrawMarginLevel,
-    uint256 maxOpenPositions,
-    uint256 liquidationFeePercent
-  );
+  event BasicParamsUpdate(BasicParams newParams);
 
   error SearchWithHintFailed(uint256);
   error EmptyArrayToSearch();
@@ -58,17 +60,7 @@ interface IBaseDEX {
     uint256 length
   ) external view returns (FundingRateInfo[] memory);
 
-  function setBasicParams(
-    IDepositDEX depositDex_,
-    ISessionManager sessionManager_,
-    IMarginCalc marginCalculator_,
-    address fundingRateAccount_,
-    address staticFundingRateAccount_,
-    int112 soLevel_,
-    int112 withdrawMarginLevel_,
-    uint256 maxOpenPositions_,
-    uint256 liquidationFeePercent_
-  ) external;
+  function setBasicParams(BasicParams calldata params_) external;
 
   function deleteInstrument() external;
 

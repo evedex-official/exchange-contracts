@@ -5,7 +5,7 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {SignedMath} from "@openzeppelin/contracts/utils/math/SignedMath.sol";
-import {BaseDEX, FundingRateInfo} from "./base/BaseDEX.sol";
+import {BaseDEX, FundingRateInfo, BasicParams} from "./base/BaseDEX.sol";
 import "./interfaces/IEVEDEX.sol";
 
 contract EVEDEX is BaseDEX, IEVEDEX {
@@ -14,30 +14,8 @@ contract EVEDEX is BaseDEX, IEVEDEX {
 
   constructor() {}
 
-  function initialize(
-    address initialOwner_,
-    IDepositDEX depositDex_,
-    ISessionManager sessionManager_,
-    IMarginCalc marginCalculator_,
-    address fundingRateAccount_,
-    address staticFundingRateAccount_,
-    uint256 maxOpenPositions_,
-    int112 soLevel_,
-    int112 withdrawMarginLevel_,
-    uint112 liquidationFeePercent_
-  ) external initializer {
-    __BaseDEX_init(
-      initialOwner_,
-      depositDex_,
-      sessionManager_,
-      marginCalculator_,
-      fundingRateAccount_,
-      staticFundingRateAccount_,
-      maxOpenPositions_,
-      soLevel_,
-      withdrawMarginLevel_,
-      liquidationFeePercent_
-    );
+  function initialize(address initialOwner_, BasicParams calldata params_) external initializer {
+    __BaseDEX_init(initialOwner_, params_);
   }
 
   function getActiveInstrumentsIndexes(address account) public view returns (uint256[] memory) {
@@ -136,18 +114,16 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     pnls = new int256[](len);
     frs = new int256[](len);
     uint256 pricesChecked = 0;
-    IMarginCalc calc = marginCalculator;
     for (uint256 i = 0; i < len; ++i) {
       uint256 index = prices[i].index;
       if (!_activeInstruments[account].contains(index)) continue;
 
       {
         PositionInfo memory positionInfo_ = _positionInfo[index][account];
-        uint256 leverage = positionInfo_.leverage;
+        uint16 leverage = positionInfo_.leverage;
         leverage = leverage == 0 ? 1 : leverage;
-        uint256 absPosition = SignedMath.abs(positionInfo_.position);
-        uint256 positionVolume = (absPosition * uint80(positionInfo_.positionAvgPrice)) / _UINT_PRECISION / leverage;
-        margin += int256(calc.getMargin(index, positionVolume));
+        positionInfo_.leverage = leverage;
+        margin += int256(_getMarginFromCalc(index, positionInfo_));
       }
 
       pnls[i] = getPNL(account, index, int256(prices[i].price));
@@ -207,18 +183,29 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     return ((margin == 0 || accountMarginLevel >= marginLevel), equity);
   }
 
-  function _calculateLiquidationFee(PositionInfo memory position) internal view returns (uint256) {
-    uint256 absPosition = SignedMath.abs(position.position);
-    // TODO make fixed with constant precision
-    uint256 margin = (absPosition * uint80(position.positionAvgPrice)) / _UINT_PRECISION / position.leverage;
-    uint256 liquidationFee = (margin * liquidationFeePercent) / _UINT_PRECISION;
+  function _calculateLiquidationFee(uint256 index, PositionInfo memory position) internal view returns (uint256) {
+    return (_getMarginFromCalc(index, position) * liquidationFeePercent) / _UINT_PRECISION;
+  }
 
-    return liquidationFee;
+  function _getMarginFromCalc(uint256 index, PositionInfo memory position) internal view returns (uint256) {
+    uint256 absPosition = SignedMath.abs(position.position);
+    uint256 positionVolume = (absPosition * uint80(position.positionAvgPrice)) / _UINT_PRECISION / position.leverage;
+
+    return marginCalculator.getMargin(index, positionVolume);
   }
 
   //////////////////////////
   //  Mutative functions
   //////////////////////////
+
+  // function liquidatePartially(
+  //   PartialOrderLiquidation memory liquidationOrder,
+  //   FullPrices calldata fullPrices,
+  //   LiquidationCollaterals calldata collateralIndices,
+  //   uint256 historyTimestamp,
+  //   uint256 historySearchHint
+  // ) external onlyRole(MATCHER_ROLE) {}
+
   function liquidatePositions(
     MultiOrderLiquidation memory liquidationOrder,
     FullPrices calldata fullPrices,
@@ -276,7 +263,7 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     pnl = (accountToLiquidatePosition.position * (liquidationPrice - positionAvgPrice)) / _INT_PRECISION;
     (fr, ) = getAccountFR(accountToLiquidate, index, historyTimestamp, historySearchHint);
     fr = (fr * liquidationPrice) / _INT_PRECISION;
-    liquidationFee = _calculateLiquidationFee(accountToLiquidatePosition);
+    liquidationFee = _calculateLiquidationFee(index, accountToLiquidatePosition);
 
     _adjustBalances(accountToLiquidate, liquidator, fullPrices, collateralIndices, pnl + fr, int256(liquidationFee));
 
@@ -413,9 +400,9 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     );
   }
 
-  function fillOrders(
-    OrderExtended memory buyOrder,
-    OrderExtended memory sellOrder,
+  function fillOrder(
+    OrderExtended memory filledOrder,
+    OrderExtended memory complimentaryOrder,
     uint256 filledPrice,
     uint256 filledAmount,
     FullPrices calldata fullPrices,
@@ -424,108 +411,112 @@ contract EVEDEX is BaseDEX, IEVEDEX {
   ) external onlyRole(MATCHER_ROLE) {
     // Orders validation
     {
-      address buyOrderSigner = buyOrder.order.senderAddress;
-      address sellOrderSigner = sellOrder.order.senderAddress;
-      if (buyOrder.order.userSession != address(0)) {
-        buyOrderSigner = _validateUserOrder(buyOrder.order);
-        if (buyOrderSigner == address(0)) revert InvalidSession();
+      address filledOrderSigner = filledOrder.order.senderAddress;
+      address complimentaryOrderSigner = complimentaryOrder.order.senderAddress;
+      if (filledOrder.order.userSession != address(0)) {
+        filledOrderSigner = _validateUserOrder(filledOrder.order);
+        if (filledOrderSigner == address(0)) revert InvalidSession();
       }
-      if (sellOrder.order.userSession != address(0)) {
-        sellOrderSigner = _validateUserOrder(sellOrder.order);
-        if (sellOrderSigner == address(0)) revert InvalidSession();
+      if (complimentaryOrder.order.userSession != address(0)) {
+        complimentaryOrderSigner = _validateUserOrder(complimentaryOrder.order);
+        if (complimentaryOrderSigner == address(0)) revert InvalidSession();
       }
-      (bytes32 buyOrderDigest, bytes32 sellOrderDigest) = OrderValidationLib.checkOrdersInfo(
-        buyOrder.order,
-        sellOrder.order,
-        buyOrderSigner,
-        sellOrderSigner,
-        msg.sender,
-        filledAmount,
-        filledPrice,
-        msg.sender,
-        instrumentsLength,
-        historyTimestamp
-      );
+      (bytes32 filledOrderDigest, bytes32 complimentaryOrderDigest, bytes32 settlementDigest) = OrderValidationLib
+        .checkOrderInfo(
+          filledOrder.order,
+          complimentaryOrder.order,
+          filledOrderSigner,
+          complimentaryOrderSigner,
+          msg.sender,
+          filledAmount,
+          filledPrice,
+          msg.sender,
+          instrumentsLength,
+          historyTimestamp
+        );
 
-      _fillOrder(buyOrderDigest, buyOrder.order.amount, filledAmount);
-      _fillOrder(sellOrderDigest, sellOrder.order.amount, filledAmount);
+      _fillOrder(filledOrderDigest, filledOrder.order.amount, filledAmount);
+      _fillSettlement(
+        filledOrderDigest,
+        complimentaryOrderDigest,
+        settlementDigest,
+        filledOrder.order.orderId,
+        complimentaryOrder.order.orderId
+      );
     }
     // Paying execution fee to matcher
     {
-      address buyOrderCollateral = fullPrices.collateralPrices[buyOrder.collateralIndex].collateral;
-      address sellOrderCollateral = fullPrices.collateralPrices[sellOrder.collateralIndex].collateral;
-      buyOrder.order.matcherFee = (buyOrder.order.matcherFee * filledAmount) / buyOrder.order.amount;
-      sellOrder.order.matcherFee = (sellOrder.order.matcherFee * filledAmount) / sellOrder.order.amount;
-      int256 buyOrderMatcherFee = int256(
-        (buyOrder.order.matcherFee * _UINT_COLLATERAL_PRECISION) /
-          fullPrices.collateralPrices[buyOrder.collateralIndex].price
-      );
-      int256 sellOrderMatcherFee = int256(
-        (sellOrder.order.matcherFee * _UINT_COLLATERAL_PRECISION) /
-          fullPrices.collateralPrices[sellOrder.collateralIndex].price
+      address filledOrderCollateral = fullPrices.collateralPrices[filledOrder.collateralIndex].collateral;
+      filledOrder.order.matcherFee = (filledOrder.order.matcherFee * filledAmount) / filledOrder.order.amount;
+      int256 filledOrderMatcherFee = int256(
+        (filledOrder.order.matcherFee * _UINT_COLLATERAL_PRECISION) /
+          fullPrices.collateralPrices[filledOrder.collateralIndex].price
       );
       _setBalance(
-        buyOrder.order.senderAddress,
-        buyOrderCollateral,
-        _getBalance(buyOrder.order.senderAddress, buyOrderCollateral) - buyOrderMatcherFee
+        filledOrder.order.senderAddress,
+        filledOrderCollateral,
+        _getBalance(filledOrder.order.senderAddress, filledOrderCollateral) - filledOrderMatcherFee
       );
       _setBalance(
-        sellOrder.order.senderAddress,
-        sellOrderCollateral,
-        _getBalance(sellOrder.order.senderAddress, sellOrderCollateral) - sellOrderMatcherFee
-      );
-      _setBalance(
-        buyOrder.order.matcherAddress,
-        buyOrderCollateral,
-        _getBalance(buyOrder.order.matcherAddress, buyOrderCollateral) + buyOrderMatcherFee
-      );
-      _setBalance(
-        sellOrder.order.matcherAddress,
-        sellOrderCollateral,
-        _getBalance(sellOrder.order.matcherAddress, sellOrderCollateral) + sellOrderMatcherFee
+        filledOrder.order.matcherAddress,
+        filledOrderCollateral,
+        _getBalance(filledOrder.order.matcherAddress, filledOrderCollateral) + filledOrderMatcherFee
       );
     }
 
-    uint256 index = buyOrder.order.instrumentIndex;
-    PositionInfo storage buyerUserData = _positionInfo[index][buyOrder.order.senderAddress];
-    PositionInfo storage sellerUserData = _positionInfo[index][sellOrder.order.senderAddress];
-    int256 amount = int256(filledAmount);
+    uint256 index = filledOrder.order.instrumentIndex;
+    PositionInfo storage userData = _positionInfo[index][filledOrder.order.senderAddress];
+    int256 amount = filledOrder.order.side == 0 ? -int256(filledAmount) : int256(filledAmount);
     int256 soLevel_ = soLevel;
 
     _changePosition(
       index,
-      buyOrder.order.senderAddress,
-      buyerUserData,
-      buyOrder.collateralIndex,
+      filledOrder.order.senderAddress,
+      userData,
+      filledOrder.collateralIndex,
       amount,
       int256(filledPrice),
       soLevel_,
-      buyOrder.order.leverage,
-      fullPrices,
-      historyTimestamp,
-      historySearchHint
-    );
-    _changePosition(
-      index,
-      sellOrder.order.senderAddress,
-      sellerUserData,
-      sellOrder.collateralIndex,
-      -amount,
-      int256(filledPrice),
-      soLevel_,
-      sellOrder.order.leverage,
+      filledOrder.order.leverage,
       fullPrices,
       historyTimestamp,
       historySearchHint
     );
 
-    emit NewTrade(index, buyOrder.order.senderAddress, sellOrder.order.senderAddress, filledPrice, filledAmount);
+    emit NewTrade(
+      index,
+      filledOrder.order.senderAddress,
+      complimentaryOrder.order.senderAddress,
+      filledPrice,
+      filledAmount
+    );
   }
 
   function _fillOrder(bytes32 orderDigest, uint256 orderAmount, uint256 filledAmount) internal {
     uint256 newFilledAmount = filledAmounts[orderDigest] + filledAmount;
     if (newFilledAmount > orderAmount) revert OrderIsAlreadyFilled();
+
     filledAmounts[orderDigest] = newFilledAmount;
+  }
+
+  function _fillSettlement(
+    bytes32 orderDigest,
+    bytes32 complimentaryDigest,
+    bytes32 settlementId,
+    uint256 orderId,
+    uint256 complimentaryId
+  ) internal {
+    bytes32 storedComplimentaryDigest = filledSettlements[settlementId];
+    bool closed;
+    if (storedComplimentaryDigest == bytes32(0)) {
+      filledSettlements[settlementId] = orderDigest;
+      totalOpenedOrders++;
+    } else {
+      if (storedComplimentaryDigest != complimentaryDigest) revert SettlementMismatch();
+      totalSettledOrders++;
+      closed = true;
+    }
+    emit OrderSettled(settlementId, orderId, complimentaryId, closed);
   }
 
   function collectFr(
