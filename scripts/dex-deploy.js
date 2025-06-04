@@ -8,20 +8,42 @@ async function main() {
 
   const orderLib = await deployAndVerify('OrderValidationLib', []);
   const sessions = await deployAndVerify('SessionManager', [deployer.address]);
-  const libraries = { libraries: { OrderValidationLib: await orderLib.getAddress() } };
   const vault = await deployAndVerify('EveVault', [deployer.address]);
+  const calc = await deployAndVerify('MarginCalc', [
+    deployer.address,
+    config.marginCalcConfig.maxMargin,
+    config.marginCalcConfig.minMargin,
+  ]);
+  const oracle = await deployAndVerify('PriceOraclePyth', [
+    config.pythOracleConfig.pythAddress,
+    config.pythOracleConfig.usdtAddress,
+    config.pythOracleConfig.usdtPythId,
+    config.pythOracleConfig.maxWindow,
+    deployer.address,
+  ]);
+  const markPriceOracle = await deployAndVerify('MarkPriceOracle', [
+    deployer.address,
+    config.markPriceOracleConfig.operatorAddress,
+    config.markPriceOracleConfig.defaultWindow,
+  ]);
+  const libraries = { libraries: { OrderValidationLib: await orderLib.getAddress() } };
   const deposit = await deployProxyWithLibraries('DepositDEX', [], libraries, false, deployer.address);
   const dex = await deployProxyWithLibraries(
     'EveDEX',
     [
       deployer.address,
-      await deposit.getAddress(),
-      await sessions.getAddress(),
-      config.fundingRateAddress,
-      config.maxOpenPositions,
-      config.soLevel,
-      config.withdrawMarginLevel,
-      config.liquidationFeePercent,
+      {
+        depositDex: await deposit.getAddress(),
+        sessionManager: await sessions.getAddress(),
+        marginCalculator: await calc.getAddress(),
+        fundingRateAccount: config.eveDexConfig.fundingRateAddress,
+        staticFundingRateAccount: config.eveDexConfig.fundingRateAddress,
+        markPriceOracle: await markPriceOracle.getAddress(),
+        maxOpenPositions: config.eveDexConfig.maxOpenPositions,
+        soLevel: config.eveDexConfig.soLevel,
+        withdrawMarginLevel: config.eveDexConfig.withdrawMarginLevel,
+        liquidationFeePercent: config.eveDexConfig.liquidationFeePercent,
+      },
     ],
     libraries,
     true,
@@ -29,14 +51,19 @@ async function main() {
   );
   console.log('EveDEX is initialized');
 
-  await deposit.initialize(await dex.getAddress(), await vault.getAddress());
+  await deposit.initialize(
+    await dex.getAddress(),
+    await vault.getAddress(),
+    await oracle.getAddress(),
+    config.depositDex.allowedSlippage,
+  );
   console.log('DepositDEX is initialized');
 
-  await dex.grantRole(ethers.ZeroHash, config.defaultAdmin);
-  console.log(`EveDEX: default admin added: ${config.defaultAdmin}`);
+  await dex.grantRole(ethers.ZeroHash, config.eveDexConfig.eveDexConfig.defaultAdmin);
+  console.log(`EveDEX: default admin added: ${config.eveDexConfig.defaultAdmin}`);
   const matcherRole = await dex.MATCHER_ROLE();
-  await dex.grantRole(matcherRole, config.defaultMatcher);
-  console.log(`EveDEX: default matcher added: ${config.defaultMatcher}`);
+  await dex.grantRole(matcherRole, config.eveDexConfig.eveDexConfig.defaultMatcher);
+  console.log(`EveDEX: default matcher added: ${config.eveDexConfig.defaultMatcher}`);
   const validatorRole = await sessions.VALIDATOR_ROLE();
   await sessions.grantRole(validatorRole, await dex.getAddress());
   await sessions.grantRole(validatorRole, await deposit.getAddress());

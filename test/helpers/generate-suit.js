@@ -29,6 +29,7 @@ const prepareWallets = async () => {
     carolSessionWallet,
     liquidatorSessionWallet,
     staticFundingRateAccount,
+    markPriceOracleOperator,
   ] = await viem.getWalletClients();
   return {
     owner,
@@ -43,6 +44,7 @@ const prepareWallets = async () => {
     carolSessionWallet,
     liquidatorSessionWallet,
     staticFundingRateAccount,
+    markPriceOracleOperator,
   };
 };
 
@@ -68,8 +70,10 @@ const prepareContracts = async ({
   initInstrumentConfigs,
   initMarginCalcConfig,
   oracleConfig,
+  markPriceOracleConfig,
   initStaticFr,
   staticFundingRateAccount,
+  markPriceOracleOperator,
 }) => {
   const [orderLib, sessions, vault, marginCalculator, pythMock] = await Promise.all([
     viemDeployWithLibraries('OrderValidationLib', []),
@@ -89,6 +93,11 @@ const prepareContracts = async ({
     oracleConfig.window, // max time window of the price confidence,
     owner.account.address,
   ]);
+  const markPriceOracle = await viemDeployWithLibraries('MarkPriceOracle', [
+    owner.account.address,
+    markPriceOracleOperator.account.address,
+    markPriceOracleConfig.window, // default time period to trust reported prices
+  ]);
   const depositDexLibraries = { libraries: { OrderValidationLib: orderLib.address } };
   const depositDex = await viemDeployProxyWithLibraries(
     'DepositDEX',
@@ -107,6 +116,7 @@ const prepareContracts = async ({
         marginCalculator: marginCalculator.address,
         fundingRateAccount: fundingRateAccount.account.address,
         staticFundingRateAccount: staticFundingRateAccount.account.address,
+        markPriceOracle: markPriceOracle.address,
         maxOpenPositions: eveDexConfig.maxOpenPositions,
         soLevel: eveDexConfig.soLevel,
         withdrawMarginLevel: eveDexConfig.withdrawMarginLevel,
@@ -152,7 +162,7 @@ const prepareContracts = async ({
     ]);
   }
 
-  return { orderLib, sessions, vault, depositDex, eveDex, marginCalculator, oracle, pythMock };
+  return { orderLib, sessions, vault, depositDex, eveDex, marginCalculator, oracle, pythMock, markPriceOracle };
 };
 
 const populateDefaults = (config) => {
@@ -192,6 +202,9 @@ const populateDefaults = (config) => {
   }
   if (!config.oracleConfig) {
     config.oracleConfig = { window: maxUint256 };
+  }
+  if (!config.markPriceOracleConfig) {
+    config.markPriceOracleConfig = { window: 100n };
   }
   if (!config.initStaticFr) {
     config.initStaticFr = {
@@ -239,6 +252,11 @@ const populateDefaults = (config) => {
  */
 
 /**
+ * @typedef {Object} MarkPriceOracleConfig
+ * @property {bigint} window - The default cooldown in seconds after which the reported prices can be trusted.
+ */
+
+/**
  * @typedef {Object} StaticFr
  * @property {number} staticFr   - The static funding rate.
  * @property {number} timestamp  - The timestamp at which the static funding rate was set.
@@ -250,11 +268,12 @@ const populateDefaults = (config) => {
  * defaults will be populated internally.
  *
  * @typedef {Object} SuitConfig
- * @property {EveDexConfig}        [eveDexConfig]         - Configures EveDex parameters.
- * @property {InstrumentConfig[]}  [initInstrumentConfigs] - Array of initial instrument configurations.
- * @property {MarginCalcConfig}    [initMarginCalcConfig]  - Configuration for margin calculations.
- * @property {OracleConfig}        [oracleConfig]          - Pyth price oracle configuration.
- * @property {StaticFr}            [initStaticFr]          - Static funding rate and timestamp.
+ * @property {EveDexConfig}          [eveDexConfig]         - Configures EveDex parameters.
+ * @property {InstrumentConfig[]}    [initInstrumentConfigs] - Array of initial instrument configurations.
+ * @property {MarginCalcConfig}      [initMarginCalcConfig]  - Configuration for margin calculations.
+ * @property {OracleConfig}          [oracleConfig]          - Pyth price oracle configuration.
+ * @property {MarkPriceOracleConfig} [markPriceOracleConfig] - Mark price oracle configuration.
+ * @property {StaticFr}              [initStaticFr]          - Static funding rate and timestamp.
  */
 
 /**
@@ -288,6 +307,7 @@ const generateSuit = async (id, config = {}) => {
     carolSessionWallet,
     liquidatorSessionWallet,
     staticFundingRateAccount,
+    markPriceOracleOperator,
   } = await prepareWallets();
   const { usdtToken, btcToken } = await prepareTokens([
     owner,
@@ -299,19 +319,22 @@ const generateSuit = async (id, config = {}) => {
     staticFundingRateAccount,
     matcher,
   ]);
-  const { orderLib, sessions, vault, depositDex, eveDex, marginCalculator, pythMock, oracle } = await prepareContracts({
-    owner,
-    matcher,
-    usdtToken,
-    btcToken,
-    fundingRateAccount,
-    staticFundingRateAccount,
-    oracleConfig: config.oracleConfig,
-    eveDexConfig: config.eveDexConfig,
-    initInstrumentConfigs: config.initInstrumentConfigs,
-    initMarginCalcConfig: config.initMarginCalcConfig,
-    initStaticFr: config.initStaticFr,
-  });
+  const { orderLib, sessions, vault, depositDex, eveDex, marginCalculator, pythMock, oracle, markPriceOracle } =
+    await prepareContracts({
+      owner,
+      matcher,
+      usdtToken,
+      btcToken,
+      fundingRateAccount,
+      staticFundingRateAccount,
+      markPriceOracleOperator,
+      oracleConfig: config.oracleConfig,
+      markPriceOracleConfig: config.markPriceOracleConfig,
+      eveDexConfig: config.eveDexConfig,
+      initInstrumentConfigs: config.initInstrumentConfigs,
+      initMarginCalcConfig: config.initMarginCalcConfig,
+      initStaticFr: config.initStaticFr,
+    });
   suits[id] = {
     owner,
     alice,
@@ -320,6 +343,7 @@ const generateSuit = async (id, config = {}) => {
     liquidator,
     fundingRateAccount,
     staticFundingRateAccount,
+    markPriceOracleOperator,
     matcher,
     usdtToken,
     btcToken,
@@ -335,6 +359,7 @@ const generateSuit = async (id, config = {}) => {
     marginCalculator,
     oracle,
     pythMock,
+    markPriceOracle,
   };
 
   return suits[id];

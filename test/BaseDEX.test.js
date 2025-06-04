@@ -5,16 +5,27 @@ const { PYTH_IDS, ALLOWED_SLIPPAGE_DEPOSIT_DEX, EVEDEX_MARGIN_PRECISION } = requ
 const { maxUint128, maxUint256 } = require('viem');
 
 describe('EVEDEX contract', function () {
-  let depositDex, vault, eveDex, sessions, token, tokenAddress, orderLib, marginCalculator, oracle, pythMock;
+  let depositDex,
+    vault,
+    eveDex,
+    sessions,
+    token,
+    tokenAddress,
+    orderLib,
+    marginCalculator,
+    oracle,
+    pythMock,
+    markPriceOracle;
 
-  let owner, alice, bob, liquidator, fundingRateAccount, staticFundingRateAccount, matcher;
+  let owner, alice, bob, liquidator, fundingRateAccount, staticFundingRateAccount, matcher, markPriceOracleOperator;
 
   before(async function () {
     await upgrades.silenceWarnings();
   });
 
   beforeEach(async function () {
-    [owner, alice, bob, liquidator, fundingRateAccount, staticFundingRateAccount, matcher] = await ethers.getSigners();
+    [owner, alice, bob, liquidator, fundingRateAccount, staticFundingRateAccount, matcher, markPriceOracleOperator] =
+      await ethers.getSigners();
 
     orderLib = await deployWithLibraries('OrderValidationLib', []);
     sessions = await deployWithLibraries('SessionManager', [owner.address]);
@@ -40,6 +51,11 @@ describe('EVEDEX contract', function () {
       maxUint256, // max time window of the price confidence,
       owner.address,
     ]);
+    markPriceOracle = await deployWithLibraries('MarkPriceOracle', [
+      owner.address,
+      markPriceOracleOperator.address,
+      100n,
+    ]);
 
     eveDex = await deployProxyWithLibraries(
       'EVEDEX',
@@ -51,6 +67,7 @@ describe('EVEDEX contract', function () {
           marginCalculator: await marginCalculator.getAddress(),
           fundingRateAccount: fundingRateAccount.address,
           staticFundingRateAccount: staticFundingRateAccount.address,
+          markPriceOracle: await markPriceOracle.getAddress(),
           maxOpenPositions: 128,
           soLevel: 0.8 * EVEDEX_MARGIN_PRECISION,
           withdrawMarginLevel: 1 * EVEDEX_MARGIN_PRECISION,
@@ -91,7 +108,8 @@ describe('EVEDEX contract', function () {
     await eveDex.connect(matcher).setFR(0, 100, 100, 0, 300);
     await eveDex.connect(matcher).setFR(0, 1000, 1000, 0, 400);
 
-    expect((await eveDex.getFundingRateData(0, 0, 999))[3][3]).to.equal(400);
+    expect((await eveDex.getFundingRateData(0, 0, 999))[1][3]).to.equal(400);
+    expect((await eveDex.getFundingRateData(0, 0, 999))[0][2][1]).to.equal(100);
     await expect(eveDex.getTotalFR(0, 99, 0))
       .to.be.revertedWithCustomError(eveDex, 'SearchWithHintFailed')
       .withArgs(0);

@@ -24,6 +24,7 @@ abstract contract StorageDEX is IStorageDEX {
 
   address public staticFundingRateAccount;
   address public fundingRateAccount;
+  address public markPriceOracle;
 
   int256 public soLevel; // Minimal sufficient percent of margin at which a position can not be liquidated
   int256 public withdrawMarginLevel; // Minimal sufficient percent of margin after withdraw when account has open position

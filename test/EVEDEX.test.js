@@ -19,9 +19,19 @@ const {
 const { maxUint128, maxUint256 } = require('viem');
 
 describe('EVEDEX contract', function () {
-  let depositDex, vault, eveDex, sessions, token, tokenAddress, orderLib;
+  let depositDex,
+    vault,
+    eveDex,
+    sessions,
+    token,
+    tokenAddress,
+    orderLib,
+    marginCalculator,
+    oracle,
+    pythMock,
+    markPriceOracle;
 
-  let owner, alice, bob, liquidator, fundingRateAccount, staticFundingRateAccount, matcher;
+  let owner, alice, bob, liquidator, fundingRateAccount, staticFundingRateAccount, matcher, markPriceOracleOperator;
 
   const createSignedWithdrawOrder = async (signer, collateral, amount, session, expiration) => {
     const withdrawalOrder = {
@@ -43,7 +53,8 @@ describe('EVEDEX contract', function () {
   });
 
   beforeEach(async function () {
-    [owner, alice, bob, liquidator, fundingRateAccount, staticFundingRateAccount, matcher] = await ethers.getSigners();
+    [owner, alice, bob, liquidator, fundingRateAccount, staticFundingRateAccount, matcher, markPriceOracleOperator] =
+      await ethers.getSigners();
 
     orderLib = await deployWithLibraries('OrderValidationLib', []);
     sessions = await deployWithLibraries('SessionManager', [owner.address]);
@@ -69,6 +80,11 @@ describe('EVEDEX contract', function () {
       maxUint256, // max time window of the price confidence,
       owner.address,
     ]);
+    markPriceOracle = await deployWithLibraries('MarkPriceOracle', [
+      owner.address,
+      markPriceOracleOperator.address,
+      100n,
+    ]);
 
     eveDex = await deployProxyWithLibraries(
       'EVEDEX',
@@ -80,6 +96,7 @@ describe('EVEDEX contract', function () {
           marginCalculator: await marginCalculator.getAddress(),
           fundingRateAccount: fundingRateAccount.address,
           staticFundingRateAccount: staticFundingRateAccount.address,
+          markPriceOracle: await markPriceOracle.getAddress(),
           maxOpenPositions: 128,
           soLevel: 0.8 * EVEDEX_MARGIN_PRECISION,
           withdrawMarginLevel: 1 * EVEDEX_MARGIN_PRECISION,
@@ -198,7 +215,7 @@ describe('EVEDEX contract', function () {
         price: 1000000000000,
       },
     ];
-    const historyTimestamp = time.latest();
+    const historyTimestamp = await time.latest();
     await eveDex.connect(matcher).fillOrder(
       buyOrderExt,
       sellOrderExt,
@@ -229,7 +246,7 @@ describe('EVEDEX contract', function () {
     await depositDex.connect(alice).depositCollateral(tokenAddress, amount);
     await depositDex.connect(bob).depositCollateral(tokenAddress, amount);
 
-    const creationTime = Math.floor(Date.now() / 1000);
+    const creationTime = await Math.floor(Date.now() / 1000);
     const orderAmount = await ethers.parseEther('4.166'); // 4.167 * 3000 (price) / 100 (leverage) * 80 (soLevel) = 100 (balance) * 1.0 (collateralPrice) * 100 (100%)
     const orderPrice = 300000000000;
 
@@ -284,7 +301,7 @@ describe('EVEDEX contract', function () {
       },
     ];
 
-    const historyTimestamp = await time.latest();
+    const historyTimestamp = await Math.floor(Date.now() / 1000);
     const partAmount = orderAmount / 10n;
 
     await eveDex.connect(matcher).fillOrder(

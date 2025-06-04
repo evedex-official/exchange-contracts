@@ -284,7 +284,8 @@ describe(flow, () => {
       ],
       functionName: 'getFundingRateData',
     });
-    const { longFRStored, shortFRStored, lastFRUpdateTime } = frs.pop();
+    const lastFRUpdateTime = frs[1].pop();
+    const { longFRStored, shortFRStored, staticFr } = frs[0].pop();
     expect(longFRStored).to.equal(NEW_BTC_FR_LONG);
     expect(shortFRStored).to.equal(NEW_BTC_FR_SHORT);
     expect(lastFRUpdateTime).to.equal(newFrTimestamp);

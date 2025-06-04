@@ -9,17 +9,18 @@ struct FundingRateInfo {
   int72 longFRStored; // Accumulator for frLong
   int72 shortFRStored; // Accumulator for frShort
   int72 staticFr; // Static percentage of funding rate
-  uint40 lastFRUpdateTime; // Last funding rate update time
-}
-
-struct InstrumentInfo {
-  InstrumentData instrumentData;
-  FundingRateInfo[] fundingRateData;
 }
 
 struct InstrumentData {
   uint8 leverage; // Max available leverage
   string ticker; // Ticker of underlying asset
+}
+
+struct InstrumentInfo {
+  uint8 leverage; // Max available leverage
+  string ticker; // Ticker of underlying asset
+  uint256[] historyTimestamps;
+  mapping(uint256 timestamp => FundingRateInfo fundingRate) fundingRateData;
 }
 
 struct BasicParams {
@@ -28,6 +29,7 @@ struct BasicParams {
   IMarginCalc marginCalculator;
   address fundingRateAccount;
   address staticFundingRateAccount;
+  address markPriceOracle;
   uint256 maxOpenPositions;
   int112 soLevel;
   int112 withdrawMarginLevel;
@@ -58,7 +60,7 @@ interface IBaseDEX {
     uint256 index,
     uint256 start,
     uint256 length
-  ) external view returns (FundingRateInfo[] memory);
+  ) external view returns (FundingRateInfo[] memory, uint256[] memory);
 
   function setBasicParams(BasicParams calldata params_) external;
 
@@ -71,8 +73,8 @@ interface IBaseDEX {
     int72 newFRLong,
     int72 newFRShort,
     uint72 newStaticFR,
-    uint40 timestamp
+    uint256 timestamp
   ) external;
 
-  function setFR(uint256 index, int72 newFRLong, int72 newFRShort, uint72 newStaticFR, uint40 timestamp) external;
+  function setFR(uint256 index, int72 newFRLong, int72 newFRShort, uint72 newStaticFR, uint256 timestamp) external;
 }

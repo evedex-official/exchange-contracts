@@ -7,6 +7,7 @@ import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/ut
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {StorageDEX} from "./StorageDEX.sol";
+import {ArraySearch} from "../lib/ArraySearch.sol";
 import "../lib/OrderValidationLib.sol";
 import "../interfaces/IBaseDEX.sol";
 
@@ -28,29 +29,32 @@ abstract contract BaseDEX is
     _grantRole(DEFAULT_ADMIN_ROLE, initialOwner_);
   }
 
-  function getInstrumentData(uint256 index) external view returns (InstrumentData memory) {
-    return _instrumentInfo[index].instrumentData;
+  function getInstrumentData(uint256 index) external view returns (InstrumentData memory retVal) {
+    return InstrumentData(_instrumentInfo[index].leverage, _instrumentInfo[index].ticker);
   }
 
   function getFundingRateData(
     uint256 index,
     uint256 start,
     uint256 length
-  ) external view returns (FundingRateInfo[] memory) {
+  ) external view returns (FundingRateInfo[] memory, uint256[] memory) {
     InstrumentInfo storage instrument = _instrumentInfo[index];
-    uint256 max = instrument.fundingRateData.length;
+    uint256 max = instrument.historyTimestamps.length;
     if (start >= max) revert InvalidPositionsRequest(max);
     length = start + length < max ? length : max - start;
     uint256 finish = start + length;
     FundingRateInfo[] memory fundingRates = new FundingRateInfo[](length);
+    uint256[] memory startingTimestamps = new uint256[](length);
     for (uint256 i = start; i < finish; i++) {
-      fundingRates[i] = instrument.fundingRateData[i];
+      uint256 timestamp = instrument.historyTimestamps[i];
+      fundingRates[i] = instrument.fundingRateData[timestamp];
+      startingTimestamps[i] = timestamp;
     }
-    return fundingRates;
+    return (fundingRates, startingTimestamps);
   }
 
   function _getInstrumentLeverage(uint256 index) internal view returns (uint8) {
-    return _instrumentInfo[index].instrumentData.leverage;
+    return _instrumentInfo[index].leverage;
   }
 
   function setBasicParams(BasicParams calldata params_) external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -67,12 +71,15 @@ abstract contract BaseDEX is
     soLevel = params_.soLevel;
     maxOpenPositions = params_.maxOpenPositions;
     liquidationFeePercent = params_.liquidationFeePercent;
+    markPriceOracle = params_.markPriceOracle;
     emit BasicParamsUpdate(params_);
   }
 
   function deleteInstrument() external onlyRole(DEFAULT_ADMIN_ROLE) {
-    InstrumentInfo memory empty;
-    _instrumentInfo[--instrumentsLength] = empty;
+    InstrumentInfo storage instrument = _instrumentInfo[--instrumentsLength];
+    delete instrument.leverage;
+    delete instrument.ticker;
+    delete instrument.historyTimestamps;
     emit InstrumentDeleted(instrumentsLength);
   }
 
@@ -83,7 +90,7 @@ abstract contract BaseDEX is
     int72 newFRLong,
     int72 newFRShort,
     uint72 newStaticFR,
-    uint40 timestamp
+    uint256 timestamp
   ) external onlyRole(DEFAULT_ADMIN_ROLE) {
     uint256 len = instrumentsLength;
     if (len < index) revert InvalidIndex();
@@ -98,11 +105,11 @@ abstract contract BaseDEX is
     int72 newFRLong,
     int72 newFRShort,
     uint72 newStaticFR,
-    uint40 timestamp
+    uint256 timestamp
   ) internal {
-    InstrumentInfo storage instrumentInfo_ = _instrumentInfo[index];
-    instrumentInfo_.instrumentData.ticker = ticker;
-    instrumentInfo_.instrumentData.leverage = leverage;
+    InstrumentInfo storage instrument = _instrumentInfo[index];
+    instrument.ticker = ticker;
+    instrument.leverage = leverage;
     _setFR(index, newFRLong, newFRShort, newStaticFR, timestamp);
     emit InstrumentUpdate(index, ticker, leverage);
   }
@@ -113,22 +120,25 @@ abstract contract BaseDEX is
     int72 newFRLong,
     int72 newFRShort,
     uint72 newStaticFR,
-    uint40 timestamp
+    uint256 timestamp
   ) external onlyRole(MATCHER_ROLE) {
     _setFR(index, newFRLong, newFRShort, newStaticFR, timestamp);
   }
 
-  function _setFR(uint256 index, int72 newFRLong, int72 newFRShort, uint72 newStaticFR, uint40 timestamp) internal {
-    uint256 len = _instrumentInfo[index].fundingRateData.length;
+  function _setFR(uint256 index, int72 newFRLong, int72 newFRShort, uint72 newStaticFR, uint256 timestamp) internal {
+    InstrumentInfo storage instrument = _instrumentInfo[index];
+    uint256 len = instrument.historyTimestamps.length;
     if (len > 0) {
-      if (timestamp <= _instrumentInfo[index].fundingRateData[len - 1].lastFRUpdateTime) revert InvalidFRTimestamp();
+      unchecked {
+        if (timestamp <= instrument.historyTimestamps[len - 1]) revert InvalidFRTimestamp();
+      }
     }
     FundingRateInfo memory newFundingRateInfo;
-    newFundingRateInfo.lastFRUpdateTime = timestamp;
     newFundingRateInfo.longFRStored = newFRLong;
     newFundingRateInfo.shortFRStored = newFRShort;
     newFundingRateInfo.staticFr = int72(newStaticFR);
-    _instrumentInfo[index].fundingRateData.push(newFundingRateInfo);
+    instrument.historyTimestamps.push(timestamp);
+    instrument.fundingRateData[timestamp] = newFundingRateInfo;
     emit NewFundingRate(index, newFRLong, newFRShort, newStaticFR, len);
   }
 
@@ -137,24 +147,11 @@ abstract contract BaseDEX is
     uint256 timestamp,
     uint256 searchHint
   ) internal view returns (FundingRateInfo memory) {
-    uint256 len = _instrumentInfo[index].fundingRateData.length;
-    if (len == 0) revert EmptyArrayToSearch();
-    if (_instrumentInfo[index].fundingRateData[searchHint].lastFRUpdateTime > timestamp)
-      revert SearchWithHintFailed(searchHint);
+    InstrumentInfo storage instrument = _instrumentInfo[index];
+    uint256 found = ArraySearch.upperBoundHint(instrument.historyTimestamps, timestamp, searchHint);
+    if (found == searchHint) revert SearchWithHintFailed(searchHint);
 
-    uint256 low = searchHint;
-    uint256 high = len;
-    while (low < high) {
-      uint256 mid = Math.average(low, high);
-      if (_instrumentInfo[index].fundingRateData[mid].lastFRUpdateTime > timestamp) {
-        high = mid;
-      } else {
-        unchecked {
-          low = mid + 1;
-        }
-      }
-    }
-    return _instrumentInfo[index].fundingRateData[--low];
+    return instrument.fundingRateData[instrument.historyTimestamps[--found]];
   }
 
   function _getBalance(address account_, address collateral_) internal view returns (int256 balance) {

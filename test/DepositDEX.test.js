@@ -6,9 +6,20 @@ const { maxUint128, maxUint256 } = require('viem');
 const { PYTH_IDS, ALLOWED_SLIPPAGE_DEPOSIT_DEX, EVEDEX_MARGIN_PRECISION } = require('./helpers/constants');
 
 describe('DepositDex contract', function () {
-  let depositDex, vault, eveDex, sessions, usdt, btcToken, tokenAddress, orderLib, marginCalculator, oracle, pythMock;
+  let depositDex,
+    vault,
+    eveDex,
+    sessions,
+    usdt,
+    btcToken,
+    tokenAddress,
+    orderLib,
+    marginCalculator,
+    oracle,
+    pythMock,
+    markPriceOracle;
 
-  let owner, alice, bob, liquidator, fundingRateAccount, staticFundingRateAccount, matcher;
+  let owner, alice, bob, liquidator, fundingRateAccount, staticFundingRateAccount, matcher, markPriceOracleOperator;
 
   const createSignedWithdrawOrder = async (signer, collateral, amount, session, expiration) => {
     const withdrawalOrder = {
@@ -30,7 +41,8 @@ describe('DepositDex contract', function () {
   });
 
   beforeEach(async function () {
-    [owner, alice, bob, liquidator, fundingRateAccount, staticFundingRateAccount, matcher] = await ethers.getSigners();
+    [owner, alice, bob, liquidator, fundingRateAccount, staticFundingRateAccount, matcher, markPriceOracleOperator] =
+      await ethers.getSigners();
 
     orderLib = await deployWithLibraries('OrderValidationLib', []);
     sessions = await deployWithLibraries('SessionManager', [owner.address]);
@@ -57,6 +69,11 @@ describe('DepositDex contract', function () {
       maxUint256, // max time window of the price confidence,
       owner.address,
     ]);
+    markPriceOracle = await deployWithLibraries('MarkPriceOracle', [
+      owner.address,
+      markPriceOracleOperator.address,
+      100n,
+    ]);
 
     eveDex = await deployProxyWithLibraries(
       'EVEDEX',
@@ -68,6 +85,7 @@ describe('DepositDex contract', function () {
           marginCalculator: await marginCalculator.getAddress(),
           fundingRateAccount: fundingRateAccount.address,
           staticFundingRateAccount: staticFundingRateAccount.address,
+          markPriceOracle: await markPriceOracle.getAddress(),
           maxOpenPositions: 128,
           soLevel: 0.8 * EVEDEX_MARGIN_PRECISION,
           withdrawMarginLevel: 1 * EVEDEX_MARGIN_PRECISION,

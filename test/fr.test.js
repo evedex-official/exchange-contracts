@@ -64,9 +64,9 @@ describe('fr tests', async () => {
       account: matcher.account.address,
     });
     const frData = await eveDex.read.getFundingRateData([BTC_USD_INDEX, 0, maxUint256]);
-    expect(frData.at(-1).longFRStored).to.equal(longFr);
-    expect(frData.at(-1).shortFRStored).to.equal(shortFr);
-    expect(frData.at(-1).staticFr).to.equal(staticFr);
+    expect(frData[0].at(-1).longFRStored).to.equal(longFr);
+    expect(frData[0].at(-1).shortFRStored).to.equal(shortFr);
+    expect(frData[0].at(-1).staticFr).to.equal(staticFr);
   });
 
   it('should collect fr', async () => {
