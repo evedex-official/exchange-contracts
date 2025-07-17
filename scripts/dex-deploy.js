@@ -9,7 +9,7 @@ async function main() {
   const orderLib = await deployAndVerify('OrderValidationLib', []);
   const sessions = await deployAndVerify('SessionManager', [deployer.address]);
   const vault = await deployAndVerify('EveVault', [deployer.address]);
-  const calc = await deployAndVerify('MarginCalc', [
+  const calc = await deployProxy('MarginCalc', [
     deployer.address,
     config.marginCalcConfig.maxMargin,
     config.marginCalcConfig.minMargin,
@@ -29,7 +29,7 @@ async function main() {
   const libraries = { libraries: { OrderValidationLib: await orderLib.getAddress() } };
   const deposit = await deployProxyWithLibraries('DepositDEX', [], libraries, false, deployer.address);
   const dex = await deployProxyWithLibraries(
-    'EveDEX',
+    'EVEDEX',
     [
       deployer.address,
       {
@@ -59,10 +59,10 @@ async function main() {
   );
   console.log('DepositDEX is initialized');
 
-  await dex.grantRole(ethers.ZeroHash, config.eveDexConfig.eveDexConfig.defaultAdmin);
+  await dex.grantRole(ethers.ZeroHash, config.eveDexConfig.defaultAdmin);
   console.log(`EveDEX: default admin added: ${config.eveDexConfig.defaultAdmin}`);
   const matcherRole = await dex.MATCHER_ROLE();
-  await dex.grantRole(matcherRole, config.eveDexConfig.eveDexConfig.defaultMatcher);
+  await dex.grantRole(matcherRole, config.eveDexConfig.defaultMatcher);
   console.log(`EveDEX: default matcher added: ${config.eveDexConfig.defaultMatcher}`);
   const validatorRole = await sessions.VALIDATOR_ROLE();
   await sessions.grantRole(validatorRole, await dex.getAddress());

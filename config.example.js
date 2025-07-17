@@ -2,9 +2,9 @@ module.exports = {
   // global constants
 
   // Private key that will be used for EventHorizon testnets
-  DEPLOYER: ['0000000000000000000000000000000000000000000000000000000000000000'],
-  EVENTUM_TESTNET_NODE: 'https://testnet-rpc.eh-dev.app/',
-  API_BLOCKSCOUT: 'blockscout...',
+  DEPLOYER: ['0x0000000000000000000000000000000000000000000000000000000000000000'],
+  EVENTUM_TESTNET_NODE: 'https://testnet-rpc.evedex.tech',
+  API_BLOCKSCOUT: 'https://testnet-blockscout.evedex.tech/api',
 
   // deploy constants that used in scripts
   eveDexConfig: {
@@ -25,7 +25,7 @@ module.exports = {
   pythOracleConfig: {
     pythAddress: '0x0000000000000000000000000000000000000000',
     usdtAddress: '0x0000000000000000000000000000000000000000',
-    usdtPythId: '0000000000000000000000000000000000000000000000000000000000000000',
+    usdtPythId: '0x0000000000000000000000000000000000000000000000000000000000000000',
     maxWindow: 86400n, // Immutable max window for pyth id configs
   },
 

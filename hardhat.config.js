@@ -41,7 +41,7 @@ module.exports = {
     ],
   },
   sourcify: {
-    enabled: true,
+    enabled: false,
     // Optional: specify a different Sourcify server
     apiUrl: 'https://sourcify.dev/server',
     // Optional: specify a different Sourcify repository
@@ -116,8 +116,8 @@ module.exports = {
         network: 'eventum_demo',
         chainId: 16182,
         urls: {
-          apiURL: 'https://testnet-blockscout.eh-dev.app/api',
-          browserURL: 'https://testnet-blockscout.eh-dev.app',
+          apiURL: 'https://testnet-blockscout.evedex.tech/api',
+          browserURL: 'https://testnet-blockscout.evedex.tech',
         },
       },
     ],
