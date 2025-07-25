@@ -24,7 +24,7 @@ module.exports = {
   PRECISION_DECIMALS_EVEDEX: 10n ** 8n,
   ORDER_TYPEHASH: keccak256(
     toBytes(
-      'Order(uint256 orderId,address senderAddress,address matcherAddress,uint256 instrumentIndex,uint256 amount,uint256 price,uint16 leverage,uint256 matcherFee,uint256 creationTime,uint8 side)',
+      'Order(uint256 orderId,address senderAddress,address matcherAddress,uint256 instrumentIndex,uint256 amount,uint256 price,bool limited,uint16 leverage,uint256 creationTime,uint8 side)',
     ),
   ),
   PYTH_IDS: {

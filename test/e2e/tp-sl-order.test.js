@@ -84,6 +84,7 @@ describe(flow, () => {
       side: BUY_SIDE,
       amount: MARKET_ORDER_AMOUNT,
       price: BTC_INSTRUMENT_INITIAL_PRICE,
+      limited: true,
       leverage: ORDER_LEVERAGE,
       userSession: aliceSessionWallet.account.address,
     });
@@ -95,6 +96,7 @@ describe(flow, () => {
       side: SELL_SIDE,
       amount: TP_ORDER_AMOUNT,
       price: TP_ORDER_PRICE,
+      limited: false,
       leverage: ORDER_LEVERAGE,
       userSession: aliceSessionWallet.account.address,
     });
@@ -106,6 +108,7 @@ describe(flow, () => {
       side: SELL_SIDE,
       amount: SL_ORDER_AMOUNT,
       price: SL_ORDER_PRICE,
+      limited: false,
       leverage: ORDER_LEVERAGE,
       userSession: aliceSessionWallet.account.address,
     });
@@ -129,6 +132,7 @@ describe(flow, () => {
       side: SELL_SIDE,
       amount: MARKET_ORDER_AMOUNT,
       price: BTC_INSTRUMENT_INITIAL_PRICE,
+      limited: true,
       leverage: ORDER_LEVERAGE,
       userSession: bobSessionWallet.account.address,
     });
@@ -171,6 +175,7 @@ describe(flow, () => {
         bobOrderExt,
         BTC_INSTRUMENT_INITIAL_PRICE,
         aliceMarketOrderExt.order.amount,
+        0n,
         fullPrices,
         historyTimestamp,
         historySearchHint,
@@ -185,6 +190,7 @@ describe(flow, () => {
         aliceMarketOrderExt,
         BTC_INSTRUMENT_INITIAL_PRICE,
         aliceMarketOrderExt.order.amount,
+        0n,
         fullPrices,
         historyTimestamp,
         historySearchHint,
@@ -263,6 +269,7 @@ describe(flow, () => {
         aliceOrderExt,
         instrumentPrice,
         bobOrderExt.order.amount,
+        0n,
         fullPrices,
         historyTimestamp,
         historySearchHint,
@@ -277,6 +284,7 @@ describe(flow, () => {
         bobOrderExt,
         instrumentPrice,
         bobOrderExt.order.amount,
+        0n,
         fullPrices,
         historyTimestamp,
         historySearchHint,

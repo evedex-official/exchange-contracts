@@ -13,6 +13,8 @@ module.exports = {
     fundingRateAddress: '0xFa02EDF9ebA53Ae811650e409A1da2E6103CDB54',
     staticFundingRateAccount: '0xFa02EDF9ebA53Ae811650e409A1da2E6103CDB54',
     maxOpenPositions: 128n,
+    allowedOverloadTPSL: 1000000000n, //1e8 = up to 100% of position is allowed to flip in side via TPSL
+    maxMatcherFee: 50000000n, //1e8 = up to 100% max matcher fee is allowed as global constant
     soLevel: 80n,
     withdrawMarginLevel: 100n,
     liquidationFeePercent: 0,

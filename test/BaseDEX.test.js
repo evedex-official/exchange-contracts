@@ -1,15 +1,20 @@
 const { ethers } = require('hardhat');
 const { expect } = require('chai');
 const { deployProxyWithLibraries, deployWithLibraries, deployProxy } = require('./helpers/deploy-utils');
-const { PYTH_IDS, ALLOWED_SLIPPAGE_DEPOSIT_DEX, EVEDEX_MARGIN_PRECISION } = require('./helpers/constants');
+const {
+  PYTH_IDS,
+  ALLOWED_SLIPPAGE_DEPOSIT_DEX,
+  EVEDEX_MARGIN_PRECISION,
+  PRECISION_DECIMALS_EVEDEX,
+} = require('./helpers/constants');
 const { maxUint128, maxUint256 } = require('viem');
 
 describe('EVEDEX contract', function () {
   let depositDex,
     vault,
+    dexViewer,
     eveDex,
     sessions,
-    token,
     tokenAddress,
     orderLib,
     marginCalculator,
@@ -37,6 +42,7 @@ describe('EVEDEX contract', function () {
     const libraries = { libraries: { OrderValidationLib: await orderLib.getAddress() } };
 
     vault = await deployWithLibraries('EveVault', [owner.address]);
+    dexViewer = await deployProxyWithLibraries('EVEDEXViewer', [], {}, false, owner.address);
     depositDex = await deployProxyWithLibraries('DepositDEX', [], libraries, false, owner.address);
     marginCalculator = await deployProxy('MarginCalc', [
       owner.address,
@@ -69,6 +75,8 @@ describe('EVEDEX contract', function () {
           staticFundingRateAccount: staticFundingRateAccount.address,
           markPriceOracle: await markPriceOracle.getAddress(),
           maxOpenPositions: 128,
+          maxMatcherFee: PRECISION_DECIMALS_EVEDEX,
+          allowedOverloadTPSL: PRECISION_DECIMALS_EVEDEX,
           soLevel: 0.8 * EVEDEX_MARGIN_PRECISION,
           withdrawMarginLevel: 1 * EVEDEX_MARGIN_PRECISION,
           liquidationFeePercent: 0,
@@ -79,15 +87,18 @@ describe('EVEDEX contract', function () {
       owner.address,
     );
 
+    await dexViewer.initialize(await eveDex.getAddress());
+
     await depositDex.initialize(
       await eveDex.getAddress(),
+      await dexViewer.getAddress(),
       await vault.getAddress(),
       await oracle.getAddress(),
       ALLOWED_SLIPPAGE_DEPOSIT_DEX,
     );
 
     await eveDex.grantRole(ethers.ZeroHash, owner.address);
-    const matcherRole = await eveDex.MATCHER_ROLE();
+    const matcherRole = await dexViewer.MATCHER_ROLE();
     await eveDex.grantRole(matcherRole, matcher.address);
 
     const validatorRole = await sessions.VALIDATOR_ROLE();

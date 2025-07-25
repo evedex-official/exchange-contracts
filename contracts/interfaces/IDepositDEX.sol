@@ -3,7 +3,7 @@ pragma solidity ^0.8.21;
 
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import {OrderValidationLib, OrderWithdrawal, PriceData} from "../lib/OrderValidationLib.sol";
+import {OrderValidationLib, WithdrawalOrder} from "../lib/OrderValidationLib.sol";
 import {ISessionManager} from "./ISessionManager.sol";
 import {IEVEDEX, FullPrices, CollateralPriceData} from "./IEVEDEX.sol";
 import {IStorageDEX} from "./IStorageDEX.sol";
@@ -37,13 +37,13 @@ interface IDepositDEX {
   error InvalidPrices();
   error InvalidSlippage();
 
-  event WithdrawRequestRegistered(address indexed account, OrderWithdrawal order);
+  event WithdrawRequestRegistered(address indexed account, WithdrawalOrder order);
 
   event WithdrawRequestStatusUpdated(bytes32 indexed request, uint8 status);
 
   event DepositBalanceChanged(address indexed account, address indexed collateral, int112 amount, int112 finalBalance);
 
-  event BasicParamsUpdate(address baseDex, address vault, address oracle, uint256 allowedSlippage);
+  event BasicParamsUpdate(address baseDex, address dexViewer, address vault, address oracle, uint256 allowedSlippage);
 
   event CollateralListUpdate(address indexed collateral, bool status);
 
@@ -78,18 +78,18 @@ interface IDepositDEX {
 
   function getWithdrawRequest(bytes32 orderHash) external view returns (WithdrawRequest memory);
 
-  function getWithdrawOrderHash(OrderWithdrawal calldata order) external pure returns (bytes32);
+  function getWithdrawOrderHash(WithdrawalOrder calldata order) external pure returns (bytes32);
 
   function depositCollateral(address collateral, uint112 amount) external;
 
   function depositCollateralTo(address collateral, uint112 amount, address to) external;
 
-  function withdrawRequest(OrderWithdrawal calldata order) external;
+  function withdrawRequest(WithdrawalOrder calldata order) external;
 
-  function withdrawRequestCancel(OrderWithdrawal calldata order) external;
+  function withdrawRequestCancel(WithdrawalOrder calldata order) external;
 
   function withdrawComplete(
-    OrderWithdrawal calldata order,
+    WithdrawalOrder calldata order,
     FullPrices calldata fullPrices,
     uint256 historyTimestamp,
     uint256 historySearchHint
@@ -110,7 +110,13 @@ interface IDepositDEX {
 
   function getTotalBalance(address account, CollateralPriceData[] memory prices) external view returns (int112 balance);
 
-  function setBasicParams(address baseDex_, address vault_, address oracle_, uint256 allowedSlippage_) external;
+  function setBasicParams(
+    address baseDex_,
+    address dexViewer_,
+    address vault_,
+    address oracle_,
+    uint256 allowedSlippage_
+  ) external;
 
   function setCollateralConfigs(address[] calldata collaterals_, bool[] calldata statuses_) external;
 }

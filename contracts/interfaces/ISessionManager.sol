@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.21;
 
-import {Order, OrderWithdrawal} from "../lib/OrderValidationLib.sol";
+import {Order, WithdrawalOrder} from "../lib/OrderValidationLib.sol";
 import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
 
 interface ISessionManager {
@@ -115,18 +115,18 @@ interface ISessionManager {
    * @notice Restricted function to check withdraw order's parameters and update user's session data
    * @dev Caller must be authorized by having the VALIDATOR_ROLE role
    * @dev Emits `SessionDataUpdated` on success
-   * @param order OrderWithdrawal struct to check data for
+   * @param order WithdrawalOrder struct to check data for
    * @return Address of the user's session that has been used
    */
-  function validateWithdrawalOrder(OrderWithdrawal calldata order) external returns (address);
+  function validateWithdrawalOrder(WithdrawalOrder calldata order) external returns (address);
 
   /**
    * @notice View function to check withdraw order from session without spending its limits
    * @dev Reverts on failures
-   * @param order OrderWithdrawal struct to check data for
+   * @param order WithdrawalOrder struct to check data for
    * @return Address of the user's session that has been used
    */
-  function validateWithdrawalOrderView(OrderWithdrawal calldata order) external view returns (address);
+  function validateWithdrawalOrderView(WithdrawalOrder calldata order) external view returns (address);
 
   /**
    * @dev Event to be emitted on session data update

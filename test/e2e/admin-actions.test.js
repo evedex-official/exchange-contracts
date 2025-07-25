@@ -48,14 +48,14 @@ describe(flow, () => {
   });
 
   it('check new instrument', async () => {
-    const { owner, eveDex } = await restoreSuit(flow);
+    const { owner, dexViewer } = await restoreSuit(flow);
     const { ticker, leverage } = await readContract(owner, {
-      abi: eveDex.abi,
-      address: eveDex.address,
+      abi: dexViewer.abi,
+      address: dexViewer.address,
       args: [ETH_USD_INSTRUMENT.INDEX],
       functionName: 'getInstrumentData',
     });
-    expect(ticker).to.equal(ETH_USD_INSTRUMENT.SYMBOL);
+    expect(ticker.replaceAll('\x00', '')).to.equal(ETH_USD_INSTRUMENT.SYMBOL);
     expect(leverage).to.equal(ETH_USD_INSTRUMENT.MAX_LEVERAGE);
   });
 
@@ -82,14 +82,14 @@ describe(flow, () => {
   });
 
   it('check modified instrument', async () => {
-    const { owner, eveDex } = await restoreSuit(flow);
+    const { owner, dexViewer } = await restoreSuit(flow);
     const { ticker, leverage } = await readContract(owner, {
-      abi: eveDex.abi,
-      address: eveDex.address,
+      abi: dexViewer.abi,
+      address: dexViewer.address,
       args: [ETH_USD_INSTRUMENT.INDEX],
       functionName: 'getInstrumentData',
     });
-    expect(ticker).to.equal(ETH_USD_INSTRUMENT.SYMBOL);
+    expect(ticker.replaceAll('\x00', '')).to.equal(ETH_USD_INSTRUMENT.SYMBOL);
     expect(leverage).to.equal(ETH_USD_INSTRUMENT.MAX_LEVERAGE + 1n);
   });
 
@@ -109,14 +109,14 @@ describe(flow, () => {
   });
 
   it('check removed instrument', async () => {
-    const { owner, eveDex } = await restoreSuit(flow);
+    const { owner, dexViewer } = await restoreSuit(flow);
     const { ticker } = await readContract(owner, {
-      abi: eveDex.abi,
-      address: eveDex.address,
+      abi: dexViewer.abi,
+      address: dexViewer.address,
       args: [ETH_USD_INSTRUMENT.INDEX],
       functionName: 'getInstrumentData',
     });
-    expect(ticker).to.equal('');
+    expect(ticker.replaceAll('\x00', '')).to.equal('');
   });
 
   it('Alice and Bob deposit usdt to dex', async () => {
@@ -220,6 +220,7 @@ describe(flow, () => {
         bobSellOrderExt,
         aliceBuyOrderExt.order.price,
         aliceBuyOrderExt.order.amount,
+        0n,
         fullPrices,
         orderExecutionTimestamp,
         historySearchHint,
@@ -234,6 +235,7 @@ describe(flow, () => {
         aliceBuyOrderExt,
         aliceBuyOrderExt.order.price,
         aliceBuyOrderExt.order.amount,
+        0n,
         fullPrices,
         orderExecutionTimestamp,
         historySearchHint,

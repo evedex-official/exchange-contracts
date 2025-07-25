@@ -46,12 +46,13 @@ contract MarginCalc is OwnableUpgradeable, UUPSUpgradeable, IMarginCalc {
     return levels;
   }
 
-  function getMargin(uint256 instrumentIndex, uint256 positionVolume) external view returns (uint256) {
+  function getMargin(uint256 instrumentIndex, uint256 positionVolume) external view returns (int256) {
     uint256 nextLevel = ArraySearch.upperBound(_positionVolumeLowerBounds[instrumentIndex], positionVolume);
     if (nextLevel == 0) return 0;
     uint256 lowerBound = _positionVolumeLowerBounds[instrumentIndex][nextLevel - 1];
     MarginLevel memory lev = _marginLevels[instrumentIndex][lowerBound];
-    return ((positionVolume - lowerBound) * lev.marginCoefficient) / PRECISION + lev.accumulatedMarginLowerLevels;
+    return
+      int256(((positionVolume - lowerBound) * lev.marginCoefficient) / PRECISION + lev.accumulatedMarginLowerLevels);
   }
 
   function setLevels(uint256 instrumentIndex, MarginLevelView[] calldata levels) external onlyOwner {

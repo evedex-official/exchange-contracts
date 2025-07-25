@@ -18,51 +18,6 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     __BaseDEX_init(initialOwner_, params_);
   }
 
-  function getActiveInstrumentsIndexes(address account) public view returns (uint256[] memory) {
-    return _activeInstruments[account].values();
-  }
-
-  function getActiveInstrumentsPositions(
-    address account
-  ) external view returns (uint256[] memory indexes, PositionInfo[] memory positions) {
-    indexes = _activeInstruments[account].values();
-    uint256 indexesLen = indexes.length;
-    positions = new PositionInfo[](indexesLen);
-    for (uint i = 0; i < indexesLen; ++i) {
-      positions[i] = _positionInfo[indexes[i]][account];
-    }
-  }
-
-  function getAccountsWithOpenPositionLength() external view returns (uint256) {
-    return _accountsWithOpenPositions.length();
-  }
-
-  function getAccountsWithOpenPositions(uint256 offset, uint256 limit) external view returns (address[] memory res) {
-    uint256 length = _accountsWithOpenPositions.length();
-    if (offset >= length) return res;
-    uint256 size = length - offset < limit ? length - offset : limit;
-    res = new address[](size);
-    for (uint256 i = offset; i < offset + size; ++i) {
-      res[i] = _accountsWithOpenPositions.at(i);
-    }
-  }
-
-  function getOpenPositions(uint256 offset, uint256 limit) external view returns (AccountPositions[] memory positions) {
-    uint256 length = _accountsWithOpenPositions.length();
-    if (offset >= length) return (positions);
-    uint256 size = length - offset < limit ? length - offset : limit;
-    positions = new AccountPositions[](size);
-    for (uint256 i = offset; i < offset + size; ++i) {
-      positions[i].account = _accountsWithOpenPositions.at(i);
-      uint256[] memory indexes = getActiveInstrumentsIndexes(positions[i].account);
-      uint256 len = indexes.length;
-      positions[i].positions = new PositionInfo[](len);
-      for (uint256 j = 0; j < len; ++j) {
-        positions[i].positions[j] = _positionInfo[indexes[j]][positions[i].account];
-      }
-    }
-  }
-
   function getTotalFR(
     uint256 index,
     uint256 historyTimestamp,
@@ -80,7 +35,6 @@ contract EVEDEX is BaseDEX, IEVEDEX {
   ) public view returns (int256, int256) {
     PositionInfo memory positionInfo_ = _positionInfo[index][account];
     FundingRateInfo memory frInfo = _getFundingRateInfo(index, historyTimestamp, historySearchHint);
-    int256 absPosition = int256(SignedMath.abs(positionInfo_.position));
     int256 accumulatedPercentage;
     int256 staticFee;
     if (positionInfo_.position < 0) {
@@ -88,7 +42,7 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     } else {
       accumulatedPercentage = (frInfo.longFRStored - positionInfo_.positionLongFRStored);
     }
-    int256 frDiff = (absPosition * accumulatedPercentage) / _FR_PRECISION;
+    int256 frDiff = (_absPosition(positionInfo_.position) * accumulatedPercentage) / _FR_PRECISION;
     if (accumulatedPercentage > 0) {
       staticFee = (frDiff * frInfo.staticFr) / _FR_PRECISION;
     }
@@ -107,23 +61,35 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     bool checkPrices,
     uint256 historyTimestamp,
     uint256 historySearchHint
-  ) public view returns (int256 marginLevel, int256 equity, int256 margin, int256[] memory pnls, int256[] memory frs) {
-    equity = depositDex.getTotalBalance(account, collateralPrices);
-    margin = 0;
+  )
+    public
+    view
+    returns (
+      int256 marginLevel,
+      int256 equity,
+      int256 totalMargin,
+      int256[] memory margins,
+      int256[] memory pnls,
+      int256[] memory frs
+    )
+  {
+    equity = _depositDex.getTotalBalance(account, collateralPrices);
     uint256 len = prices.length;
     pnls = new int256[](len);
     frs = new int256[](len);
+    margins = new int256[](len);
     uint256 pricesChecked = 0;
-    for (uint256 i = 0; i < len; ++i) {
+    for (uint256 i; i < len; i++) {
       uint256 index = prices[i].index;
       if (!_activeInstruments[account].contains(index)) continue;
 
       {
         PositionInfo memory positionInfo_ = _positionInfo[index][account];
-        uint16 leverage = positionInfo_.leverage;
-        leverage = leverage == 0 ? 1 : leverage;
-        positionInfo_.leverage = leverage;
-        margin += int256(_getMarginFromCalc(index, positionInfo_));
+        int256 margin = int256(
+          _getMarginFromCalc(index, positionInfo_.position, positionInfo_.positionAvgPrice, positionInfo_.leverage)
+        );
+        margins[i] = margin;
+        totalMargin += margin;
       }
 
       pnls[i] = getPNL(account, index, int256(prices[i].price));
@@ -134,7 +100,7 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     }
     if (checkPrices && _activeInstruments[account].length() != pricesChecked) revert IncorrectInstrumentIndexes();
 
-    return (margin != 0 ? (equity * _MARGIN_LEVEL_PRECISION - 1) / margin : int256(0), equity, margin, pnls, frs);
+    marginLevel = totalMargin != 0 ? (equity * _MARGIN_LEVEL_PRECISION - 1) / totalMargin : int256(0);
   }
 
   function checkMarginWithPrices(
@@ -143,24 +109,24 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     FullPrices calldata fullPrices,
     uint256 historyTimestamp,
     uint256 historySearchHint
-  ) public view returns (bool, int256) {
-    if (fullPrices.instrumentPrices.length != instrumentsLength) revert PriceArrayLengthError();
+  ) public view returns (bool) {
+    if (fullPrices.instrumentPrices.length != _instrumentsLength) revert PriceArrayLengthError();
     uint256[] memory indices = _activeInstruments[account].values();
     uint256 len = indices.length;
     PriceData[] memory prices = new PriceData[](len);
-    for (uint256 i = 0; i < len; ++i) {
+    for (uint256 i; i < len; ++i) {
       prices[i] = fullPrices.instrumentPrices[indices[i]];
     }
-    return
-      _checkMargin(
-        account,
-        marginLevel,
-        prices,
-        fullPrices.collateralPrices,
-        false,
-        historyTimestamp,
-        historySearchHint
-      );
+    (bool valid /*equity, margin, margins*/, , , ) = _checkMargin(
+      account,
+      marginLevel,
+      prices,
+      fullPrices.collateralPrices,
+      false,
+      historyTimestamp,
+      historySearchHint
+    );
+    return valid;
   }
 
   function _checkMargin(
@@ -171,40 +137,46 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     bool checkPrices,
     uint256 historyTimestamp,
     uint256 historySearchHint
-  ) internal view returns (bool, int256) {
-    (int256 accountMarginLevel, int256 equity, int256 margin, , ) = calculateMarginLevel(
-      account,
-      prices,
-      collateralPrices,
-      checkPrices,
-      historyTimestamp,
-      historySearchHint
-    );
-    return ((margin == 0 || accountMarginLevel >= marginLevel), equity);
+  ) internal view returns (bool, int256, int256, int256[] memory) {
+    (
+      int256 accountMarginLevel,
+      int256 equity,
+      int256 margin,
+      int256[] memory margins /*, pnls, frs */,
+      ,
+
+    ) = calculateMarginLevel(account, prices, collateralPrices, checkPrices, historyTimestamp, historySearchHint);
+    return ((margin == 0 || accountMarginLevel >= marginLevel), equity, margin, margins);
   }
 
-  function _calculateLiquidationFee(uint256 index, PositionInfo memory position) internal view returns (uint256) {
-    return (_getMarginFromCalc(index, position) * liquidationFeePercent) / _UINT_PRECISION;
+  function _calculateLiquidationFee(
+    uint256 index,
+    int112 position,
+    int80 avgPrice,
+    uint16 leverage
+  ) internal view returns (int256) {
+    return (_getMarginFromCalc(index, position, avgPrice, leverage) * _liquidationFeePercent) / _INT_PRECISION;
   }
 
-  function _getMarginFromCalc(uint256 index, PositionInfo memory position) internal view returns (uint256) {
-    uint256 absPosition = SignedMath.abs(position.position);
-    uint256 positionVolume = (absPosition * uint80(position.positionAvgPrice)) / _UINT_PRECISION / position.leverage;
+  function _getMarginFromCalc(
+    uint256 index,
+    int112 position,
+    int80 avgPrice,
+    uint16 leverage
+  ) internal view returns (int256) {
+    leverage = leverage == 0 ? 1 : leverage;
+    uint256 positionVolume = (SignedMath.abs(position) * uint80(avgPrice)) / _UINT_PRECISION / leverage;
 
-    return marginCalculator.getMargin(index, positionVolume);
+    return _marginCalculator.getMargin(index, positionVolume);
+  }
+
+  function _absPosition(int256 position) internal pure returns (int256) {
+    return int256(SignedMath.abs(position));
   }
 
   //////////////////////////
   //  Mutative functions
   //////////////////////////
-
-  // function liquidatePartially(
-  //   PartialOrderLiquidation memory liquidationOrder,
-  //   FullPrices calldata fullPrices,
-  //   LiquidationCollaterals calldata collateralIndices,
-  //   uint256 historyTimestamp,
-  //   uint256 historySearchHint
-  // ) external onlyRole(MATCHER_ROLE) {}
 
   function liquidatePositions(
     MultiOrderLiquidation memory liquidationOrder,
@@ -212,13 +184,13 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     LiquidationCollaterals calldata collateralIndices,
     uint256 historyTimestamp,
     uint256 historySearchHint
-  ) external onlyRole(MATCHER_ROLE) {
+  ) external onlyRole(_MATCHER_ROLE) {
     OrderValidationLib.checkLiquidationOrder(liquidationOrder, historyTimestamp);
 
     //TODO double calculation of pnl in checkMargin and then liquidationPosition
-    (bool validMargin, ) = _checkMargin(
+    (bool validMargin, , , ) = _checkMargin(
       liquidationOrder.accountToLiquidate,
-      soLevel,
+      _soLevel,
       liquidationOrder.prices,
       fullPrices.collateralPrices,
       true,
@@ -255,7 +227,7 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     uint16 liquidatorLeverage,
     uint256 historyTimestamp,
     uint256 historySearchHint
-  ) internal returns (int256 pnl, int256 fr, uint256 liquidationFee) {
+  ) internal returns (int256 pnl, int256 fr, int256 liquidationFee) {
     PositionInfo storage accountToLiquidatePosition = _positionInfo[index][accountToLiquidate];
     PositionInfo storage liquidatorPosition = _positionInfo[index][liquidator];
     if (accountToLiquidatePosition.position == 0) revert ZeroPositionLiquidation();
@@ -263,7 +235,12 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     pnl = (accountToLiquidatePosition.position * (liquidationPrice - positionAvgPrice)) / _INT_PRECISION;
     (fr, ) = getAccountFR(accountToLiquidate, index, historyTimestamp, historySearchHint);
     fr = (fr * liquidationPrice) / _INT_PRECISION;
-    liquidationFee = _calculateLiquidationFee(index, accountToLiquidatePosition);
+    liquidationFee = _calculateLiquidationFee(
+      index,
+      accountToLiquidatePosition.position,
+      accountToLiquidatePosition.positionAvgPrice,
+      accountToLiquidatePosition.leverage
+    );
 
     _adjustBalances(accountToLiquidate, liquidator, fullPrices, collateralIndices, pnl + fr, int256(liquidationFee));
 
@@ -274,8 +251,9 @@ contract EVEDEX is BaseDEX, IEVEDEX {
       collateralIndices.liquidatorIndex,
       accountToLiquidatePosition.position,
       liquidationPrice,
-      soLevel,
+      _soLevel,
       liquidatorLeverage,
+      true,
       fullPrices,
       historyTimestamp,
       historySearchHint
@@ -289,7 +267,7 @@ contract EVEDEX is BaseDEX, IEVEDEX {
       accountToLiquidate,
       index,
       liquidationFee,
-      depositDex.getTotalBalance(accountToLiquidate, fullPrices.collateralPrices),
+      _depositDex.getTotalBalance(accountToLiquidate, fullPrices.collateralPrices),
       pnl,
       fr
     );
@@ -347,12 +325,12 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     FullPrices calldata fullPrices,
     uint256 historyTimestamp,
     uint256 historySearchHint
-  ) external onlyRole(MATCHER_ROLE) {
+  ) external onlyRole(_MATCHER_ROLE) {
     uint256 index = liquidationOrder.index;
     if (liquidationOrder.prices[0].index != index) revert PriceOfLiquidatedInstrumentNotFirst();
 
-    int256 soLevel_ = soLevel;
-    (bool validMargin, ) = _checkMargin(
+    int256 soLevel_ = _soLevel;
+    (bool validMargin, , , ) = _checkMargin(
       liquidationOrder.accountToLiquidate,
       soLevel_,
       liquidationOrder.prices,
@@ -381,6 +359,7 @@ contract EVEDEX is BaseDEX, IEVEDEX {
       int256(liquidationPrice),
       soLevel_,
       liquidationOrder.leverageLiquidator,
+      true,
       fullPrices,
       historyTimestamp,
       historySearchHint
@@ -394,6 +373,7 @@ contract EVEDEX is BaseDEX, IEVEDEX {
       int256(liquidationPrice),
       type(int256).min,
       liquidationOrder.leverageToLiquidate,
+      true,
       fullPrices,
       historyTimestamp,
       historySearchHint
@@ -401,26 +381,21 @@ contract EVEDEX is BaseDEX, IEVEDEX {
   }
 
   function fillOrder(
-    OrderExtended memory filledOrder,
-    OrderExtended memory complimentaryOrder,
+    OrderExtended calldata filledOrder,
+    OrderExtended calldata complimentaryOrder,
     uint256 filledPrice,
     uint256 filledAmount,
+    int256 matcherFee,
     FullPrices calldata fullPrices,
     uint256 historyTimestamp,
     uint256 historySearchHint
-  ) external onlyRole(MATCHER_ROLE) {
+  ) external onlyRole(_MATCHER_ROLE) {
+    // _checkLiquidationStatus(filledOrder.order.senderAddress, LiquidationStatus.Normal);
+    // _checkLiquidationStatus(complimentaryOrder.order.senderAddress, LiquidationStatus.Normal);
     // Orders validation
     {
-      address filledOrderSigner = filledOrder.order.senderAddress;
-      address complimentaryOrderSigner = complimentaryOrder.order.senderAddress;
-      if (filledOrder.order.userSession != address(0)) {
-        filledOrderSigner = _validateUserOrder(filledOrder.order);
-        if (filledOrderSigner == address(0)) revert InvalidSession();
-      }
-      if (complimentaryOrder.order.userSession != address(0)) {
-        complimentaryOrderSigner = _validateUserOrder(complimentaryOrder.order);
-        if (complimentaryOrderSigner == address(0)) revert InvalidSession();
-      }
+      address filledOrderSigner = _checkUserSession(filledOrder.order);
+      address complimentaryOrderSigner = _checkUserSession(complimentaryOrder.order);
       (bytes32 filledOrderDigest, bytes32 complimentaryOrderDigest, bytes32 settlementDigest) = OrderValidationLib
         .checkOrderInfo(
           filledOrder.order,
@@ -430,12 +405,11 @@ contract EVEDEX is BaseDEX, IEVEDEX {
           msg.sender,
           filledAmount,
           filledPrice,
-          msg.sender,
-          instrumentsLength,
+          _instrumentsLength,
           historyTimestamp
         );
 
-      _fillOrder(filledOrderDigest, filledOrder.order.amount, filledAmount);
+      _fillOrder(filledOrderDigest, filledOrder.order.amount, filledAmount, filledOrder.order.limited);
       _fillSettlement(
         filledOrderDigest,
         complimentaryOrderDigest,
@@ -444,30 +418,20 @@ contract EVEDEX is BaseDEX, IEVEDEX {
         complimentaryOrder.order.orderId
       );
     }
-    // Paying execution fee to matcher
-    {
-      address filledOrderCollateral = fullPrices.collateralPrices[filledOrder.collateralIndex].collateral;
-      filledOrder.order.matcherFee = (filledOrder.order.matcherFee * filledAmount) / filledOrder.order.amount;
-      int256 filledOrderMatcherFee = int256(
-        (filledOrder.order.matcherFee * _UINT_COLLATERAL_PRECISION) /
-          fullPrices.collateralPrices[filledOrder.collateralIndex].price
-      );
-      _setBalance(
-        filledOrder.order.senderAddress,
-        filledOrderCollateral,
-        _getBalance(filledOrder.order.senderAddress, filledOrderCollateral) - filledOrderMatcherFee
-      );
-      _setBalance(
-        filledOrder.order.matcherAddress,
-        filledOrderCollateral,
-        _getBalance(filledOrder.order.matcherAddress, filledOrderCollateral) + filledOrderMatcherFee
-      );
-    }
+
+    _payMatcherFee(
+      filledOrder.order.senderAddress,
+      filledOrder.order.matcherAddress,
+      fullPrices.collateralPrices[filledOrder.collateralIndex].collateral,
+      _maxMatcherFee,
+      matcherFee,
+      filledAmount,
+      fullPrices.collateralPrices[filledOrder.collateralIndex].price
+    );
 
     uint256 index = filledOrder.order.instrumentIndex;
     PositionInfo storage userData = _positionInfo[index][filledOrder.order.senderAddress];
     int256 amount = filledOrder.order.side == 0 ? -int256(filledAmount) : int256(filledAmount);
-    int256 soLevel_ = soLevel;
 
     _changePosition(
       index,
@@ -476,8 +440,9 @@ contract EVEDEX is BaseDEX, IEVEDEX {
       filledOrder.collateralIndex,
       amount,
       int256(filledPrice),
-      soLevel_,
+      _soLevel,
       filledOrder.order.leverage,
+      filledOrder.order.limited,
       fullPrices,
       historyTimestamp,
       historySearchHint
@@ -492,11 +457,35 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     );
   }
 
-  function _fillOrder(bytes32 orderDigest, uint256 orderAmount, uint256 filledAmount) internal {
-    uint256 newFilledAmount = filledAmounts[orderDigest] + filledAmount;
+  function _payMatcherFee(
+    address account,
+    address matcher,
+    address collateral,
+    uint256 matcherFeeLimit,
+    int256 matcherFee,
+    uint256 amount,
+    uint256 price
+  ) internal {
+    if (SignedMath.abs(matcherFee) > matcherFeeLimit) revert MatcherFeeLimitExceeded();
+
+    int256 fee = (matcherFee * int256(amount) * _INT_COLLATERAL_PRECISION) / int256(price) / _INT_PRECISION;
+    _setBalance(account, collateral, _getBalance(account, collateral) - fee);
+    _setBalance(matcher, collateral, _getBalance(matcher, collateral) + fee);
+  }
+
+  function _checkUserSession(Order calldata order) internal returns (address signer) {
+    if (order.userSession == address(0)) return order.senderAddress;
+    signer = _validateUserOrder(order);
+    if (signer == address(0)) revert InvalidSession();
+  }
+
+  function _fillOrder(bytes32 orderDigest, uint256 orderAmount, uint256 filledAmount, bool isLimited) internal {
+    if (!isLimited) return;
+
+    uint256 newFilledAmount = _filledAmounts[orderDigest] + filledAmount;
     if (newFilledAmount > orderAmount) revert OrderIsAlreadyFilled();
 
-    filledAmounts[orderDigest] = newFilledAmount;
+    _filledAmounts[orderDigest] = newFilledAmount;
   }
 
   function _fillSettlement(
@@ -506,14 +495,14 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     uint256 orderId,
     uint256 complimentaryId
   ) internal {
-    bytes32 storedComplimentaryDigest = filledSettlements[settlementId];
+    bytes32 storedComplimentaryDigest = _filledSettlements[settlementId];
     bool closed;
     if (storedComplimentaryDigest == bytes32(0)) {
-      filledSettlements[settlementId] = orderDigest;
-      totalOpenedOrders++;
+      _filledSettlements[settlementId] = orderDigest;
+      _totalOpenedOrders++;
     } else {
       if (storedComplimentaryDigest != complimentaryDigest) revert SettlementMismatch();
-      totalSettledOrders++;
+      _totalSettledOrders++;
       closed = true;
     }
     emit OrderSettled(settlementId, orderId, complimentaryId, closed);
@@ -525,10 +514,10 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     uint256 collateralIndex,
     uint256 historyTimestamp,
     uint256 historySearchHint
-  ) external onlyRole(MATCHER_ROLE) {
+  ) external onlyRole(_MATCHER_ROLE) {
     uint256[] memory indices = _activeInstruments[account].values();
     uint256 len = indices.length;
-    for (uint256 i = 0; i < len; ++i) {
+    for (uint256 i; i < len; i++) {
       _collectFr(indices[i], account, fullPrices, collateralIndex, historyTimestamp, historySearchHint);
     }
   }
@@ -550,11 +539,11 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     int256 collateralFee = (frCurrent * posAvgPrice * _COLLATERAL_PRECISION) / collateralPrice / _INT_PRECISION;
     int256 staticCollateralFee;
     if (staticFee != 0) {
-      address staticFrAccount = staticFundingRateAccount;
+      address staticFrAccount = _staticFundingRateAccount;
       staticCollateralFee = (staticFee * posAvgPrice * _COLLATERAL_PRECISION) / collateralPrice / _INT_PRECISION;
       _setBalance(staticFrAccount, collateral, _getBalance(staticFrAccount, collateral) + staticCollateralFee);
     }
-    address frAccount = fundingRateAccount;
+    address frAccount = _fundingRateAccount;
     _setBalance(frAccount, collateral, _getBalance(frAccount, collateral) - collateralFee - staticCollateralFee);
     int256 newBalance = _getBalance(account, collateral) + collateralFee;
     _setBalance(account, collateral, newBalance);
@@ -577,12 +566,17 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     int256 price,
     int256 marginLevel,
     uint16 leverage,
+    bool isLimited,
     FullPrices calldata fullPrices,
     uint256 historyTimestamp,
     uint256 historySearchHint
   ) internal {
     int256 oldPosition = posData.position;
     int256 newPosition = amount + oldPosition;
+    if (!isLimited) {
+      _checkTPSLLimit(oldPosition, newPosition);
+    }
+
     int256 realizedFRCollateral;
     int256 realizedPNL;
     address collateral = fullPrices.collateralPrices[collateralIndex].collateral;
@@ -636,7 +630,7 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     posData.positionLastUpdate = uint32(historyTimestamp);
 
     _updateActivePositions(positionOwner, index, posData.position);
-    (bool validMargin, ) = checkMarginWithPrices(
+    bool validMargin = checkMarginWithPrices(
       positionOwner,
       marginLevel,
       fullPrices,
@@ -653,6 +647,16 @@ contract EVEDEX is BaseDEX, IEVEDEX {
       realizedPNL,
       realizedFRCollateral
     );
+  }
+
+  function _checkTPSLLimit(int256 oldPos, int256 newPos) internal view {
+    if (oldPos * newPos >= 0) {
+      if (oldPos * (oldPos - newPos) < 0) revert IncreasingPositionWithTPSL();
+
+      return;
+    }
+
+    if ((-newPos * _INT_PRECISION) / oldPos > _allowedOverloadTPSL) revert RevertingPositionWithTPSL();
   }
 
   function _changePositionSide(
@@ -675,7 +679,7 @@ contract EVEDEX is BaseDEX, IEVEDEX {
         ((realizedFRCollateral + realizedPNL) * _COLLATERAL_PRECISION) /
         collateralPrice
     );
-    address frAccount = fundingRateAccount;
+    address frAccount = _fundingRateAccount;
     _setBalance(
       frAccount,
       collateral,
@@ -727,7 +731,7 @@ contract EVEDEX is BaseDEX, IEVEDEX {
         ((realizedFRCollateral + realizedPNL) * _COLLATERAL_PRECISION) /
         collateralPrice
     );
-    address frAccount = fundingRateAccount;
+    address frAccount = _fundingRateAccount;
     _setBalance(
       frAccount,
       collateral,
@@ -736,8 +740,8 @@ contract EVEDEX is BaseDEX, IEVEDEX {
     posData.frAccumulated = int112((frCurrent * newPosition) / oldPosition);
   }
 
-  function _validateUserOrder(Order memory order) internal returns (address) {
-    return sessionManager.validateUserOrder(order);
+  function _validateUserOrder(Order calldata order) internal returns (address) {
+    return _sessionManager.validateUserOrder(order);
   }
 
   function _updateActivePositions(address account, uint256 index, int256 position) internal {
@@ -747,10 +751,10 @@ contract EVEDEX is BaseDEX, IEVEDEX {
         _accountsWithOpenPositions.remove(account);
       }
     } else {
-      if (_activeInstruments[account].length() >= maxOpenPositions) revert MaxOpenPositionsExceeded();
+      if (_activeInstruments[account].length() >= _maxOpenPositions) revert MaxOpenPositionsExceeded();
       _activeInstruments[account].add(index);
       _accountsWithOpenPositions.add(account);
     }
-    settledOrders[account]++;
+    _settledOrders[account]++;
   }
 }

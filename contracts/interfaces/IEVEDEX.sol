@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.21;
 
-import "../lib/OrderValidationLib.sol";
 import {IDepositDEX} from "./IDepositDEX.sol";
 import {IMarginCalc} from "./IMarginCalc.sol";
 import {ISessionManager} from "./ISessionManager.sol";
+import {IMarkPriceOracle} from "./IMarkPriceOracle.sol";
+import "../lib/OrderValidationLib.sol";
 
 struct PositionInfo {
   int112 position; // Signed position size (10^8 = 1 collateral token). position < 0 - short, position > 0 long
@@ -16,10 +17,10 @@ struct PositionInfo {
   uint16 leverage;
 }
 
-struct AccountPositions {
-  address account;
-  PositionInfo[] positions;
-}
+// struct PriceData {
+//   uint256 index;
+//   uint256 price;
+// }
 
 struct CollateralPriceData {
   address collateral;
@@ -54,7 +55,7 @@ interface IEVEDEX {
   event PositionLiquidated(
     address indexed account,
     uint256 liquidatedInstrument,
-    uint256 liquidationFee,
+    int256 liquidationFee,
     int256 balance,
     int256 realizedPNL,
     int256 realizedFR
@@ -84,7 +85,6 @@ interface IEVEDEX {
   );
 
   error InvalidSession();
-  error ZeroPositionLiquidation();
   error InsufficientMargin();
   error SufficientMargin();
   error IncorrectInstrumentIndexes();
@@ -92,14 +92,14 @@ interface IEVEDEX {
   error PriceOfLiquidatedInstrumentNotFirst();
   error OrderIsAlreadyFilled();
   error PriceArrayLengthError();
-  error UnprofitableTrade();
   error SettlementMismatch();
-
-  function getActiveInstrumentsIndexes(address account) external view returns (uint256[] memory);
-
-  function getActiveInstrumentsPositions(
-    address account
-  ) external view returns (uint256[] memory indexes, PositionInfo[] memory positions);
+  error IncreasingPositionWithTPSL();
+  error RevertingPositionWithTPSL();
+  error InvalidLiquidationStatus();
+  error ActiveADLLiquidation();
+  error MatcherFeeLimitExceeded();
+  error ZeroPositionLiquidation();
+  error UnprofitableTrade();
 
   function getTotalFR(
     uint256 index,
@@ -116,19 +116,13 @@ interface IEVEDEX {
 
   function getPNL(address account, uint256 index, int256 price) external view returns (int256);
 
-  function getAccountsWithOpenPositionLength() external view returns (uint256);
-
-  function getAccountsWithOpenPositions(uint256 offset, uint256 limit) external view returns (address[] memory res);
-
-  function getOpenPositions(uint256 offset, uint256 limit) external view returns (AccountPositions[] memory positions);
-
   function checkMarginWithPrices(
     address account,
     int256 marginLevel,
     FullPrices calldata fullPrices,
     uint256 historyTimestamp,
     uint256 historySearchHint
-  ) external view returns (bool, int256);
+  ) external view returns (bool);
 
   function calculateMarginLevel(
     address account,
@@ -137,28 +131,24 @@ interface IEVEDEX {
     bool checkPrices,
     uint256 historyTimestamp,
     uint256 historySearchHint
-  ) external view returns (int256 marginLevel, int256 equity, int256 margin, int256[] memory pnls, int256[] memory frs);
-
-  function liquidatePositions(
-    MultiOrderLiquidation memory liquidationOrder,
-    FullPrices calldata fullPrices,
-    LiquidationCollaterals calldata collateralIndices,
-    uint256 historyTimestamp,
-    uint256 historySearchHint
-  ) external;
-
-  function adlLiquidation(
-    AdlOrderLiquidation memory liquidationOrder,
-    FullPrices calldata fullPrices,
-    uint256 historyTimestamp,
-    uint256 historySearchHint
-  ) external;
+  )
+    external
+    view
+    returns (
+      int256 marginLevel,
+      int256 equity,
+      int256 margin,
+      int256[] memory margins,
+      int256[] memory pnls,
+      int256[] memory frs
+    );
 
   function fillOrder(
-    OrderExtended memory buyOrder,
-    OrderExtended memory sellOrder,
+    OrderExtended calldata buyOrder,
+    OrderExtended calldata sellOrder,
     uint256 filledPrice,
     uint256 filledAmount,
+    int256 matcherFee,
     FullPrices calldata fullPrices,
     uint256 historyTimestamp,
     uint256 historySearchHint

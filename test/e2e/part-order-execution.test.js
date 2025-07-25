@@ -159,18 +159,18 @@ describe(flow, () => {
       functionName: 'fillOrder',
       address: eveDex.address,
       abi: eveDex.abi,
-      args: [longOrder, shortOrder, instrumentPrice, fillAmount, fullPrices, historyTimestamp, historySearchHint],
+      args: [longOrder, shortOrder, instrumentPrice, fillAmount, 0n, fullPrices, historyTimestamp, historySearchHint],
     });
     await writeContract(matcher, {
       functionName: 'fillOrder',
       address: eveDex.address,
       abi: eveDex.abi,
-      args: [shortOrder, longOrder, instrumentPrice, fillAmount, fullPrices, historyTimestamp, historySearchHint],
+      args: [shortOrder, longOrder, instrumentPrice, fillAmount, 0n, fullPrices, historyTimestamp, historySearchHint],
     });
   });
 
   it('check open positions', async () => {
-    const { alice, bob, eveDex } = await restoreSuit(flow);
+    const { alice, bob, dexViewer } = await restoreSuit(flow);
     const aliceOrderExt = matcherState.aliceOrderExt;
     const bobOrderExt = matcherState.bobOrderExt;
     const positionsAmount =
@@ -180,8 +180,8 @@ describe(flow, () => {
       const answer = await readContract(userWallet, {
         functionName: 'getActiveInstrumentsPositions',
         args: [userWallet.account.address],
-        abi: eveDex.abi,
-        address: eveDex.address,
+        abi: dexViewer.abi,
+        address: dexViewer.address,
       });
       return answer[1].shift();
     };

@@ -15,6 +15,8 @@ const { expect } = require('chai');
 
 const flow = 'deposit -> create session -> simple order replacement -> partially executed order replacement';
 describe(flow, () => {
+  before(upgrades.silenceWarnings);
+
   const matcherState = {
     orders: {},
   };
@@ -207,13 +209,13 @@ describe(flow, () => {
       functionName: 'fillOrder',
       address: eveDex.address,
       abi: eveDex.abi,
-      args: [longOrder, shortOrder, instrumentPrice, fillAmount, fullPrices, historyTimestamp, historySearchHint],
+      args: [longOrder, shortOrder, instrumentPrice, fillAmount, 0n, fullPrices, historyTimestamp, historySearchHint],
     });
     await writeContract(matcher, {
       functionName: 'fillOrder',
       address: eveDex.address,
       abi: eveDex.abi,
-      args: [shortOrder, longOrder, instrumentPrice, fillAmount, fullPrices, historyTimestamp, historySearchHint],
+      args: [shortOrder, longOrder, instrumentPrice, fillAmount, 0n, fullPrices, historyTimestamp, historySearchHint],
     });
   });
 
@@ -224,11 +226,11 @@ describe(flow, () => {
    *  if ACTUAL_NEW_AMOUNT > 0 then we post the order with the ACTUAL_NEW_AMOUNT
    */
   it('Alice changes the order after partial execution', async () => {
-    const { alice, matcher, usdtToken, aliceSessionWallet, eveDex } = await restoreSuit(flow);
+    const { alice, matcher, usdtToken, aliceSessionWallet, eveDex, dexViewer } = await restoreSuit(flow);
     const filledAmount = await readContract(alice, {
       functionName: 'filledAmounts',
-      address: eveDex.address,
-      abi: eveDex.abi,
+      address: dexViewer.address,
+      abi: dexViewer.abi,
       args: [aliceOrderId],
     });
     const actualNewAmount = NEW_ORDER_AMOUNT - filledAmount;

@@ -11,40 +11,50 @@ abstract contract StorageDEX is IStorageDEX {
   int256 internal constant _INT_1DAY = 1e8;
   int256 internal constant _INT_PRECISION = 1e8;
   int256 internal constant _COLLATERAL_PRECISION = 1e12;
-  uint256 internal constant _UINT_COLLATERAL_PRECISION = 1e12;
+  int256 internal constant _INT_COLLATERAL_PRECISION = 1e12;
   uint256 internal constant _UINT_PRECISION = 1e8;
   int256 internal constant _MARGIN_LEVEL_PRECISION = 1e2;
   uint256 internal constant _WITHDRAW_DELAY = 7 days;
 
-  bytes32 public constant MATCHER_ROLE = keccak256("MATCHER_ROLE");
+  bytes32 internal constant _MATCHER_ROLE = keccak256("MATCHER_ROLE");
 
-  IMarginCalc public marginCalculator;
-  IDepositDEX public depositDex;
-  ISessionManager public sessionManager;
+  IMarginCalc internal _marginCalculator;
+  IDepositDEX internal _depositDex;
+  ISessionManager internal _sessionManager;
+  IMarkPriceOracle internal _markPriceOracle;
 
-  address public staticFundingRateAccount;
-  address public fundingRateAccount;
-  address public markPriceOracle;
+  address internal _staticFundingRateAccount;
+  address internal _fundingRateAccount;
 
-  int256 public soLevel; // Minimal sufficient percent of margin at which a position can not be liquidated
-  int256 public withdrawMarginLevel; // Minimal sufficient percent of margin after withdraw when account has open position
-  uint256 public liquidationFeePercent; // Percent of margin for position which is taken as liquidation fee. 10**8 = 100%
-  uint256 public instrumentsLength;
-  uint256 public maxOpenPositions;
-  uint256 public totalOpenedOrders;
-  uint256 public totalSettledOrders;
+  int256 internal _soLevel; // Minimal sufficient percent of margin at which a position can not be liquidated
+  int256 internal _withdrawMarginLevel; // Minimal sufficient percent of margin after withdraw when account has open position
+  int256 internal _liquidationFeePercent; // Percent of margin for position which is taken as liquidation fee. 10**8 = 100%
+  int256 internal _allowedOverloadTPSL; // Percent of active position that is allowed to be reverted in side with TPSL closing. 10**8 = 100%.
+  uint256 internal _instrumentsLength;
+  uint256 internal _maxOpenPositions;
+  uint256 internal _totalOpenedOrders;
+  uint256 internal _totalSettledOrders;
+  uint256 internal _maxMatcherFee; // Immutable, can't be modified without implementation change
+
+  bytes32 internal _RESERVED_FOR_LIQUIDATION1;
+  EnumerableSet.AddressSet internal _accountsWithOpenPositions;
 
   mapping(uint256 index => InstrumentInfo config) internal _instrumentInfo;
-  mapping(address account => uint256 settledOrdersForAccount) public settledOrders;
-
+  mapping(address account => uint256 settledOrdersForAccount) internal _settledOrders;
   mapping(address account => EnumerableSet.UintSet instruments) internal _activeInstruments;
-
-  EnumerableSet.AddressSet internal _accountsWithOpenPositions;
+  mapping(address => bool) internal _RESERVED_FOR_LIQUIDATION2;
+  mapping(address => bool) internal _RESERVED_FOR_LIQUIDATION3;
   mapping(uint256 instrumentIndex => mapping(address account => PositionInfo position)) internal _positionInfo;
-  mapping(bytes32 orderHash => uint256 orderAmount) public filledAmounts;
-  mapping(bytes32 settlementHash => bytes32 orderHash) public filledSettlements;
+  mapping(bytes32 orderHash => uint256 orderAmount) internal _filledAmounts;
+  mapping(bytes32 settlementHash => bytes32 orderHash) internal _filledSettlements;
 
   uint256[50] private __gap;
+
+  function getStorageSlot(uint256 storageSlot) external view returns (bytes32 value) {
+    assembly {
+      value := sload(storageSlot)
+    }
+  }
 }
 
 /**

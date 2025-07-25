@@ -93,7 +93,7 @@ describe(flow, () => {
   });
 
   it('Alice buy order creation', async () => {
-    const { alice, matcher, usdtToken, btcToken, aliceSessionWallet, eveDex } = await restoreSuit(flow);
+    const { alice, matcher, usdtToken, btcToken, aliceSessionWallet, eveDex, dexViewer } = await restoreSuit(flow);
     // Set up prices for instruments and collateral
     const instrumentPrices = [
       {
@@ -113,6 +113,7 @@ describe(flow, () => {
     ];
     const buyOrderAmount = await calculateBoundaryOrderAmount({
       eveDexContract: eveDex,
+      viewerContract: dexViewer,
       instrumentPrices,
       userWallet: alice,
       leverage: ORDER_LEVERAGE,
@@ -145,7 +146,7 @@ describe(flow, () => {
   });
 
   it('Bob sell order creation', async () => {
-    const { bob, matcher, usdtToken, btcToken, bobSessionWallet, eveDex } = await restoreSuit(flow);
+    const { bob, matcher, usdtToken, btcToken, bobSessionWallet, eveDex, dexViewer } = await restoreSuit(flow);
     // Set up prices for instruments and collateral
     const instrumentPrices = [
       {
@@ -165,6 +166,7 @@ describe(flow, () => {
     ];
     const sellOrderAmount = await calculateBoundaryOrderAmount({
       eveDexContract: eveDex,
+      viewerContract: dexViewer,
       instrumentPrices,
       userWallet: bob,
       leverage: ORDER_LEVERAGE,
@@ -233,6 +235,7 @@ describe(flow, () => {
         sellOrder,
         BTC_INSTRUMENT_PRICE,
         buyOrder.order.amount,
+        0n,
         fullPrices,
         historyTimestamp,
         historySearchHint,
@@ -247,6 +250,7 @@ describe(flow, () => {
         buyOrder,
         BTC_INSTRUMENT_PRICE,
         buyOrder.order.amount,
+        0n,
         fullPrices,
         historyTimestamp,
         historySearchHint,

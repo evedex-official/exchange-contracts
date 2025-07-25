@@ -5,6 +5,7 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
 import {IERC20, SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "./interfaces/IDepositDEX.sol";
+import "./interfaces/IViewer.sol";
 
 contract DepositDEX is IDepositDEX, UUPSUpgradeable {
   using SafeERC20 for IERC20;
@@ -18,6 +19,7 @@ contract DepositDEX is IDepositDEX, UUPSUpgradeable {
   int112 internal constant _INT_PRECISION = 1e12;
 
   address public baseDex;
+  address public dexViewer;
   address public vault;
   address public oracle;
 
@@ -36,11 +38,12 @@ contract DepositDEX is IDepositDEX, UUPSUpgradeable {
 
   function initialize(
     address baseDex_,
+    address dexViewer_,
     address vault_,
     address oracle_,
     uint256 allowedSlippage_
   ) external initializer {
-    _setBasicParams(baseDex_, vault_, oracle_, allowedSlippage_);
+    _setBasicParams(baseDex_, dexViewer_, vault_, oracle_, allowedSlippage_);
   }
 
   function getCollaterals() external view returns (address[] memory) {
@@ -59,7 +62,7 @@ contract DepositDEX is IDepositDEX, UUPSUpgradeable {
     return _withdrawRequests[orderHash];
   }
 
-  function getWithdrawOrderHash(OrderWithdrawal calldata order) public pure returns (bytes32) {
+  function getWithdrawOrderHash(WithdrawalOrder calldata order) public pure returns (bytes32) {
     return keccak256(abi.encode(order));
   }
 
@@ -77,12 +80,12 @@ contract DepositDEX is IDepositDEX, UUPSUpgradeable {
     emit DepositBalanceChanged(to, collateral, int112(amount), balance);
   }
 
-  function withdrawRequest(OrderWithdrawal calldata order) external {
+  function withdrawRequest(WithdrawalOrder calldata order) external {
     _checkWithdrawOrderView(order);
     _registerWithdrawRequest(order);
   }
 
-  function _checkWithdrawOrder(OrderWithdrawal calldata _order) internal {
+  function _checkWithdrawOrder(WithdrawalOrder calldata _order) internal {
     address withdrawalOrderSigner = _order.account;
     if (_order.session != address(0)) {
       withdrawalOrderSigner = _validateWithdrawalOrder(_order);
@@ -91,7 +94,7 @@ contract DepositDEX is IDepositDEX, UUPSUpgradeable {
     OrderValidationLib.checkWithdrawalOrder(_order, withdrawalOrderSigner);
   }
 
-  function _checkWithdrawOrderView(OrderWithdrawal calldata _order) internal view {
+  function _checkWithdrawOrderView(WithdrawalOrder calldata _order) internal view {
     address withdrawalOrderSigner = _order.account;
     if (_order.session != address(0)) {
       withdrawalOrderSigner = _validateWithdrawalOrderView(_order);
@@ -100,15 +103,15 @@ contract DepositDEX is IDepositDEX, UUPSUpgradeable {
     OrderValidationLib.checkWithdrawalOrder(_order, withdrawalOrderSigner);
   }
 
-  function _validateWithdrawalOrder(OrderWithdrawal calldata _order) internal returns (address) {
-    return ISessionManager(IStorageDEX(baseDex).sessionManager()).validateWithdrawalOrder(_order);
+  function _validateWithdrawalOrder(WithdrawalOrder calldata _order) internal returns (address) {
+    return ISessionManager(IViewer(dexViewer).sessionManager()).validateWithdrawalOrder(_order);
   }
 
-  function _validateWithdrawalOrderView(OrderWithdrawal calldata _order) internal view returns (address) {
-    return ISessionManager(IStorageDEX(baseDex).sessionManager()).validateWithdrawalOrderView(_order);
+  function _validateWithdrawalOrderView(WithdrawalOrder calldata _order) internal view returns (address) {
+    return ISessionManager(IViewer(dexViewer).sessionManager()).validateWithdrawalOrderView(_order);
   }
 
-  function _registerWithdrawRequest(OrderWithdrawal calldata _order) internal {
+  function _registerWithdrawRequest(WithdrawalOrder calldata _order) internal {
     bytes32 orderHash = getWithdrawOrderHash(_order);
 
     if (_withdrawRequests[orderHash].status != RequestStatus.NotCreated)
@@ -125,7 +128,7 @@ contract DepositDEX is IDepositDEX, UUPSUpgradeable {
     emit WithdrawRequestStatusUpdated(_orderHash, uint8(_status));
   }
 
-  function withdrawRequestCancel(OrderWithdrawal calldata order) external {
+  function withdrawRequestCancel(WithdrawalOrder calldata order) external {
     address sender = msg.sender;
     if (!(sender == order.account || _hasRole(WITHDRAW_GUARDIAN_ROLE, sender))) revert UnauthorizedAccount(sender);
 
@@ -137,7 +140,7 @@ contract DepositDEX is IDepositDEX, UUPSUpgradeable {
   }
 
   function withdrawComplete(
-    OrderWithdrawal calldata order,
+    WithdrawalOrder calldata order,
     FullPrices calldata fullPrices,
     uint256 historyTimestamp,
     uint256 historySearchHint
@@ -170,9 +173,9 @@ contract DepositDEX is IDepositDEX, UUPSUpgradeable {
     balance -= int112(amount);
     _balances[from][collateral] = balance;
 
-    (bool validMargin, ) = IEVEDEX(baseDex).checkMarginWithPrices(
+    bool validMargin = IEVEDEX(baseDex).checkMarginWithPrices(
       from,
-      IStorageDEX(baseDex).withdrawMarginLevel(),
+      IViewer(dexViewer).withdrawMarginLevel(),
       fullPrices,
       historyTimestamp,
       historySearchHint
@@ -237,11 +240,12 @@ contract DepositDEX is IDepositDEX, UUPSUpgradeable {
 
   function setBasicParams(
     address baseDex_,
+    address dexViewer_,
     address vault_,
     address oracle_,
     uint256 allowedSlippage_
   ) external onlyRole(_DEFAULT_ADMIN_ROLE) {
-    _setBasicParams(baseDex_, vault_, oracle_, allowedSlippage_);
+    _setBasicParams(baseDex_, dexViewer_, vault_, oracle_, allowedSlippage_);
   }
 
   function setCollateralConfigs(
@@ -261,12 +265,19 @@ contract DepositDEX is IDepositDEX, UUPSUpgradeable {
     }
   }
 
-  function _setBasicParams(address baseDex_, address vault_, address oracle_, uint256 allowedSlippage_) internal {
+  function _setBasicParams(
+    address baseDex_,
+    address dexViewer_,
+    address vault_,
+    address oracle_,
+    uint256 allowedSlippage_
+  ) internal {
     vault = vault_;
     baseDex = baseDex_;
+    dexViewer = dexViewer_;
     oracle = oracle_;
     allowedSlippage = allowedSlippage_;
-    emit BasicParamsUpdate(baseDex_, vault_, oracle_, allowedSlippage_);
+    emit BasicParamsUpdate(baseDex_, dexViewer_, vault_, oracle_, allowedSlippage_);
   }
 
   function _hasRole(bytes32 role_, address account_) internal view returns (bool) {

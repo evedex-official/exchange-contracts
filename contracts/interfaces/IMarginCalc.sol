@@ -32,7 +32,7 @@ interface IMarginCalc {
 
   function getMarginLevels(uint256 instrumentIndex) external view returns (MarginLevelView[] memory levels);
 
-  function getMargin(uint256 instrumentIndex, uint256 positionVolume) external view returns (uint256 marginLevel);
+  function getMargin(uint256 instrumentIndex, uint256 positionVolume) external view returns (int256 marginLevel);
 
   function setLevels(uint256 instrumentIndex, MarginLevelView[] memory levels) external;
 }

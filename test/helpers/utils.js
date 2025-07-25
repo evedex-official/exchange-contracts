@@ -48,6 +48,7 @@ const createWithdrawOrder = ({ accountAddress, collateralAddress, amount, sessio
  * @param {number} params.instrumentIndex - The index of the instrument being traded.
  * @param {bigint} params.amount - The amount of the instrument being ordered.
  * @param {bigint} params.price - The price of the instrument with precision.
+ * @param {boolean} params.limited - Indicator for normal (limited in amount) or TPSL order (unlimited).
  * @param {number} params.side - The side of the order (e.g., 0 for sell, 1 for buy).
  * @param {string} params.userSession - The session address associated with the user.
  * @param {bigint} [params.leverage=1n] - The leverage used in the order (default: 1).
@@ -63,6 +64,7 @@ const createOrderExtended = ({
   instrumentIndex,
   amount,
   price,
+  limited = true,
   side,
   userSession,
   leverage = 1n,
@@ -80,6 +82,7 @@ const createOrderExtended = ({
       instrumentIndex,
       amount,
       price,
+      limited,
       leverage,
       matcherFee,
       creationTime,
@@ -112,7 +115,7 @@ const getOrderDigest = ({ order }) => {
       { type: 'uint256', name: 'instrumentIndex' },
       { type: 'uint256', name: 'amount' },
       { type: 'uint256', name: 'price' },
-      { type: 'uint256', name: 'matcherFee' },
+      { type: 'bool', name: 'limited' },
       { type: 'uint256', name: 'creationTime' },
       { type: 'uint8', name: 'side' },
     ],
@@ -124,7 +127,7 @@ const getOrderDigest = ({ order }) => {
       order.instrumentIndex,
       order.amount,
       order.price,
-      order.matcherFee,
+      order.limited,
       order.creationTime,
       order.side,
     ],
@@ -141,8 +144,8 @@ const toMultiOrders = async ({ wallet, contractAddress, ordersExt }) => {
     'uint256',
     'uint256',
     'uint256',
+    'bool',
     'uint16',
-    'uint256',
     'uint256',
     'uint8',
   ];
@@ -154,8 +157,8 @@ const toMultiOrders = async ({ wallet, contractAddress, ordersExt }) => {
     order.instrumentIndex,
     order.amount,
     order.price,
+    order.limited,
     order.leverage,
-    order.matcherFee,
     order.creationTime,
     order.side,
   ]);
@@ -232,6 +235,7 @@ const removeSession = async ({ userWallet, sessionManagerContract, sessionAccoun
  */
 const calculateBoundaryOrderAmount = async ({
   eveDexContract,
+  viewerContract,
   userWallet,
   instrumentPrices,
   collateralPrices,
@@ -246,8 +250,8 @@ const calculateBoundaryOrderAmount = async ({
   });
   const soLevel = await readContract(userWallet, {
     functionName: 'soLevel',
-    address: eveDexContract.address,
-    abi: eveDexContract.abi,
+    address: viewerContract.address,
+    abi: viewerContract.abi,
     args: [],
   });
   const instrumentPrice = instrumentPrices[instrumentIndex].price;

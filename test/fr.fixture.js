@@ -66,6 +66,7 @@ const createOrders = async ({
   aliceSessionWallet,
   bobSessionWallet,
   eveDex,
+  dexViewer,
   config,
 }) => {
   const createOrder = async ({ side, userWallet, userSessionWallet, price, orderSizePercent }) => {
@@ -78,6 +79,7 @@ const createOrders = async ({
     );
     const boundaryAmount = await calculateBoundaryOrderAmount({
       eveDexContract: eveDex,
+      viewerContract: dexViewer,
       instrumentPrices,
       userWallet,
       leverage: config.ORDER_LEVERAGE,
@@ -142,6 +144,7 @@ const matchOrders = async ({ matcher, usdtToken, btcToken, eveDex, orders, confi
       orders.shortOrderExt,
       orders.longOrderExt.order.price,
       orders.longOrderExt.order.amount,
+      0n,
       getFullPricesBtcUsdt(
         config.BTC_PRICE_INSTRUMENT_USERS_TRADE,
         config.BTC_PRICE_COLLATERAL,
@@ -163,6 +166,7 @@ const matchOrders = async ({ matcher, usdtToken, btcToken, eveDex, orders, confi
       orders.longOrderExt,
       orders.longOrderExt.order.price,
       orders.longOrderExt.order.amount,
+      0n,
       getFullPricesBtcUsdt(
         config.BTC_PRICE_INSTRUMENT_USERS_TRADE,
         config.BTC_PRICE_COLLATERAL,

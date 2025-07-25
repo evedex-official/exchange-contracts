@@ -54,7 +54,7 @@ contract MarkPriceOracle is AccessControlEnumerable, IMarkPriceOracle {
     uint256 index,
     uint256 timestamp,
     uint256 searchHint
-  ) external view returns (uint256 price) {
+  ) external view returns (int256 price) {
     uint256 nextEpoch = ArraySearch.upperBoundHint(_timestampHistory[index], timestamp, searchHint);
     if (nextEpoch == 0) revert InvalidTimestamp();
 
@@ -67,7 +67,7 @@ contract MarkPriceOracle is AccessControlEnumerable, IMarkPriceOracle {
     PriceData memory data = _priceHistory[index][epochStart];
     if (data.status == PriceStatus.Contested) revert PriceContested();
 
-    price = data.price;
+    price = int256(uint256(data.price));
   }
 
   /// @inheritdoc IMarkPriceOracle

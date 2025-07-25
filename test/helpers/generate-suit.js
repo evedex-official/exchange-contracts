@@ -10,6 +10,7 @@ const {
   PYTH_IDS,
   ALLOWED_SLIPPAGE_DEPOSIT_DEX,
   EVEDEX_MARGIN_PRECISION,
+  PRECISION_DECIMALS_EVEDEX,
   MARGIN_CALC_MARGIN_PRECISION,
 } = require('./constants');
 
@@ -99,6 +100,7 @@ const prepareContracts = async ({
     markPriceOracleConfig.window, // default time period to trust reported prices
   ]);
   const depositDexLibraries = { libraries: { OrderValidationLib: orderLib.address } };
+  const dexViewer = await viemDeployProxyWithLibraries('EVEDEXViewer', [], {}, false, owner.account.address);
   const depositDex = await viemDeployProxyWithLibraries(
     'DepositDEX',
     [],
@@ -118,6 +120,8 @@ const prepareContracts = async ({
         staticFundingRateAccount: staticFundingRateAccount.account.address,
         markPriceOracle: markPriceOracle.address,
         maxOpenPositions: eveDexConfig.maxOpenPositions,
+        allowedOverloadTPSL: eveDexConfig.allowedOverloadTPSL,
+        maxMatcherFee: eveDexConfig.maxMatcherFee,
         soLevel: eveDexConfig.soLevel,
         withdrawMarginLevel: eveDexConfig.withdrawMarginLevel,
         liquidationFeePercent: eveDexConfig.liquidationFeePercent,
@@ -127,10 +131,17 @@ const prepareContracts = async ({
     true,
     owner.account.address,
   );
-  await depositDex.write.initialize([eveDex.address, vault.address, oracle.address, ALLOWED_SLIPPAGE_DEPOSIT_DEX]);
+  await dexViewer.write.initialize([eveDex.address]);
+  await depositDex.write.initialize([
+    eveDex.address,
+    dexViewer.address,
+    vault.address,
+    oracle.address,
+    ALLOWED_SLIPPAGE_DEPOSIT_DEX,
+  ]);
 
   const [matcherRole, validatorRole, withdrawRole] = await Promise.all([
-    eveDex.read.MATCHER_ROLE(),
+    dexViewer.read.MATCHER_ROLE(),
     sessions.read.VALIDATOR_ROLE(),
     vault.read.WITHDRAWER_ROLE(),
   ]);
@@ -162,13 +173,26 @@ const prepareContracts = async ({
     ]);
   }
 
-  return { orderLib, sessions, vault, depositDex, eveDex, marginCalculator, oracle, pythMock, markPriceOracle };
+  return {
+    orderLib,
+    sessions,
+    vault,
+    depositDex,
+    dexViewer,
+    eveDex,
+    marginCalculator,
+    oracle,
+    pythMock,
+    markPriceOracle,
+  };
 };
 
 const populateDefaults = (config) => {
   if (!config.eveDexConfig) {
     config.eveDexConfig = {
       maxOpenPositions: 128,
+      allowedOverloadTPSL: PRECISION_DECIMALS_EVEDEX,
+      maxMatcherFee: (5n * PRECISION_DECIMALS_EVEDEX) / 100n,
       soLevel: 0.8 * EVEDEX_MARGIN_PRECISION,
       withdrawMarginLevel: 1 * EVEDEX_MARGIN_PRECISION,
       liquidationFeePercent: 0,
@@ -217,6 +241,8 @@ const populateDefaults = (config) => {
 /**
  * @typedef {Object} EveDexConfig
  * @property {number|bigint} maxOpenPositions - The maximum number of open positions allowed.
+ * @property {number|bigint} allowedOverloadTPSL - The percentage of position that is allowed to be switched in side vy TPSL order.
+ * @property {number|bigint} maxMatcherFee - The global constant limit of matcher fee.
  * @property {number}        soLevel          - The stop-out level (expressed as a fraction of the margin precision).
  * @property {number}        withdrawMarginLevel - The margin level required to withdraw.
  * @property {number}        liquidationFeePercent - The fee percentage charged upon liquidation.
@@ -319,22 +345,32 @@ const generateSuit = async (id, config = {}) => {
     staticFundingRateAccount,
     matcher,
   ]);
-  const { orderLib, sessions, vault, depositDex, eveDex, marginCalculator, pythMock, oracle, markPriceOracle } =
-    await prepareContracts({
-      owner,
-      matcher,
-      usdtToken,
-      btcToken,
-      fundingRateAccount,
-      staticFundingRateAccount,
-      markPriceOracleOperator,
-      oracleConfig: config.oracleConfig,
-      markPriceOracleConfig: config.markPriceOracleConfig,
-      eveDexConfig: config.eveDexConfig,
-      initInstrumentConfigs: config.initInstrumentConfigs,
-      initMarginCalcConfig: config.initMarginCalcConfig,
-      initStaticFr: config.initStaticFr,
-    });
+  const {
+    orderLib,
+    sessions,
+    vault,
+    depositDex,
+    dexViewer,
+    eveDex,
+    marginCalculator,
+    pythMock,
+    oracle,
+    markPriceOracle,
+  } = await prepareContracts({
+    owner,
+    matcher,
+    usdtToken,
+    btcToken,
+    fundingRateAccount,
+    staticFundingRateAccount,
+    markPriceOracleOperator,
+    oracleConfig: config.oracleConfig,
+    markPriceOracleConfig: config.markPriceOracleConfig,
+    eveDexConfig: config.eveDexConfig,
+    initInstrumentConfigs: config.initInstrumentConfigs,
+    initMarginCalcConfig: config.initMarginCalcConfig,
+    initStaticFr: config.initStaticFr,
+  });
   suits[id] = {
     owner,
     alice,
@@ -351,6 +387,7 @@ const generateSuit = async (id, config = {}) => {
     sessions,
     vault,
     depositDex,
+    dexViewer,
     eveDex,
     aliceSessionWallet,
     bobSessionWallet,

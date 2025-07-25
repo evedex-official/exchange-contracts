@@ -3,6 +3,7 @@ pragma solidity ^0.8.21;
 
 import {IDepositDEX} from "./IDepositDEX.sol";
 import {IMarginCalc} from "./IMarginCalc.sol";
+import {IMarkPriceOracle} from "./IMarkPriceOracle.sol";
 import {ISessionManager} from "./ISessionManager.sol";
 
 struct FundingRateInfo {
@@ -11,13 +12,8 @@ struct FundingRateInfo {
   int72 staticFr; // Static percentage of funding rate
 }
 
-struct InstrumentData {
-  uint8 leverage; // Max available leverage
-  string ticker; // Ticker of underlying asset
-}
-
 struct InstrumentInfo {
-  uint8 leverage; // Max available leverage
+  uint16 leverage; // Max available leverage
   string ticker; // Ticker of underlying asset
   uint256[] historyTimestamps;
   mapping(uint256 timestamp => FundingRateInfo fundingRate) fundingRateData;
@@ -31,13 +27,15 @@ struct BasicParams {
   address staticFundingRateAccount;
   address markPriceOracle;
   uint256 maxOpenPositions;
+  uint256 allowedOverloadTPSL;
+  uint256 maxMatcherFee;
   int112 soLevel;
   int112 withdrawMarginLevel;
-  uint112 liquidationFeePercent;
+  int112 liquidationFeePercent;
 }
 
 interface IBaseDEX {
-  event InstrumentUpdate(uint256 indexed index, string ticker, uint8 leverage);
+  event InstrumentUpdate(uint256 indexed index, string ticker, uint16 leverage);
   event NewFundingRate(
     uint256 indexed index,
     int72 longFRStored,
@@ -54,8 +52,6 @@ interface IBaseDEX {
   error InvalidIndex();
   error InvalidPositionsRequest(uint256);
 
-  function getInstrumentData(uint256 index) external view returns (InstrumentData memory);
-
   function getFundingRateData(
     uint256 index,
     uint256 start,
@@ -69,7 +65,7 @@ interface IBaseDEX {
   function changeInstrument(
     uint256 index,
     string calldata ticker,
-    uint8 leverage,
+    uint16 leverage,
     int72 newFRLong,
     int72 newFRShort,
     uint72 newStaticFR,

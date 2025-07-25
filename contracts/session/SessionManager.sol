@@ -3,7 +3,7 @@ pragma solidity 0.8.27;
 
 import {AccessControlEnumerable} from "@openzeppelin/contracts/access/extensions/AccessControlEnumerable.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import {Order, OrderWithdrawal} from "../lib/OrderValidationLib.sol";
+import {Order, WithdrawalOrder} from "../lib/OrderValidationLib.sol";
 import "../interfaces/ISessionManager.sol";
 
 contract SessionManager is ISessionManager, AccessControlEnumerable {
@@ -137,7 +137,7 @@ contract SessionManager is ISessionManager, AccessControlEnumerable {
   }
 
   /// @inheritdoc ISessionManager
-  function validateWithdrawalOrder(OrderWithdrawal calldata order) external onlyRole(VALIDATOR_ROLE) returns (address) {
+  function validateWithdrawalOrder(WithdrawalOrder calldata order) external onlyRole(VALIDATOR_ROLE) returns (address) {
     address user = order.account;
     address session = order.session;
     if (session == address(0)) revert ZeroAddress();
@@ -151,7 +151,7 @@ contract SessionManager is ISessionManager, AccessControlEnumerable {
   }
 
   /// @inheritdoc ISessionManager
-  function validateWithdrawalOrderView(OrderWithdrawal calldata order) external view returns (address) {
+  function validateWithdrawalOrderView(WithdrawalOrder calldata order) external view returns (address) {
     address session = order.session;
     if (session == address(0)) revert ZeroAddress();
 
@@ -194,7 +194,7 @@ contract SessionManager is ISessionManager, AccessControlEnumerable {
     }
   }
 
-  function _checkWithdrawals(OrderWithdrawal calldata order, address session) internal {
+  function _checkWithdrawals(WithdrawalOrder calldata order, address session) internal {
     SessionData storage data = _sessionData[session];
     if (data.values.limitWithdrawals) {
       uint256 allowed = data.withdrawalsAllowed.get(order.collateral);
@@ -209,7 +209,7 @@ contract SessionManager is ISessionManager, AccessControlEnumerable {
     }
   }
 
-  function _checkWithdrawalsView(OrderWithdrawal calldata order, address session) internal view {
+  function _checkWithdrawalsView(WithdrawalOrder calldata order, address session) internal view {
     SessionData storage data = _sessionData[session];
     (, uint256 allowed) = data.withdrawalsAllowed.tryGet(order.collateral);
     if (data.values.limitWithdrawals && allowed < order.amount) {

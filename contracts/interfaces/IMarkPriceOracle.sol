@@ -97,7 +97,7 @@ interface IMarkPriceOracle {
     uint256 index,
     uint256 timestamp,
     uint256 searchHint
-  ) external view returns (uint256 price);
+  ) external view returns (int256 price);
 
   /// @notice Get timestamps historical data for given instrument.
   /// @param index Instrument index to request data for.

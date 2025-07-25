@@ -11,8 +11,8 @@ struct Order {
   uint256 instrumentIndex;
   uint256 amount;
   uint256 price;
+  bool limited;
   uint16 leverage;
-  uint256 matcherFee;
   uint256 creationTime;
   uint8 side;
   address userSession;
@@ -60,7 +60,7 @@ struct AdlOrderLiquidation {
   uint16 leverageToLiquidate;
 }
 
-struct OrderWithdrawal {
+struct WithdrawalOrder {
   address collateral;
   address account;
   uint256 amount;
@@ -94,7 +94,7 @@ library OrderValidationLib {
 
   bytes32 public constant ORDER_TYPEHASH =
     keccak256(
-      "Order(uint256 orderId,address senderAddress,address matcherAddress,uint256 instrumentIndex,uint256 amount,uint256 price,uint16 leverage,uint256 matcherFee,uint256 creationTime,uint8 side)"
+      "Order(uint256 orderId,address senderAddress,address matcherAddress,uint256 instrumentIndex,uint256 amount,uint256 price,bool limited,uint16 leverage,uint256 creationTime,uint8 side)"
     );
 
   bytes32 public constant MULTI_ORDER_TYPEHASH = keccak256("MultiOrder(bytes32 merkleRoot)");
@@ -114,7 +114,7 @@ library OrderValidationLib {
   bytes32 public constant WITHDRAWAL_ORDER_TYPEHASH =
     keccak256("OrderWithdrawal(address collateral,address account,uint256 amount,address session,uint256 expiration)");
 
-  function _getOrderTypeValueHash(Order memory _order) internal pure returns (bytes32) {
+  function _getOrderTypeValueHash(Order calldata _order) internal pure returns (bytes32) {
     return
       keccak256(
         abi.encode(
@@ -125,30 +125,16 @@ library OrderValidationLib {
           _order.instrumentIndex,
           _order.amount,
           _order.price,
+          _order.limited,
           _order.leverage,
-          _order.matcherFee,
           _order.creationTime,
           _order.side
         )
       );
   }
 
-  function _getOrderHash(Order memory _order) internal pure returns (bytes32) {
-    return
-      keccak256(
-        abi.encode(
-          ORDER_TYPEHASH,
-          _order.orderId,
-          _order.senderAddress,
-          _order.matcherAddress,
-          _order.instrumentIndex,
-          _order.amount,
-          _order.price,
-          _order.matcherFee,
-          _order.creationTime,
-          _order.side
-        )
-      );
+  function _getOrderHash(Order calldata _order) internal pure returns (bytes32) {
+    return keccak256(abi.encode(_order.orderId, _order.senderAddress));
   }
 
   function _getSettlementHash(
@@ -160,10 +146,20 @@ library OrderValidationLib {
     uint256 timestamp
   ) internal pure returns (bytes32) {
     (orderA, orderB) = side == 0 ? (orderA, orderB) : (orderB, orderA);
+    return _getSortedSettlementHash(orderA, orderB, amount, price, timestamp);
+  }
+
+  function _getSortedSettlementHash(
+    bytes32 orderA,
+    bytes32 orderB,
+    uint256 amount,
+    uint256 price,
+    uint256 timestamp
+  ) internal pure returns (bytes32) {
     return keccak256(abi.encode(orderA, orderB, amount, price, timestamp));
   }
 
-  function _getMultiOrderTypeValueHash(Order memory _order) internal pure returns (bytes32) {
+  function _getMultiOrderTypeValueHash(Order calldata _order) internal pure returns (bytes32) {
     return keccak256(abi.encode(MULTI_ORDER_TYPEHASH, _order.merkleRoot));
   }
 
@@ -222,7 +218,7 @@ library OrderValidationLib {
       );
   }
 
-  function _getWithdrawalOrderTypeValueHash(OrderWithdrawal memory _withdrawalOrder) internal pure returns (bytes32) {
+  function _getWithdrawalOrderTypeValueHash(WithdrawalOrder calldata _withdrawalOrder) internal pure returns (bytes32) {
     return
       keccak256(
         abi.encode(
@@ -236,11 +232,11 @@ library OrderValidationLib {
       );
   }
 
-  function getOrderDigest(Order memory order) public view returns (bytes32) {
+  function getOrderDigest(Order calldata order) public view returns (bytes32) {
     return keccak256(abi.encodePacked("\x19\x01", buildDomainSeparator(), _getOrderTypeValueHash(order)));
   }
 
-  function getMultiOrderDigest(Order memory order) public view returns (bytes32, bytes32) {
+  function getMultiOrderDigest(Order calldata order) public view returns (bytes32, bytes32) {
     bytes32 digest = keccak256(
       abi.encodePacked("\x19\x01", buildDomainSeparator(), _getMultiOrderTypeValueHash(order))
     );
@@ -252,15 +248,15 @@ library OrderValidationLib {
     if (future < past) revert InvalidTimeline();
   }
 
-  function _checkSignature(address signer, bytes32 digest, bytes memory signature) internal view {
+  function _checkSignature(address signer, bytes32 digest, bytes calldata signature) internal view {
     if (!SignatureChecker.isValidSignatureNow(signer, digest, signature)) revert InvalidSignature();
   }
 
-  function _checkMerkleTree(bytes32[] memory proof, bytes32 root, bytes32 leaf) internal pure {
+  function _checkMerkleTree(bytes32[] calldata proof, bytes32 root, bytes32 leaf) internal pure {
     if (!MerkleProof.verify(proof, root, leaf)) revert InvalidMerkleTree();
   }
 
-  function checkLiquidationOrder(OrderLiquidation memory liquidationOrder, uint256 historyTimestamp) external view {
+  function checkLiquidationOrder(OrderLiquidation calldata liquidationOrder, uint256 historyTimestamp) external view {
     _checkTimeline(historyTimestamp, liquidationOrder.expiration);
     bytes32 digest = keccak256(
       abi.encodePacked("\x19\x01", buildDomainSeparator(), _getLiquidationOrderTypeValueHash(liquidationOrder))
@@ -269,7 +265,7 @@ library OrderValidationLib {
   }
 
   function checkLiquidationOrder(
-    MultiOrderLiquidation memory liquidationOrder,
+    MultiOrderLiquidation calldata liquidationOrder,
     uint256 historyTimestamp
   ) external view {
     _checkTimeline(historyTimestamp, liquidationOrder.expiration);
@@ -279,7 +275,7 @@ library OrderValidationLib {
     _checkSignature(liquidationOrder.liquidator, digest, liquidationOrder.signature);
   }
 
-  function checkWithdrawalOrder(OrderWithdrawal memory withdrawalOrder, address orderSigner) external view {
+  function checkWithdrawalOrder(WithdrawalOrder calldata withdrawalOrder, address orderSigner) external view {
     _checkTimeline(block.timestamp, withdrawalOrder.expiration);
     bytes32 digest = keccak256(
       abi.encodePacked("\x19\x01", buildDomainSeparator(), _getWithdrawalOrderTypeValueHash(withdrawalOrder))
@@ -287,61 +283,14 @@ library OrderValidationLib {
     _checkSignature(orderSigner, digest, withdrawalOrder.signature);
   }
 
-  function checkOrdersInfo(
-    Order memory buyOrder,
-    Order memory sellOrder,
-    address buyOrderSigner,
-    address sellOrderSigner,
-    address sender,
-    uint256 filledAmount,
-    uint256 filledPrice,
-    address allowedMatcher,
-    uint256 instrumentsLength,
-    uint256 historyTimestamp
-  ) external view returns (bytes32 buyOrderDigest, bytes32 sellOrderDigest) {
-    _checkTimeline(buyOrder.creationTime, historyTimestamp);
-    _checkTimeline(sellOrder.creationTime, historyTimestamp);
-
-    if (buyOrder.merkleRoot != 0x00) {
-      bytes32 buyOrderLeaf;
-      (buyOrderDigest, buyOrderLeaf) = getMultiOrderDigest(buyOrder);
-      _checkMerkleTree(buyOrder.merkleProof, buyOrder.merkleRoot, buyOrderLeaf);
-    } else {
-      buyOrderDigest = getOrderDigest(buyOrder);
-    }
-
-    if (sellOrder.merkleRoot != 0x00) {
-      bytes32 sellOrderLeaf;
-      (sellOrderDigest, sellOrderLeaf) = getMultiOrderDigest(sellOrder);
-      _checkMerkleTree(sellOrder.merkleProof, sellOrder.merkleRoot, sellOrderLeaf);
-    } else {
-      sellOrderDigest = getOrderDigest(sellOrder);
-    }
-
-    _checkSignature(buyOrderSigner, buyOrderDigest, buyOrder.signature);
-    _checkSignature(sellOrderSigner, sellOrderDigest, sellOrder.signature);
-
-    if (buyOrder.instrumentIndex != sellOrder.instrumentIndex) revert DifferentInstruments();
-    if (instrumentsLength <= buyOrder.instrumentIndex) revert InstrumentOutOfIndex();
-    if (!(buyOrder.matcherAddress == sender && sellOrder.matcherAddress == sender)) revert DifferentMatchers();
-    if (buyOrder.matcherAddress != allowedMatcher) revert InvalidMatcher();
-    if (filledAmount > buyOrder.amount || filledAmount > sellOrder.amount) revert InvalidAmount();
-    if (filledPrice > buyOrder.price || filledPrice < sellOrder.price) revert InvalidPrice();
-    if (buyOrder.side != 1 && sellOrder.side != 0) revert InvalidDealSide();
-    if (buyOrder.leverage == 0 || sellOrder.leverage == 0) revert InvalidLeverage();
-    buyOrderDigest = _getOrderHash(buyOrder);
-    sellOrderDigest = _getOrderHash(sellOrder);
-  }
-
   function checkOrderInfo(
-    Order memory fillingOrder,
-    Order memory complimentaryOrder,
+    Order calldata fillingOrder,
+    Order calldata complimentaryOrder,
     address fillingOrderSigner,
     address complimentaryOrderSigner,
     address sender,
     uint256 filledAmount,
     uint256 filledPrice,
-    address allowedMatcher,
     uint256 instrumentsLength,
     uint256 historyTimestamp
   ) external view returns (bytes32 fillingOrderDigest, bytes32 complimentaryOrderDigest, bytes32 settlementDigest) {
@@ -371,8 +320,10 @@ library OrderValidationLib {
     if (instrumentsLength <= fillingOrder.instrumentIndex) revert InstrumentOutOfIndex();
     if (!(fillingOrder.matcherAddress == sender && complimentaryOrder.matcherAddress == sender))
       revert DifferentMatchers();
-    if (fillingOrder.matcherAddress != allowedMatcher) revert InvalidMatcher();
-    if (filledAmount > fillingOrder.amount || filledAmount > complimentaryOrder.amount) revert InvalidAmount();
+    if (
+      (fillingOrder.limited && filledAmount > fillingOrder.amount) ||
+      (complimentaryOrder.limited && filledAmount > complimentaryOrder.amount)
+    ) revert InvalidAmount();
     (uint256 buyLimitPrice, uint256 sellLimitPrice) = fillingOrder.side == 1
       ? (fillingOrder.price, complimentaryOrder.price)
       : (complimentaryOrder.price, fillingOrder.price);

@@ -23,14 +23,10 @@ abstract contract BaseDEX is
   }
 
   function __BaseDEX_init(address initialOwner_, BasicParams calldata params_) internal onlyInitializing {
-    _setBasicParams(params_);
     __ReentrancyGuard_init();
     __AccessControlEnumerable_init();
     _grantRole(DEFAULT_ADMIN_ROLE, initialOwner_);
-  }
-
-  function getInstrumentData(uint256 index) external view returns (InstrumentData memory retVal) {
-    return InstrumentData(_instrumentInfo[index].leverage, _instrumentInfo[index].ticker);
+    _setBasicParams(params_);
   }
 
   function getFundingRateData(
@@ -53,55 +49,54 @@ abstract contract BaseDEX is
     return (fundingRates, startingTimestamps);
   }
 
-  function _getInstrumentLeverage(uint256 index) internal view returns (uint8) {
-    return _instrumentInfo[index].leverage;
-  }
-
-  function setBasicParams(BasicParams calldata params_) external onlyRole(DEFAULT_ADMIN_ROLE) {
+  function setBasicParams(BasicParams memory params_) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    params_.maxMatcherFee = _maxMatcherFee;
     _setBasicParams(params_);
   }
 
-  function _setBasicParams(BasicParams calldata params_) internal {
-    depositDex = params_.depositDex;
-    sessionManager = params_.sessionManager;
-    marginCalculator = params_.marginCalculator;
-    fundingRateAccount = params_.fundingRateAccount;
-    staticFundingRateAccount = params_.staticFundingRateAccount;
-    withdrawMarginLevel = params_.withdrawMarginLevel;
-    soLevel = params_.soLevel;
-    maxOpenPositions = params_.maxOpenPositions;
-    liquidationFeePercent = params_.liquidationFeePercent;
-    markPriceOracle = params_.markPriceOracle;
+  function _setBasicParams(BasicParams memory params_) internal {
+    _depositDex = params_.depositDex;
+    _sessionManager = params_.sessionManager;
+    _marginCalculator = params_.marginCalculator;
+    _fundingRateAccount = params_.fundingRateAccount;
+    _staticFundingRateAccount = params_.staticFundingRateAccount;
+    _withdrawMarginLevel = params_.withdrawMarginLevel;
+    _soLevel = params_.soLevel;
+    _maxOpenPositions = params_.maxOpenPositions;
+    _liquidationFeePercent = params_.liquidationFeePercent;
+    _markPriceOracle = IMarkPriceOracle(params_.markPriceOracle);
+    _allowedOverloadTPSL = int256(params_.allowedOverloadTPSL);
+    _maxMatcherFee = params_.maxMatcherFee;
     emit BasicParamsUpdate(params_);
   }
 
   function deleteInstrument() external onlyRole(DEFAULT_ADMIN_ROLE) {
-    InstrumentInfo storage instrument = _instrumentInfo[--instrumentsLength];
+    InstrumentInfo storage instrument = _instrumentInfo[--_instrumentsLength];
     delete instrument.leverage;
     delete instrument.ticker;
     delete instrument.historyTimestamps;
-    emit InstrumentDeleted(instrumentsLength);
+    emit InstrumentDeleted(_instrumentsLength);
   }
 
   function changeInstrument(
     uint256 index,
     string calldata ticker,
-    uint8 leverage,
+    uint16 leverage,
     int72 newFRLong,
     int72 newFRShort,
     uint72 newStaticFR,
     uint256 timestamp
   ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-    uint256 len = instrumentsLength;
+    uint256 len = _instrumentsLength;
     if (len < index) revert InvalidIndex();
-    if (len == index) instrumentsLength = len + 1;
+    if (len == index) _instrumentsLength = len + 1;
     _changeInstrument(index, ticker, leverage, newFRLong, newFRShort, newStaticFR, timestamp);
   }
 
   function _changeInstrument(
     uint256 index,
     string memory ticker,
-    uint8 leverage,
+    uint16 leverage,
     int72 newFRLong,
     int72 newFRShort,
     uint72 newStaticFR,
@@ -121,7 +116,7 @@ abstract contract BaseDEX is
     int72 newFRShort,
     uint72 newStaticFR,
     uint256 timestamp
-  ) external onlyRole(MATCHER_ROLE) {
+  ) external onlyRole(_MATCHER_ROLE) {
     _setFR(index, newFRLong, newFRShort, newStaticFR, timestamp);
   }
 
@@ -155,11 +150,11 @@ abstract contract BaseDEX is
   }
 
   function _getBalance(address account_, address collateral_) internal view returns (int256 balance) {
-    balance = IDepositDEX(depositDex).getBalance(account_, collateral_);
+    balance = _depositDex.getBalance(account_, collateral_);
   }
 
   function _setBalance(address account_, address collateral_, int256 balance_) internal {
-    IDepositDEX(depositDex).setBalance(account_, collateral_, balance_);
+    _depositDex.setBalance(account_, collateral_, balance_);
   }
 
   function _authorizeUpgrade(address newImplementation) internal override onlyRole(DEFAULT_ADMIN_ROLE) {}
